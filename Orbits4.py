@@ -305,15 +305,22 @@ class camera:
         # Get relative position to camera's position.
         radius = particle.radius
         relPosition = particle.pos - self.pos
-        relPosUnit = relPosition.multiply(1 / relPosition.getMag())
+        # relPosUnit = relPosition.multiply(1 / relPosition.getMag())
         relRotation = relPosUnit - self.rot
 
+        theta = self.rot.relAngle(relPosition)
         # Get angles in XZ, YZ, (XY?) planes
-        x1, y1, x2, y2 = 0, 0, 0, 0
+        # x1, y1, x2, y2 = 0, 0, 0, 0
         # centreAngleX = self.rot.relAngle(relPosUnit, [0, 2])
         # centreAngleY = self.rot.relAngle(relPosUnit, [1, 2])
         centreAngleX = acos((2 - relRotation.lock([0, 2]).getMag() ** 2) / 2)
         centreAngleY = acos((2 - relRotation.lock([1, 2]).getMag() ** 2) / 2)
+
+        rp = particle.radius
+        SD = self.screenDepth
+        CP = relPosition
+        a = SD * (2 * rp * (abs(CP)**2 - rp**2)**(3/2) / (abs(CP)**4 * cos(theta)**2) - sin(theta)**2 * rp**2 / abs(CP)**2)
+
         # offset: angle either side of centre angle which is slightly distorted due to the 3d bulge of the sphere.
         if tan(centreAngleX) * self.screenDepth > screen.winfo_width() or tan(centreAngleY) * self.screenDepth > screen.winfo_width():
             return False
