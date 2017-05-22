@@ -494,11 +494,11 @@ class camera:
         relPosUnit = relPosition.multiply(1 / relPosition.getMag())
         relRotation = relPosUnit - self.rot
 
-        normal = vector([relPosOnScreen[0] - scrCent[2], relPosOnScreen[1], relPosOnScreen[2] + scrCent[0]])
-        R = scrCent - relPosOnScreen
-        X = normal.dot(R) / ScreenParticleDistance
-        PZ = normal.getClone().setMag(X)
-        CZ = relPosOnScreen + PZ
+        # normal = vector([relPosOnScreen[0] - scrCent[2], relPosOnScreen[1], relPosOnScreen[2] + scrCent[0]])
+        # R = scrCent - relPosOnScreen
+        # X = normal.dot(R) / ScreenParticleDistance
+        # PZ = normal.getClone().setMag(X)
+        # CZ = relPosOnScreen + PZ
         print("R   :", R)
         print("X   :", X)
         print("PZ  :", PZ)
@@ -506,29 +506,13 @@ class camera:
         print("|CZ|:", CZ.getMag())
         Y = sqrt(CZ.getMag() ** 2 - self.screenDepth ** 2)
 
-        # re = self.rot.elements
-        # rp = relPosOnScreen.elements
-        # r = relPosOnScreen
-        # rm = self.rot.getMag()
-        # rpm = relPosOnScreen.getMag() # Just done to shorten the line
+        rp = particle.radius
+        SD = self.screenDepth
+        CP = relPosition
+        majorAxis = SD * (2 * rp * (abs(CP)**2 - rp**2)**(3/2) / (abs(CP)**4 * cos(theta)**2) - sin(theta)**2 * rp**2 / abs(CP)**2)
 
-        # print("relPosOnScreen: {}, mag: {}".format(rp, rpm))
-        # print("ScreenParticleDistance: {}".format(ScreenParticleDistance))
-        # alpha = acos(re[1])
-        # beta = acos(rp[1] / rpm)
-        # delta = self.rot.relAngle(r, plane = [0, 2])
-        # prin += "Alpha, beta, delta: {}, {}, {}".format(alpha, beta, delta) + "\n"
-        # # print(delta - (atan(self.rot.elements[2]/self.rot.elements[0]) - atan(r.elements[2]/r.elements[0]))) # It checks out
-        # a = sd / sin(alpha)
-        # d = a / cos(delta)
-        # c = sqrt(a ** 2 + d **2 - 2 * a * d * cos(delta))
-        # if (delta < 0): c *= -1
-        # e = sqrt(d ** 2 + ScreenParticleDistance ** 2 - 2 * d * ScreenParticleDistance * sin(beta))
-        # y = a * tan(alpha)
-        # f = sqrt(y ** 2 + d ** 2)
-        # g = sqrt(y ** 2 + a ** 2)
-        # X = c * (f - e) / f
-        # Y = g - (c + g * (f - e) / f)
+
+
 
 
         centreAngleX = acos((2 - relRotation.lock([0, 2]).getMag() ** 2) / 2)
