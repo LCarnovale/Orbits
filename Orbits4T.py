@@ -510,7 +510,7 @@ class camera:
         SD = self.screenDepth
         CP = relPosition
         majorAxis = SD * (2 * rp * (abs(CP)**2 - rp**2)**(3/2) / (abs(CP)**4 * cos(theta)**2) - sin(theta)**2 * rp**2 / abs(CP)**2)
-
+        minorAxis = SD * 2 * rp / (CP**2 - rp**2)**(1/2)
 
 
 
@@ -534,8 +534,8 @@ class camera:
             return False
 
         # Major axis = 2 * (sqrt(x^2 + y^2) - screenDepth * tan(atan(sqrt(x^2 + y^2)/screenDepth) - offset))
-        majorAxis = 2 * (sqrt(X ** 2 + Y ** 2) - self.screenDepth * tan(atan(sqrt(X ** 2 + Y ** 2)/self.screenDepth) - offset))
-        minorAxis = 2 * self.screenDepth * tan(offset)
+        # majorAxis = 2 * (sqrt(X ** 2 + Y ** 2) - self.screenDepth * tan(atan(sqrt(X ** 2 + Y ** 2)/self.screenDepth) - offset))
+        # minorAxis = 2 * self.screenDepth * tan(offset)
         if X != 0:
             angle = atan(Y / X)
         elif X == 0 and Y == 0:
