@@ -499,18 +499,27 @@ class camera:
         # X = normal.dot(R) / ScreenParticleDistance
         # PZ = normal.getClone().setMag(X)
         # CZ = relPosOnScreen + PZ
-        print("R   :", R)
-        print("X   :", X)
-        print("PZ  :", PZ)
-        print("CZ  :", CZ)
-        print("|CZ|:", CZ.getMag())
-        Y = sqrt(CZ.getMag() ** 2 - self.screenDepth ** 2)
-
+        # print("R   :", R)
+        # print("X   :", X)
+        # print("PZ  :", PZ)
+        # print("CZ  :", CZ)
+        # print("|CZ|:", CZ.getMag())
+        # Y = sqrt(CZ.getMag() ** 2 - self.screenDepth ** 2)
         rp = particle.radius
         SD = self.screenDepth
         CP = relPosition
+        theta = (CP.dot(self.rot) / abs(CP))
+
+        x_r, y_r, z_r = self.rot.elements
+        x_P, y_P, z_P = pos.elements
+        x_C, y_C, z_C = self.pos.elements
+        X = ((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) * (-z_P + z_C) + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) * (x_P - x_C)) * ((-z_P + z_C) ** 2 + (x_P - x_C) ** 2) ** (-1 / 2)
+        Y = sqrt((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) ** 2 + (SD * y_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (y_P - y_C)) ** 2 + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) ** 2 - ((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) * (-z_P + z_C) + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) * (x_P - x_C)) ** 2 / ((-z_P + z_C) ** 2 + (x_P - x_C) ** 2))
+
+
+
         majorAxis = SD * (2 * rp * (abs(CP)**2 - rp**2)**(3/2) / (abs(CP)**4 * cos(theta)**2) - sin(theta)**2 * rp**2 / abs(CP)**2)
-        minorAxis = SD * 2 * rp / (CP**2 - rp**2)**(1/2)
+        minorAxis = SD * 2 * rp / (abs(CP)**2 - rp**2)**(1/2)
 
 
 
