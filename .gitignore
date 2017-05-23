@@ -47,8 +47,14 @@ Temporary Items
 .apdisk
 *.PNG
 maths/Fig3.ggb
-*.pdf
 maths/Fig3.svg
+maths/Fig1.pdf
+maths/Fig2.pdf
+maths/Fig3.pdf
+maths/Fig4.pdf
+maths/Fig5.pdf
+
+
 *.ggb
 maths/Projection.synctex.gz
 Orbits3.5.py
