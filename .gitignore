@@ -45,3 +45,9 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+*.PNG
+maths/Fig3.ggb
+*.pdf
+maths/Fig3.svg
+*.ggb
+maths/Projection.synctex.gz

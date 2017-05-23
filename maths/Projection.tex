@@ -1,0 +1,242 @@
+\documentclass{article}
+
+\usepackage{graphicx}
+\usepackage{amsmath, amsfonts, amsthm, amssymb}
+\usepackage{xspace}
+\usepackage{tikz}
+\usepackage{float}
+\usepackage{multicol}
+
+\newcommand\dd{{2-Dimensional}\xspace}
+\newcommand\ddd{{3-Dimensional}\xspace}
+\newcommand\ru{\hat{\mathbf{r}}\xspace}
+%\newcommand\rv{\hat{\mathbf{r}}\xspace}
+\newcommand\cpv{\overrightarrow{CP}\xspace}
+
+\newcommand\sina{2 r_p\frac{\sqrt{\left|\cpv\right|^2 - r_p^2}}{\left|\cpv\right|^2}}
+\newcommand\cosa{ \frac{\left|\cpv\right|^2 - 2 r_p^2}{\left|\cpv\right|^2}}
+\newcommand\sinah{\frac{r_p}{\left|\cpv\right|}}
+\newcommand\cosah{\frac{\sqrt{\left|\cpv\right|^2 - r_p^2}}{\left|\cpv\right|}}
+
+\newcommand\dprod[2]{\frac{#1 \cdot #2}{\left|#2\right|^2} #2}
+
+\title{Projecting Spherical Objects onto a 2-Dimensional plane within 3-Dimensional Space}
+
+
+\date{}
+\begin{document}
+\maketitle
+\section{Scenario}
+
+	\subsection{Introduction}
+	Consider \ddd space containing objects we will define as spheres of any size. Within this space, we will have a point of 
+	observation, called the camera. The camera itself is a singular point, however at a fixed distance from the camera, in a direction given by a
+	unit vector $\ru$ , is a \dd plane 
+	representing the screen of the computer running the simulation. The location of the camera and each object will be given as a vector:
+	$$P = \begin{pmatrix}x_P\\y_P\\z_P\end{pmatrix}, C = \begin{pmatrix}x_C\\y_C\\z_C\end{pmatrix}, \hat{\mathbf{r}} = \begin{pmatrix}x_r\\y_r\\z_r\end{pmatrix}:|\ru|=1$$
+%	Likewise, the position of an object in space will be given as:
+	
+
+	In Figure 1 below, the line perpendicular to the plane through C is parallel to $\ru$, and the distance from the camera to the screen will be
+	defined as $S_d$.
+	\subsection{Projecting spheres onto a plane}
+	Projecting a spherical object onto a \dd plane, if the plane is not perpendicular to the vector between the camera and the object, 
+	will produce a conic section, ie, an ellipse. This is essentially the definition of a conic section, the intersection of a \dd plane and a cone 
+	extending from the camera at $C$ to the object at $P$, made up of the tangents that join them. See figure 1 for a visualisation.
+	Such an ellipse will have certain properties, such always being aligned so that the line through the major axis passes through the centre of 
+	the screen, meaning there are three unknowns:
+	\begin{itemize}
+		\item The length of the minor axis
+		\item The length of the major axis
+		\item The $x$ and $y$ position of the object \textit{on the screen}
+	\end{itemize}
+	
+	\begin{figure}
+		\includegraphics[width = 12cm]{Fig1.PNG}
+		\caption{Projection of a sphere onto a \dd plane.}
+		\includegraphics[width = 12cm]{Fig2.PNG}
+		\caption{View of the ellipse looking onto the plane (from underneath)}
+	\end{figure}
+
+	\paragraph{}
+	In Figure 1, the plane shown by the grid represents the screen, the red sphere and the blue dot at $C$ correspond to the object in space and 
+	the camera, also in space, respectively. It is clear how the projection of the sphere onto the plane would produce a conic section, and it is 
+	worth noting that if an observer were to observe this ellipse fom $C$, the ellipse would appear to be a circle. In the example shown in the 
+	figure, the object is so far from the centre of the screen (marked by $S_C$) relative to the distance of the camera from the screen that the 
+	projection would place the ellipse well outside the physical bounds of the screen, and in reality the eccentricity of the projections would be very 	low. 
+	\paragraph{}
+	Figure 2 shows what the projection would look like on the screen, as it would appear looking perpendicular towards the plane from 	
+	underneath it. The perpendicular lines are shown for reference.
+	
+
+\section{Finding the Shape of the Ellipse Using Geometry}
+	Calculating the lengths of the major and minor axis of the projection is fairly simple, and involves a bit of trigonometry. 
+	\subsection{Finding the Length of the Major Axis}
+	As the major axis is aligned with the origin - the centre of the screen - there is no use in breaking the problem into $x$ and $y$ 
+	components, it is better to look at a cross sectional diagram parrallel with the major axis, as shown in Figure 3. 
+	In the diagram, the displacement vector $\overrightarrow{CP}$, the vector $\hat{\mathbf{r}}$, the length of $CS_C$ and the radius of the 
+	particle $r_p$ are the only known variables. The angle $\theta$ is going to be the angle between $\ru$ and $\cpv$. 
+	\begin{figure}
+		\includegraphics[width = 12cm]{Fig3.pdf}
+		\caption{Diagram of the projection of a circle onto a line, in this case, the red line $a$ is equivalent to the major axis in the \ddd case.}
+	\end{figure} 
+%	\paragraph{}
+	Thus, to find theta, we use the dot product of the two vectors:
+	$$
+	\ru \cdot \cpv = |\ru| |\cpv| \cos{\theta} $$ $$
+	\cos{\theta} = \frac{\ru \cdot \cpv}{|\ru||\cpv|}
+	$$
+	\begin{equation}
+		\cos{\theta} = \frac{\ru \cdot \cpv}{|\cpv|}
+	\end{equation}
+%	\paragraph{}
+	Since $\ru$ is defined to have a length of 1. Then,
+	$$\cos{\theta} = \frac{S_D}{|CS_P|} $$
+	\begin{equation}
+		\left|C S_P\right| = \frac{S_D}{\cos{\theta}}
+	\end{equation}
+	\paragraph{}
+	Thus we now know both the angle of the particle from the centre of the screen and the distance from the origin of the camera to the 
+	projection. This will allow us to also calculate $|S_C S_P|$, the distance from the centre of screen to the centre 
+	of the projection, although isn't needed for this part of the problem, but will be used later on.
+
+	$$\left| \overrightarrow{S_C S_P} \right| =\sqrt{ \left|C S_P\right|^2 - S_D ^2}$$
+
+	\paragraph{} 
+	Now, to find the length of $a$, we will also need the angle $\alpha$, which is the angle between the two tangents joining the circle at $P$ 
+	to the camera at $C$. This is found using the right angled triangles on either side of $\cpv$.
+	$$\sin\left(\frac{\alpha}{2}\right)  = \frac{r_p}{\left|\cpv\right|},\text{   } \cos{\left(\frac{\alpha}{2}\right)} = \frac{\sqrt{\left|\cpv\right|^2 - r_p^2}}{\left|\cpv\right|} $$
+	\pagebreak
+	\begin{multicols}{2}
+	\begin{align*}
+		\cos{\alpha} & = \cos^2{\frac{\alpha}{2}} -  \sin^2{\frac{\alpha}{2}}\\
+					& = \frac{\left|\cpv\right|^2 - r_p^2}{\left|\cpv\right|^2} - \frac{r_p^2}{\left|\cpv\right|^2}\\
+					& = \frac{\left|\cpv\right|^2 - 2 r_p^2}{\left|\cpv\right|^2}
+	\end{align*}
+	\columnbreak
+	\begin{align*}
+		\sin{\alpha} & = 2 \sin{\frac{\alpha}{2}} \cos{\frac{\alpha}{2}}\\
+					& = 2 r_p \frac{\sqrt{\left|\cpv\right|^2 - r_p^2}}{\left|\cpv\right|^2}
+	\end{align*}
+	\end{multicols}
+	\begin{multicols}{2}
+	\begin{equation}
+		\therefore \cos{\alpha} = \frac{\left|\cpv\right|^2 - 2 r_p^2}{\left|\cpv\right|^2}
+	\end{equation}
+	\columnbreak
+	\begin{equation}
+		\therefore \sin{\alpha} = 2 r_p\frac{\sqrt{\left|\cpv\right|^2 - r_p^2}}{\left|\cpv\right|^2}
+	\end{equation}
+	\end{multicols}
+	\paragraph{}
+	Now the length of $a$ can be calculated from the difference in the distance from $S_C$ to the closest tangent line and the furthest tangent 	line. In the following working, we will call those distances $d_1$ and $d_2$ for the shortest distance and longest distance respectively, 
+	such that $d_2 - d_1 = a$.
+	$$  d_2 =  \tan{\left(\theta + \frac{\alpha}{2}\right)} S_D $$
+	$$  d_1 =  \tan{\left(\theta - \frac{\alpha}{2}\right)} S_D $$
+	\begin{align*}
+		a = d_2 - d_1 & = S_D \left(\tan{\left(\theta + \frac{\alpha}{2}\right)} - \tan{\left(\theta - \frac{\alpha}{2}\right)} \right) \\
+		& = S_D\left(\frac{\sin{\left(\theta + \frac{\alpha}{2}\right)}}{\cos{\left(\theta + \frac{\alpha}{2}\right)}} 
+				    - \frac{\sin{\left(\theta - \frac{\alpha}{2}\right)}}{\cos{\left(\theta - \frac{\alpha}{2}\right)}}\right)    \\
+		& = S_D \frac{\sin{\alpha}}{\cos{\left(\theta + \frac{\alpha}{2}\right)} \cos{\left(\theta - \frac{\alpha}{2}\right)}} \\
+		& = S_D \frac{\sin{\alpha}}{\cos^2{\theta} \cos^2{\frac{\alpha}{2}} - \sin^2{\theta} \sin^2{\frac{\alpha}{2}}} \\
+	\end{align*}
+	All terrms of which are known. And so we have,
+	\begin{equation}
+		a =  S_D \frac{\sin{\alpha}}{\cos^2{\theta} \cos^2{\frac{\alpha}{2}} - \sin^2{\theta} \sin^2{\frac{\alpha}{2}}}
+	\end{equation}
+	There are other ways to find this length, some of them are probably easier. Expanding this to be in terms of the known variables gives:
+	\begin{equation*}
+		a = S_D  \left(\frac{2 r_p \left(\left|\cpv\right|^2-r_p^2\right)^{(3/2)}}{\left|\cpv\right|^4  \cos^2{\theta}}- 	
+		\frac{r^2 \sin^2{\theta}}{\left|\cpv\right|^2}\right)
+	\end{equation*}
+	Or as code:
+	\begin{verbatim}
+		a = SD * (2 * rp * (CP**2 - rp**2)**(3/2) / 
+		    (CP**4 * cos(theta)**2) - sin(theta)**2 * rp**2 / CP**2)
+	\end{verbatim}
+
+	\subsection{Finding the Length of the Minor Axis}
+	\paragraph{}	
+	Finding the length of the minor axis, $b$, is much simple than the major axis. The minor axis is orthogonal to the line joining the camera 
+	and the object, so methods like the ones used in the previous section won't be necessary. 
+	\begin{figure}[H]
+		\includegraphics[width = 14cm]{Fig4.pdf}
+		\caption{Diagram of the projection of a circle onto a plane where the red line represents the minor axis of the ellipse.}	
+	\end{figure}
+	\paragraph{}
+	From Figure 4:
+	\begin{align*}
+		\tan{\frac{\alpha}{2}} & = \frac{r_p}{\sqrt{\left|\cpv\right|^2 - r_p^2}} \\
+		b & = 2 S_D \tan{\frac{\alpha}{2}}
+	\end{align*}
+	\paragraph{}
+	And so we have:
+	\begin{equation}
+		b = S_D \frac{2 r_p}{\sqrt{\left|\cpv\right|^2 - r_p^2}}
+	\end{equation}
+	As code:
+	\begin{verbatim}
+		b = SD * 2 * rp / (CP**2 - rp**2)**(1/2)
+	\end{verbatim}•
+	Thus we have the major and minor axis of the ellipse. Now two of the three unknowns have been calculated, all that remains is to find the 	position of the ellipse on the screen.
+	
+\section{Finding the Position of the Ellipse on the Screen}
+	\subsection{Vector Geometry Tools}
+	To find the x and y component of the position on the screen, vector geometry is needed. The most important function we will use is the 
+	projection of one vector onto another. Defined as:
+	$$ \text{Proj}_{\mathbf{b}}\mathbf{a} = \frac{\mathbf{a} \cdot \mathbf{b}}{|\mathbf{b}|^2} \mathbf{b} $$
+	The result gives you the projection of $\mathbf{a}$ onto $\mathbf{b}$. When just distances are needed, we divide 
+	by the unit vector of $\mathbf{b}$, ie $\frac{\mathbf{b}}{|\mathbf{b}|}$ to get
+	$$ \left|\text{Proj}_\mathbf{b} \mathbf{a}\right| = \frac{\mathbf{a} \cdot \mathbf{b}}{|\mathbf{b}|} $$ 
+
+	Vector projection can infact be thought of to be defined as multiplying the above scalar value by the unit vector of the vector being projected onto.
+	First we need to find the vector orthogonal to both the position vector of the screen and the $y$-axis, which will be aligned with the screen.
+	This vector will be defined as: 
+%	\begin{multicols}{2}
+		$$ \mathbf{n} \parallel \cpv \times \begin{pmatrix}0\\1\\0\end{pmatrix} $$
+		$$= \begin{pmatrix}x_P - x_C\\y_P - y_C\\z_P - z_C \end{pmatrix} \times \begin{pmatrix}0\\1\\0\end{pmatrix} $$
+		
+		$$= \begin{pmatrix}z_C - z_P\\ 0 \\x_P - x_C \end{pmatrix} $$
+		\begin{equation}
+			\therefore \mathbf{n} = \lambda \begin{pmatrix}z_C - z_P\\ 0 \\x_P - x_C \end{pmatrix}
+		\end{equation}
+%	\end{multicols}
+	\paragraph{}
+	
+	\begin{figure}
+		\centering
+		\includegraphics[width = 12cm]{Fig5.pdf}
+		\caption{The triangle $Z S_C S_P$ lies on the plane of the screen, perpendicular to $\hat{\mathbf{r}}$. The point P will lie on any point on the ray through $\protect\overrightarrow{C S_P}$ represented by the dotted line.}
+	\end{figure}	
+
+
+	Now that we have the normal, we say that the vector $\overrightarrow{S_P Z}$ is simply the projection of $\overrightarrow{S_P S_C}$ 
+	onto $\mathbf{n}$. We then solve for the distance of that projection, being our x value:
+	$$\text{Proj}_{\mathbf{n}} {\overrightarrow{S_P S_C}} = \overrightarrow{S_P Z}$$
+	\begin{equation}
+	\left| \text{Proj}_{\mathbf{n}} {\overrightarrow{S_P S_C}} \right| = \left|\overrightarrow{S_P Z}\right| = x = \frac{
+		\overrightarrow{S_P S_C} \cdot \mathbf{n}}{
+		\left|\mathbf{n}\right|}
+	\end{equation}•
+	
+	Where $\overrightarrow{C S_P}$ is parallel to $\overrightarrow{CP}$ but with a modulus equal to $\left|CS_P\right|$, defined in equation (2) to be:
+	$$\left|C S_P\right| = \frac{S_D \left|\overrightarrow{CP}\right| }{ \hat{\mathbf{r}} \cdot \overrightarrow{CP}}$$
+ 	$$C S_P = \frac{\left|\overrightarrow{CP}\right|}{\left|S_P\right|} \overrightarrow{CP}$$
+	$$C S_P = \frac{\hat{\mathbf{r}} \cdot \overrightarrow{CP}}{S_D} \overrightarrow{CP} $$
+	$$C S_P = \frac{1}{S_D} \left( \begin{pmatrix}x_r\\y_r\\z_r\end{pmatrix} \cdot \begin{pmatrix}x_P-x_C\\y_P - y_C\\z_P - z_C 
+	\end{pmatrix} \right) \begin{pmatrix}x_P-x_C\\y_P - y_C\\z_P - z_C \end{pmatrix}
+	$$
+	And by definition,
+	$$ S_C = S_D \hat{\mathbf{r}}$$
+	Now we have enough information to find $x$. And, now that we know $x$, we can say that $x^2 + y^2 = \left|\overrightarrow{S_P 
+	S_C}\right|^2$, defined in section 2.1. Therefore,
+	\begin{align*}
+		y & = \sqrt{ \left|C S_P\right|^2 - {S_D} ^2 - x^2}\\
+		& = \sqrt{\frac{S_D \left|\overrightarrow{CP}\right| }{ \hat{\mathbf{r}} \cdot \overrightarrow{CP}} - {S_D}^2 - x^2}
+	\end{align*}
+			
+
+%\subsection{
+	
+
+\end{document}
