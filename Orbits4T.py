@@ -35,8 +35,8 @@ args = {#       \/
 "-g" :  [float, 500,    True],  # Gravitational constant
 "-w" :  [float, 500,    True],  # Window width
 "-h" :  [float, 600,    True],  # Window height
-"-pd":  [str,   False,  False,  True],
-"-sd":  [float, 500,    True]
+"-pd":  [str,   False,  False,  True], # Print data
+"-sd":  [float, 500,    True]   # Default screen depth
 }
 
 # "-d":[int, None, True],
@@ -175,13 +175,21 @@ def drawOval(x, y, major, minor, angle, fill = "black"):
 
     return True
 
-def drawLine(x2, y2 = (0, 0), x1 = 0, y1 = 0, fill = "black", width = 1):
-    if type(x2) == tuple or type(x2) == list:
-        # 1 or 2 points should have been provided
-        screen.create_line(x2[0], x2[1], y2[0], y2[1], fill = fill, width = width)
+def drawLine(pointA, pointB = None, fill = "black", width = 1):
+    if (pointB == None):
+        x1, y1 = (0, 0)
+        x2, y2 = pointA
     else:
-        # x and y should be numbers.
-        screen.create_line(x1, y1, x2, y2)
+        x1, y1 = pointA
+        x2, y2 = pointB
+
+    turtle.pencolor(fill)
+    turtle.up()
+    turtle.goto(x1, y1)
+    turtle.down()
+    turtle.goto(x2, y2)
+    turtle.up()
+
 
 
 class buffer:
@@ -251,6 +259,7 @@ class MainLoop:
         # I think it would be slightly more effecient to only do an if comparison once,
         # even if means a few lines are duplicated.
 
+        drawLine((-500, 0), (500, 0), fill = [1, 1, 1])
         if draw:
             for p in particleList:
                 p.step(delta)
@@ -507,8 +516,9 @@ class camera:
         # Y = sqrt(CZ.getMag() ** 2 - self.screenDepth ** 2)
         rp = particle.radius
         SD = self.screenDepth
-        CP = relPosition
-        theta = (CP.dot(self.rot) / abs(CP))
+        CP = pos - self.pos
+        theta = acos(CP.dot(self.rot) / abs(CP))
+
 
         x_r, y_r, z_r = self.rot.elements
         x_P, y_P, z_P = pos.elements
@@ -736,7 +746,7 @@ camera = camera()
 setup()
 Running = True
 for i in range(-5, 5):
-    particle(150, vector([150, 25, i * 50]))
+    particle(150, vector([150, 25 + DEFAULT_SCREEN_DEPTH, i * 50]))
 # particle(150, vector([223.43434, 266.12801, 157.37214]), vector([0, 0, 0]))
 
 while Running:
