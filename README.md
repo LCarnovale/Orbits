@@ -1,6 +1,6 @@
 # Orbits
 A 3D n-body simulator in Python.
-\\
+
 The latest version of Orbits (Orbits4) attempts to take particles in 3-dimensional space, and project them on to a plane in a separate location,
 representing the screen. The correct shape of a sphere projected onto a plane would be an ellipse, as it is a conic section, and that's 
 what I'm trying to create. It requires some nifty mathematics to work out the shape of the ellipse, aswell as the position of the ellipse on the screen. 
