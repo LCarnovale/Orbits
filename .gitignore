@@ -59,3 +59,6 @@ maths/Fig5.pdf
 maths/Projection.synctex.gz
 Orbits3.5.py
 Orbits3.py
+__pycache__/vector.cpython-36.pyc
+*.un~
+*.tex~

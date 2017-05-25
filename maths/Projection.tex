@@ -20,6 +20,9 @@
 
 \newcommand\dprod[2]{\frac{#1 \cdot #2}{\left|#2\right|^2} #2}
 
+\newcommand\xp{x\prime\xspace}
+\newcommand\yp{y\prime\xspace}
+
 \title{Projecting Spherical Objects onto a 2-Dimensional plane within 3-Dimensional Space}
 
 
@@ -140,7 +143,7 @@
 		& = S_D \frac{\sin{\alpha}}{\cos{\left(\theta + \frac{\alpha}{2}\right)} \cos{\left(\theta - \frac{\alpha}{2}\right)}} \\
 		& = S_D \frac{\sin{\alpha}}{\cos^2{\theta} \cos^2{\frac{\alpha}{2}} - \sin^2{\theta} \sin^2{\frac{\alpha}{2}}} \\
 	\end{align*}
-	All terrms of which are known. And so we have,
+	All terms of which are known. And so we have,
 	\begin{equation}
 		a =  S_D \frac{\sin{\alpha}}{\cos^2{\theta} \cos^2{\frac{\alpha}{2}} - \sin^2{\theta} \sin^2{\frac{\alpha}{2}}}
 	\end{equation}
@@ -181,7 +184,7 @@
 	Thus we have the major and minor axis of the ellipse. Now two of the three unknowns have been calculated, all that remains is to find the 	position of the ellipse on the screen.
 	
 \section{Finding the Position of the Ellipse on the Screen}
-	\subsection{Vector Geometry Tools}
+	\subsection{Vector Geometry}
 	To find the x and y component of the position on the screen, vector geometry is needed. The most important function we will use is the 
 	projection of one vector onto another. Defined as:
 	$$ \text{Proj}_{\mathbf{b}}\mathbf{a} = \frac{\mathbf{a} \cdot \mathbf{b}}{|\mathbf{b}|^2} \mathbf{b} $$
@@ -190,17 +193,31 @@
 	$$ \left|\text{Proj}_\mathbf{b} \mathbf{a}\right| = \frac{\mathbf{a} \cdot \mathbf{b}}{|\mathbf{b}|} $$ 
 
 	Vector projection can infact be thought of to be defined as multiplying the above scalar value by the unit vector of the vector being projected onto.
-	First we need to find the vector orthogonal to both the position vector of the screen and the $y$-axis, which will be aligned with the screen.
-	This vector will be defined as: 
-%	\begin{multicols}{2}
-		$$ \mathbf{n} \parallel \cpv \times \begin{pmatrix}0\\1\\0\end{pmatrix} $$
-		$$= \begin{pmatrix}x_P - x_C\\y_P - y_C\\z_P - z_C \end{pmatrix} \times \begin{pmatrix}0\\1\\0\end{pmatrix} $$
-		
-		$$= \begin{pmatrix}z_C - z_P\\ 0 \\x_P - x_C \end{pmatrix} $$
-		\begin{equation}
-			\therefore \mathbf{n} = \lambda \begin{pmatrix}z_C - z_P\\ 0 \\x_P - x_C \end{pmatrix}
-		\end{equation}
-%	\end{multicols}
+	\paragraph{}
+	To get the $x$ and $y$ components, consider two vectors $\yp$ and $\xp$, both parallel to the plane of the screen but:
+	\begin{itemize}
+		\item $\xp$ is parallel to the $x$-axis of the screen, meaning it is orthogonal to both the vector $\overrightarrow{C S_C}$ and the global $y$-axis.
+		\item $\yp$ is parallel to the $y$-axis of the screen, meaning it is orthogonal to both the vector $\overrightarrow{C S_C}$ and $\xp$.
+ 
+	\end{itemize}
+	The lengths of $\xp$ and $\yp$ are irrelevant, only their directions are important. Thus, from their definitions, 
+	\begin{align*}
+			\xp & = \overrightarrow{C S_C} \times \begin{pmatrix} 0\\1\\0 \end{pmatrix}\\
+			     & = S_D \begin{pmatrix}x_r\\y_r\\z_r\end{pmatrix} \times \begin{pmatrix} 0\\1\\0 \end{pmatrix}\\
+			    & = \begin{pmatrix} -S_D z_r\\ 0\\ S_D x_r \end{pmatrix}
+	\end{align*}
+	\begin{equation}
+		\therefore \xp = \begin{pmatrix} -z_r \\0 \\x_r\end{pmatrix} 
+	\end{equation}
+	And,
+	\begin{align*}
+		\yp & = \overrightarrow{C S_C} \times \xp \\
+		     & = S_D  \begin{pmatrix}x_r\\y_r\\z_r\end{pmatrix} \times \begin{pmatrix} -z_r\\ 0\\ x_r \end{pmatrix} \\
+		     & = S_D \begin{pmatrix} x_r y_r \\ -\left({x_r}^2 + {z_r}^2\right) \\ z_r y_r \end{pmatrix}
+	\end{align*}
+	\begin{equation}
+		\therefore \yp = \begin{pmatrix} x_r y_r \\ -\left({x_r}^2 + {z_r}^2\right) \\ z_r y_r \end{pmatrix}
+	\end{equation}
 	\paragraph{}
 	
 	\begin{figure}
@@ -209,15 +226,27 @@
 		\caption{The triangle $Z S_C S_P$ lies on the plane of the screen, perpendicular to $\hat{\mathbf{r}}$. The point P will lie on any point on the ray through $\protect\overrightarrow{C S_P}$ represented by the dotted line.}
 	\end{figure}	
 
+	\paragraph{}	
+	Now that we have the $x$ and $y$ axes of the screen, the $x$ and $y$ components of the position of particle are the respective lengths of the projection of $\overrightarrow{S_C S_P}$ onto $\xp$ and $\yp$. 
+	We recall $\overrightarrow{S_C S_P}$ to be:
+	\begin{align*}
+		\overrightarrow{S_C S_P} & = S_P - S_C \\
+		& = C S_P - C S_C \\
+		& = \frac{\left|\overrightarrow{CP}\right|}{\left|\overrightarrow{C S_P}\right|} \overrightarrow{CP} - S_D \hat{\mathbf{r}} 
+			& \left|\overrightarrow{C S_P}\right| \text{is defined in equation (2).} \\
+		& = 
+	\end{align*}
 
-	Now that we have the normal, we say that the vector $\overrightarrow{S_P Z}$ is simply the projection of $\overrightarrow{S_P S_C}$ 
-	onto $\mathbf{n}$. We then solve for the distance of that projection, being our x value:
-	$$\text{Proj}_{\mathbf{n}} {\overrightarrow{S_P S_C}} = \overrightarrow{S_P Z}$$
-	\begin{equation}
-	\left| \text{Proj}_{\mathbf{n}} {\overrightarrow{S_P S_C}} \right| = \left|\overrightarrow{S_P Z}\right| = x = \frac{
-		\overrightarrow{S_P S_C} \cdot \mathbf{n}}{
-		\left|\mathbf{n}\right|}
-	\end{equation}•
+
+
+%	Now that we have the normal, we say that the vector $\overrightarrow{S_P Z}$ is simply the projection of $\overrightarrow{S_P S_C}$ 
+%	onto $\mathbf{n}$. We then solve for the distance of that projection, being our x value:
+%	$$\text{Proj}_{\mathbf{n}} {\overrightarrow{S_P S_C}} = \overrightarrow{S_P Z}$$
+%	\begin{equation}
+%	\left| \text{Proj}_{\mathbf{n}} {\overrightarrow{S_P S_C}} \right| = \left|\overrightarrow{S_P Z}\right| = x = \frac{
+%		\overrightarrow{S_P S_C} \cdot \mathbf{n}}{
+%		\left|\mathbf{n}\right|}
+%	\end{equation}
 	
 	Where $\overrightarrow{C S_P}$ is parallel to $\overrightarrow{CP}$ but with a modulus equal to $\left|CS_P\right|$, defined in equation (2) to be:
 	$$\left|C S_P\right| = \frac{S_D \left|\overrightarrow{CP}\right| }{ \hat{\mathbf{r}} \cdot \overrightarrow{CP}}$$
