@@ -33,12 +33,13 @@ args = {#       \/
 "-p" :  [int,   0,      True], # preset
 "-sp":  [str,   False,  False,  True], # start paused
 "-ss":  [str,   False,  False,  True], # staggered simulation
-"-g" :  [float, 500,    True],  # Gravitational constant
+"-g" :  [float, 20,     True],  # Gravitational constant
 "-w" :  [float, 500,    True],  # Window width
 "-h" :  [float, 600,    True],  # Window height
 "-pd":  [str,   False,  False,  True], # Print data
-"-sd":  [float, 500,    True],  # Default screen depth
-"-ps":  [float, 1.0,    True]   # Maximum pan speed
+"-sd":  [float, 1500,   True],  # Default screen depth
+"-ps":  [float, 5.0,    True],  # Maximum pan speed
+"-rs":  [float, 0.1,    True]   # Rotational speed
 }
 
 # "-d":[int, None, True],
@@ -78,15 +79,15 @@ INITIAL_WINDOW_HEIGHT   = args["-h"][1]
 PRINT_DATA              = args["-pd"][1]
 DEFAULT_SCREEN_DEPTH    = args["-sd"][1]
 maxPan                  = args["-ps"][1]
-
+rotSpeed                = args["-rs"][1]
 
 AUTO_RATE_CONSTANT = 100                   #
 
 defaultDensity = 1
-radiusLimit = 50
+radiusLimit = 500
 voidRadius = 1000
 
-particleList = []
+particleList = [ ]
 
 
 DEFAULT_ZERO_VEC = [0, 0, 0]
@@ -106,7 +107,10 @@ CAMERA_UNTRACK_IF_DIE = True
 def setup():
     # a = particle(1, vector([25, 1, 0]))
     # camera.drawParticle(a)
-    pass
+    O = marker(vector([0,   0, 0]), [1, 1, 1])
+    X = marker(vector([100, 0, 0]), [1, 0, 0])
+    Y = marker(vector([0, 100, 0]), [0, 1, 0])
+    Z = marker(vector([0, 0, 100]), [0, 0, 1])
 
 def roundList(list, places):
     return [round(x, places) for x in list]
@@ -246,6 +250,7 @@ class MainLoop:
         self.commonShiftVel = DEFAULT_ZERO_VEC
         self.commonRotate = DEFAULT_ZERO_VEC
         self.minDistance = None
+        self.pause = -1 # 1 for pause, -1 for not paused.
 
     def Zero(self):
         self.commonShiftPos = DEFAULT_ZERO_VEC
@@ -266,29 +271,39 @@ class MainLoop:
         # even if means a few lines are duplicated.
 
         # drawLine((-500, 0), (500, 0), fill = [1, 1, 1])
+        global particleList
         if (pan[-1] == False and self.minDistance != None):
             panAmount = self.minDistance * maxPan/(self.minDistance + AUTO_RATE_CONSTANT)
         else:
             panAmount = maxPan
 
-
-        camera.pan(pan, panAmount)
-        turtle.pencolor([1,1,1])
-        # turtle.goto(-50, 50)
-        # turtle.write("pan: {}".format(pan))
-        # camera.pos.addToMe((vector(pan[:-1]).elementWiseMultiply(camera.rot)) * panAmount)
-        camera.rot.setHeading(rotate[0]/10, plane = [0,2], increment = True)
-        camera.rot.setHeading(rotate[1]/10, plane = [0,1], increment = True)
+        if ([0, 0, 0] not in pan):
+            camera.pan(pan, panAmount)
+        if (rotate != [0, 0]):
+            camera.rot.setHeading(rotate[0]*rotSpeed, plane = [0,2], increment = True)
+            camera.rot.setHeading(rotate[1]*rotSpeed, plane = 1,     increment = True)
         if draw:
             self.minDistance = None
-            for p in particleList:
+            for m in sorted(markerList, key = lambda x: abs(x.pos - camera.pos), reverse = True):
+                camera.drawParticle(m)
+            # if not particleList:
+            #     return None
+            for I in range(len(particleList)):
+                # print("I: %d" % (I))
+                p = particleList[I]
+                if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
+                    # Swap the previous one with the current one
+                    particleList = particleList[:I - 1] + [particleList[I], particleList[I-1]] + particleList[I + 1:]
+
                 if (self.minDistance == None):
                     self.minDistance = abs(p.pos - camera.pos) - p.radius
                 elif ((abs(p.pos - camera.pos) - p.radius) < self.minDistance):
                     self.minDistance = abs(p.pos - camera.pos) - p.radius
-                p.step(delta)
-                p.pos.addToMe(self.commonShiftPos)
-                p.pos.addToMe(self.commonShiftVel.multiply(delta))
+                if (self.pause == -1):
+                    p.step(delta)
+                if (abs(self.commonShiftPos != 0) or abs(self.commonShiftVel) != 0):
+                    p.pos.addToMe(self.commonShiftPos)
+                    p.pos.addToMe(self.commonShiftVel.multiply(delta))
                 buff = Buffer.processPosition(p)
                 if not buff:
                     camera.drawParticle(p)
@@ -306,6 +321,9 @@ class vector:
         self.elements = elements
         self.dim = len(elements)
         # self.type = "c" #,'c' --> cartesian, 'p' --> polar
+
+    def __len__(self):
+        return len(self.elements)
 
     def __abs__(self):
         return self.getMag()
@@ -374,17 +392,26 @@ class vector:
     def setHeading(self, angle, plane = [0, 1], increment=False):
         # plane --> plane of the angle. default XY plane, wil change only x and y values.
         # Not the same angles as getHeading!, angle must be within (-pi, pi]
+        if (len(self) not in [2, 3]): print("Warning: setHeading used on vector of dimension {}, not 2 or 3.".format(len(self)))
 
-        initialAngle = self.getHeading(axis = plane[0], trueBearing = plane[1], lock = plane)
-        # print(initialAngle)
-        radius = self.lock(plane).getMag()
-        # print(radius)
-        if increment:
+        if (type(plane) == int):
+            radius = self.getMag()
+            if increment:
+                initialAngle = self.relAngle(plane)
+            else:
+                initialAngle = 0
+            if (initialAngle + angle > pi or initialAngle + angle < 0):
+                self.reverseToMe()
+            self.elements[plane] = radius * cos(initialAngle + angle)
+        else:
+            radius = self.lock(plane).getMag()
+            if increment:
+                initialAngle = self.getHeading(axis = plane[0], trueBearing = plane[1], lock = plane)
+            else:
+                initialAngle = 0
             self.elements[plane[0]] = radius * cos(angle + initialAngle)
             self.elements[plane[1]] = radius * sin(angle + initialAngle)
-        else:
-            self.elements[plane[0]] = radius * cos(angle)
-            self.elements[plane[1]] = radius * sin(angle)
+
 
 
     def getClone(self):
@@ -392,8 +419,6 @@ class vector:
         return vector(self.elements)
 
     def setMag(self, mag):
-        #angles = [self.getHeading(i, False) for i in range(self.dim)] # a list of the cos of the angles between the vector and each axis
-        #self.elements = [mag * angles[k] for k in range(self.dim)] # trig
         self.multiplyToMe(mag / self.getMag())
         return self
 
@@ -448,6 +473,8 @@ class vector:
 
     def relAngle(self, other, plane=None):
         # plane = None or the plane [axis1, axis2]
+        if type(other) == int:
+            return acos(self[other] / abs(self))
         if not plane:
             cosTheta = self.dot(other) / (self.getMag() * other.getMag())
             return acos(cosTheta)
@@ -457,12 +484,12 @@ class vector:
             angle = angleSelf - angleOther
             return angle
 
-    def lock(self, elements):
+    def lock(self, elements, inverse=False):
         if elements == None:
             return self
         tempVec = vector([0 for x in self.elements])
         for x in enumerate(self.elements):
-            if x[0] in elements:
+            if (x[0] in elements and inverse == False) or (inverse == True and x[0] not in elements):
                 tempVec.elements[x[0]] = x[1]
         return tempVec
 
@@ -495,15 +522,22 @@ class camera:
         self.trackSeparation = 0
         self.rotTrackOrigin = DEFAULT_UNIT_VEC
         self.screenDepth = screenDepth
+        self.screenXaxis = vector([-self.rot[2], 0, self.rot[0]]).setMag(1)
+        self.screenYaxis = vector([self.rot[0] * self.rot[1], -(self.rot[0]**2 + self.rot[2]**2), self.rot[2] * self.rot[1]]).setMag(1)
+
         print(self.pos)
         print(atan((turtle.window_width()/2) / self.screenDepth))
         print(atan((turtle.window_height()/2) / self.screenDepth))
 
     def pan(self, direction, rate):
         # Direction as a vector
-        print("direction[0] = {}, rate = {}, self.rot[0] = {}".format(direction[0], rate, self.rot[0]))
-        self.pos += self.rot * direction[0] * rate
+        if PRINT_DATA: print("direction[0] = {}, rate = {}, self.rot[0] = {}".format(direction[0], rate, self.rot[0]))
+        screenZaxis = self.rot.setMag(1)
+        self.pos += ((self.screenXaxis * direction[2]) + (self.screenYaxis * -direction[1]) + (screenZaxis * direction[0])) * -rate
 
+    def rotate(self, direction, rate):
+        # direction as a 2 element list [x, y]
+        pass
 
     def panTrackSet(self, target = None):
         self.panTrack = target
@@ -532,6 +566,7 @@ class camera:
         # default max angles:
         # 0.3455555805817121
         # 0.23010109289662406
+        self.rot.setMag(1)
         prin = "-\n"
         screenAngleX = atan((turtle.window_width()/2) / self.screenDepth)
         screenAngleY = atan((turtle.window_height()/2) / self.screenDepth)
@@ -547,11 +582,12 @@ class camera:
         # Get relative position to camera's position.
         sd = self.screenDepth
         scrCent =  self.rot.getClone().setMag(self.screenDepth)
-
         relPosition = pos - self.pos
-        ScreenParticleDistance = sd * relPosition.getMag() * self.rot.getMag() / (relPosition.dot(self.rot)) #self.screenDepth * relPosition.getMag() / self.rot.dot(relPosition) # A factor to multiply the relPosition vector by to get a vector on a plane on the screen.
-        relPosOnScreen = relPosition.multiply(ScreenParticleDistance/relPosition.getMag())
-        relPosUnit = relPosition.multiply(1 / relPosition.getMag())
+        if (abs(relPosition) == 0 or relPosition.dot(self.rot) == 0):
+            return False
+        ScreenParticleDistance = sd * abs(relPosition) * abs(self.rot) / (relPosition.dot(self.rot)) #self.screenDepth * relPosition.getMag() / self.rot.dot(relPosition) # A factor to multiply the relPosition vector by to get a vector on a plane on the screen.
+        relPosOnScreen = relPosition.multiply(ScreenParticleDistance/abs(relPosition))
+        relPosUnit = relPosition.multiply(1 / abs(relPosition))
         relRotation = relPosUnit - self.rot
 
         # normal = vector([relPosOnScreen[0] - scrCent[2], relPosOnScreen[1], relPosOnScreen[2] + scrCent[0]])
@@ -568,7 +604,7 @@ class camera:
         rp = particle.radius
         SD = self.screenDepth
         CP = pos - self.pos
-        theta = acos(CP.dot(self.rot) / abs(CP))
+        # theta = acos(CP.dot(self.rot) / abs(CP))
 
 
         x_r, y_r, z_r = self.rot.elements
@@ -577,8 +613,12 @@ class camera:
         x_CSP, y_CSP, z_CSP = relPosOnScreen.elements
         x_CSC, y_CSC, z_CSC = scrCent.elements
 
-        X = (-(x_CSP - x_CSC) * z_r + (z_CSP - z_CSC) * x_r) * (x_r ** 2 + z_r ** 2) ** (-1 / 2)
-        Y = ((x_CSP - x_CSC) * x_r * y_r + (y_CSP - y_CSC) * (-x_r ** 2 - z_r ** 2) + (z_CSP - z_CSC) * z_r * y_r) * (x_r ** 2 * y_r ** 2 + (-x_r ** 2 - z_r ** 2) ** 2 + z_r ** 2 * y_r ** 2) ** (-1 / 2)
+
+        X = relPosOnScreen.dot(self.screenXaxis) / abs(self.screenXaxis)
+        Y = relPosOnScreen.dot(self.screenYaxis) / abs(self.screenYaxis)
+
+        # X = (-(x_CSP - x_CSC) * z_r + (z_CSP - z_CSC) * x_r) * (x_r ** 2 + z_r ** 2) ** (-1 / 2)
+        # Y = -((x_CSP - x_CSC) * x_r * y_r + (y_CSP - y_CSC) * (-x_r ** 2 - z_r ** 2) + (z_CSP - z_CSC) * z_r * y_r) * (x_r ** 2 * y_r ** 2 + (-x_r ** 2 - z_r ** 2) ** 2 + z_r ** 2 * y_r ** 2) ** (-1 / 2)
         # X = ((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) * (-z_P + z_C) + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) * (x_P - x_C)) * ((-z_P + z_C) ** 2 + (x_P - x_C) ** 2) ** (-1 / 2)
         # Y = sqrt((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) ** 2 + (SD * y_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (y_P - y_C)) ** 2 + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) ** 2 - ((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) * (-z_P + z_C) + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) * (x_P - x_C)) ** 2 / ((-z_P + z_C) ** 2 + (x_P - x_C) ** 2))
 
@@ -685,7 +725,7 @@ class particle:
 
     def runLoop(self):
         for p in particleList:
-            if p != self:
+            if p != self and type(p) != marker:
                 if not self.checkCollision(p):
                     self.calcAcc(p)
 
@@ -775,6 +815,20 @@ class particle:
         self.vel = vel
         return True
 
+markerList = []
+
+class marker(particle):
+    def __init__(self, position, colour, radius = 20):
+        self.pos = position
+        self.colour = colour
+        self.radius = radius
+        markerList.append(self)
+    def set_colour(self, colour):
+        self.colour = colour
+
+    def step(self, delta):
+        pass
+
 
 def randomVector(dim, mag, maxMag=0, fixComponents=[1,1,1]):
     """dimensions, magnitude, maximum magnitude (defaults to magnitude),
@@ -852,6 +906,9 @@ def escape():
     global Running
     Running = False
 
+def pause():
+    MainLoop.pause *= -1
+
 turtle.onkeypress(panLeft, "a")
 turtle.onkeyrelease(panRight , "a")
 
@@ -886,6 +943,7 @@ turtle.onkeypress(rotDown, "Down")
 turtle.onkeyrelease(rotUp, "Down")
 
 turtle.onkey(escape, "Escape")
+turtle.onkey(pause,  "space")
 
 turtle.listen()
 
