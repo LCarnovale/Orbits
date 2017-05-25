@@ -80,6 +80,8 @@ DEFAULT_SCREEN_DEPTH    = args["-sd"][1]
 maxPan                  = args["-ps"][1]
 
 
+AUTO_RATE_CONSTANT = 100                   #
+
 defaultDensity = 1
 radiusLimit = 50
 voidRadius = 1000
@@ -243,6 +245,7 @@ class MainLoop:
         self.commonShiftPos = DEFAULT_ZERO_VEC
         self.commonShiftVel = DEFAULT_ZERO_VEC
         self.commonRotate = DEFAULT_ZERO_VEC
+        self.minDistance = None
 
     def Zero(self):
         self.commonShiftPos = DEFAULT_ZERO_VEC
@@ -258,14 +261,31 @@ class MainLoop:
         return self.commonRotate
 
 
-    def STEP(self, delta, draw = True):
+    def STEP(self, delta, camera, draw = True):
         # I think it would be slightly more effecient to only do an if comparison once,
         # even if means a few lines are duplicated.
 
         # drawLine((-500, 0), (500, 0), fill = [1, 1, 1])
+        if (pan[-1] == False and self.minDistance != None):
+            panAmount = self.minDistance * maxPan/(self.minDistance + AUTO_RATE_CONSTANT)
+        else:
+            panAmount = maxPan
 
+
+        camera.pan(pan, panAmount)
+        turtle.pencolor([1,1,1])
+        # turtle.goto(-50, 50)
+        # turtle.write("pan: {}".format(pan))
+        # camera.pos.addToMe((vector(pan[:-1]).elementWiseMultiply(camera.rot)) * panAmount)
+        camera.rot.setHeading(rotate[0]/10, plane = [0,2], increment = True)
+        camera.rot.setHeading(rotate[1]/10, plane = [0,1], increment = True)
         if draw:
+            self.minDistance = None
             for p in particleList:
+                if (self.minDistance == None):
+                    self.minDistance = abs(p.pos - camera.pos) - p.radius
+                elif ((abs(p.pos - camera.pos) - p.radius) < self.minDistance):
+                    self.minDistance = abs(p.pos - camera.pos) - p.radius
                 p.step(delta)
                 p.pos.addToMe(self.commonShiftPos)
                 p.pos.addToMe(self.commonShiftVel.multiply(delta))
@@ -316,10 +336,21 @@ class vector:
     def __getitem__(self, value):
         return self.elements[value]
 
+    def __mul__(self, value):
+        if (type(value) in [int, float]):
+            return self.multiply(value)
+        else:
+            return 0
+    def __iter__(self):
+        return self.elements.__iter__()
+
     def define(self, other):
         self.elements = other.elements
         self.dim = len(other.elements)
         return True
+
+    def elementWiseMultiply(self, other):
+        return vector([self[i] * other[i] for i, x in enumerate(self)])
 
     def getMag(self):
         mag = sum([x ** 2 for x in self.elements]) ** (1/2)
@@ -468,6 +499,12 @@ class camera:
         print(atan((turtle.window_width()/2) / self.screenDepth))
         print(atan((turtle.window_height()/2) / self.screenDepth))
 
+    def pan(self, direction, rate):
+        # Direction as a vector
+        print("direction[0] = {}, rate = {}, self.rot[0] = {}".format(direction[0], rate, self.rot[0]))
+        self.pos += self.rot * direction[0] * rate
+
+
     def panTrackSet(self, target = None):
         self.panTrack = target
         return target
@@ -475,6 +512,16 @@ class camera:
     def rotTrackSet(self, target = None):
         self.rotTrack = target
         return target
+
+    def autoRate(self, rate, distance):
+        found = False
+        # origin = vector([0,0,-screenDepth])
+        # if self.track: origin = self.track.pos.add(vector([0, 0, camera.trackDistance]))
+        # dist = min([x.pos.subtract(origin).getMag() - x.radius for x in particleList]) # finds the particle closest to the origin (distance from surface of particle)
+        A = 100 # Sorry i couldnt think of a name. Its just a coeffecient for the radius
+        # I'm not sure what a varying A does to newRate exactly, but 100 works well
+        newRate = dist * rate/(dist + A)
+        return newRate
 
     def zeroCameraPosVel(self):
         MainLoop.commonShiftPos = self.pos.negate()
@@ -745,6 +792,103 @@ def randomVector(dim, mag, maxMag=0, fixComponents=[1,1,1]):
         endMag = random.random() * abs(maxMag - mag) + mag
     return vector(tempVec).setMag(endMag)
 
+
+
+autoRateValue = maxPan
+pan = [0, 0, 0, False]
+shiftL = False
+rotate = [0, 0]
+def panLeft():
+    if pan[2] < 1:
+        pan[2] += 1
+
+def panRight():
+    if pan[2] > - 1:
+        pan[2] -= 1
+
+def panForward():
+    if pan[0] > - 1:
+        pan[0] -= 1
+
+def panBack():
+    if pan[0] < 1:
+        pan[0] += 1
+
+def panUp():
+    if pan[1] > - 1:
+        pan[1] -= 1
+
+def panDown():
+    if pan[1] < 1:
+        pan[1] += 1
+
+def panFast():
+    global shiftL
+    shiftL = True
+    pan[3] = True
+
+def panSlow():
+    global shiftL
+    shiftL = False
+    pan[3] = False
+
+def rotRight():
+    if rotate[0] < 1:
+        rotate[0] = rotate[0] + 1
+
+def rotLeft():
+    if rotate[0] > -1:
+        rotate[0] = rotate[0] - 1
+
+def rotUp():
+    if rotate[1] < 1:
+        rotate[1] += 1
+
+def rotDown():
+    if rotate[1] > -1:
+        rotate[1] -= 1
+
+def escape():
+    global Running
+    Running = False
+
+turtle.onkeypress(panLeft, "a")
+turtle.onkeyrelease(panRight , "a")
+
+turtle.onkeypress(panRight, "d")
+turtle.onkeyrelease(panLeft , "d")
+
+turtle.onkeypress(panForward, "w")
+turtle.onkeyrelease(panBack , "w")
+
+turtle.onkeypress(panBack, "s")
+turtle.onkeyrelease(panForward , "s")
+
+turtle.onkeypress(panUp, "r")
+turtle.onkeyrelease(panDown , "r")
+
+turtle.onkeypress(panDown, "f")
+turtle.onkeyrelease(panUp , "f")
+
+turtle.onkeypress(panFast, "Shift_L")
+turtle.onkeyrelease(panSlow, "Shift_L")
+
+turtle.onkeypress(rotRight, "Right")
+turtle.onkeyrelease(rotLeft, "Right")
+
+turtle.onkeypress(rotLeft, "Left")
+turtle.onkeyrelease(rotRight, "Left")
+
+turtle.onkeypress(rotUp, "Up")
+turtle.onkeyrelease(rotDown, "Up")
+
+turtle.onkeypress(rotDown, "Down")
+turtle.onkeyrelease(rotUp, "Down")
+
+turtle.onkey(escape, "Escape")
+
+turtle.listen()
+
 DEFAULT_ZERO_VEC = vector(DEFAULT_ZERO_VEC)
 DEFAULT_UNIT_VEC = vector(DEFAULT_UNIT_VEC)
 Buffer = buffer()
@@ -762,7 +906,7 @@ for i in range(-5, 5):
 while Running:
     turtle.clear()
     if STAGGERED_SIM: input()
-    MainLoop.STEP(Delta)
+    MainLoop.STEP(Delta, camera)
     # for p in particleList:
     #     print(p, p.pos.elements, p.vel.elements, p.acc.elements)
     # print("step")
