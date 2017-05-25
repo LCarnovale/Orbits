@@ -28,6 +28,7 @@ class val:
 # if false, the algorithm still looks for a value after the key but if no value given the second default value is used.
         #     PUT DEFAULTS HERE
 args = {#       \/
+"-d" :  [float, 0.05,   True], # Delta time per step
 "-n" :  [int,   10,     True], # Particle count
 "-p" :  [int,   0,      True], # preset
 "-sp":  [str,   False,  False,  True], # start paused
@@ -36,7 +37,8 @@ args = {#       \/
 "-w" :  [float, 500,    True],  # Window width
 "-h" :  [float, 600,    True],  # Window height
 "-pd":  [str,   False,  False,  True], # Print data
-"-sd":  [float, 500,    True]   # Default screen depth
+"-sd":  [float, 500,    True],  # Default screen depth
+"-ps":  [float, 1.0,    True]   # Maximum pan speed
 }
 
 # "-d":[int, None, True],
@@ -66,15 +68,16 @@ if len(sys.argv) > 1:
                     print("Missing parameter for {}.".format(sys.argv[i]))
                 # except
 
-PARTICLE_COUNT = args["-n"][1]
-preset = args["-p"][1]
-STAGGERED_SIM = args["-ss"][1]
-G = args["-g"][1]
-INITIAL_WINDOW_WIDTH =  args["-w"][1]
-INITIAL_WINDOW_HEIGHT = args["-h"][1]
-PRINT_DATA = args["-pd"][1]
-DEFAULT_SCREEN_DEPTH = args["-sd"][1]
-
+Delta                   = args["-d"][1]
+PARTICLE_COUNT          = args["-n"][1]
+preset                  = args["-p"][1]
+STAGGERED_SIM           = args["-ss"][1]
+G                       = args["-g"][1]
+INITIAL_WINDOW_WIDTH    = args["-w"][1]
+INITIAL_WINDOW_HEIGHT   = args["-h"][1]
+PRINT_DATA              = args["-pd"][1]
+DEFAULT_SCREEN_DEPTH    = args["-sd"][1]
+maxPan                  = args["-ps"][1]
 
 
 defaultDensity = 1
@@ -259,7 +262,8 @@ class MainLoop:
         # I think it would be slightly more effecient to only do an if comparison once,
         # even if means a few lines are duplicated.
 
-        drawLine((-500, 0), (500, 0), fill = [1, 1, 1])
+        # drawLine((-500, 0), (500, 0), fill = [1, 1, 1])
+
         if draw:
             for p in particleList:
                 p.step(delta)
@@ -521,15 +525,20 @@ class camera:
 
 
         x_r, y_r, z_r = self.rot.elements
-        x_P, y_P, z_P = pos.elements
-        x_C, y_C, z_C = self.pos.elements
-        X = ((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) * (-z_P + z_C) + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) * (x_P - x_C)) * ((-z_P + z_C) ** 2 + (x_P - x_C) ** 2) ** (-1 / 2)
-        Y = sqrt((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) ** 2 + (SD * y_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (y_P - y_C)) ** 2 + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) ** 2 - ((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) * (-z_P + z_C) + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) * (x_P - x_C)) ** 2 / ((-z_P + z_C) ** 2 + (x_P - x_C) ** 2))
+        # x_P, y_P, z_P = pos.elements
+        # x_C, y_C, z_C = self.pos.elements
+        x_CSP, y_CSP, z_CSP = relPosOnScreen.elements
+        x_CSC, y_CSC, z_CSC = scrCent.elements
+
+        X = (-(x_CSP - x_CSC) * z_r + (z_CSP - z_CSC) * x_r) * (x_r ** 2 + z_r ** 2) ** (-1 / 2)
+        Y = ((x_CSP - x_CSC) * x_r * y_r + (y_CSP - y_CSC) * (-x_r ** 2 - z_r ** 2) + (z_CSP - z_CSC) * z_r * y_r) * (x_r ** 2 * y_r ** 2 + (-x_r ** 2 - z_r ** 2) ** 2 + z_r ** 2 * y_r ** 2) ** (-1 / 2)
+        # X = ((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) * (-z_P + z_C) + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) * (x_P - x_C)) * ((-z_P + z_C) ** 2 + (x_P - x_C) ** 2) ** (-1 / 2)
+        # Y = sqrt((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) ** 2 + (SD * y_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (y_P - y_C)) ** 2 + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) ** 2 - ((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) * (-z_P + z_C) + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) * (x_P - x_C)) ** 2 / ((-z_P + z_C) ** 2 + (x_P - x_C) ** 2))
 
 
 
-        majorAxis = SD * (2 * rp * (abs(CP)**2 - rp**2)**(3/2) / (abs(CP)**4 * cos(theta)**2) - sin(theta)**2 * rp**2 / abs(CP)**2)
-        minorAxis = SD * 2 * rp / (abs(CP)**2 - rp**2)**(1/2)
+        # majorAxis = SD * (2 * rp * (abs(CP)**2 - rp**2)**(3/2) / (abs(CP)**4 * cos(theta)**2) - sin(theta)**2 * rp**2 / abs(CP)**2)
+        # minorAxis = SD * 2 * rp / (abs(CP)**2 - rp**2)**(1/2)
 
 
 
@@ -553,8 +562,8 @@ class camera:
             return False
 
         # Major axis = 2 * (sqrt(x^2 + y^2) - screenDepth * tan(atan(sqrt(x^2 + y^2)/screenDepth) - offset))
-        # majorAxis = 2 * (sqrt(X ** 2 + Y ** 2) - self.screenDepth * tan(atan(sqrt(X ** 2 + Y ** 2)/self.screenDepth) - offset))
-        # minorAxis = 2 * self.screenDepth * tan(offset)
+        majorAxis = 2 * (sqrt(X ** 2 + Y ** 2) - self.screenDepth * tan(atan(sqrt(X ** 2 + Y ** 2)/self.screenDepth) - offset))
+        minorAxis = 2 * self.screenDepth * tan(offset)
         if X != 0:
             angle = atan(Y / X)
         elif X == 0 and Y == 0:
@@ -745,14 +754,15 @@ camera = camera()
 
 setup()
 Running = True
+particle(500, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]))
 for i in range(-5, 5):
-    particle(150, vector([150, 25 + DEFAULT_SCREEN_DEPTH, i * 50]))
+    particle(150, vector([150 + DEFAULT_SCREEN_DEPTH, 150 * sin(i/5 * pi), 150 * cos(i/5 * pi)])).circularise(particleList[0])
 # particle(150, vector([223.43434, 266.12801, 157.37214]), vector([0, 0, 0]))
 
 while Running:
     turtle.clear()
     if STAGGERED_SIM: input()
-    MainLoop.STEP(0.05)
+    MainLoop.STEP(Delta)
     # for p in particleList:
     #     print(p, p.pos.elements, p.vel.elements, p.acc.elements)
     # print("step")
