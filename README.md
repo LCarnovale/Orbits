@@ -17,6 +17,7 @@ Keep in mind at the time of writing this, the program doesn't work correctly, an
 
 Description of the files:
 
-  - *Orbits3.9.py*: A 'finished' product that does almost everything I want in the final version but uses much simpler mathematics, and thus has significant restrictions on the capabilities visually, but is also a bit sloppy and no where near optimised. Nevertheless, it works and looks good, despite not drawing particles as ellipses (which is really a minor detail anyway).
-  - *Orbits4.py*: A miserable failure at trying to use tkinter to draw the projections instead of turtle. I thought it would be a faster alternative, but it turns out that what I'm trying to do just isn't feasable in tkinter (as far as I know).
-  - *Orbits4T.py*: An example of a quick retreat from tkinter, I decided to go back to turtle and try to work out the mathematical parts before I worry about the technical bits.
+  - **Orbits3.9.py**: A 'finished' product that does almost everything I want in the final version but uses much simpler mathematics, and thus has significant restrictions on the capabilities visually, but is also a bit sloppy and no where near optimised. Nevertheless, it works and looks good, despite not drawing particles as ellipses (which is really a minor detail anyway).
+  - **Orbits4.py**: A miserable failure at trying to use tkinter to draw the projections instead of turtle. I thought it would be a faster alternative, but it turns out that what I'm trying to do just isn't feasable in tkinter (as far as I know).
+  - **Orbits4T.py**: An example of a quick retreat from tkinter, I decided to go back to turtle and try to work out the mathematical parts before I worry about the technical bits. (Currently working now!)
+  - **Projection.tex**: Basically my working out paper, an explanation of the maths involved by me for me
