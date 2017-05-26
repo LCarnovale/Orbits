@@ -39,7 +39,9 @@ args = {#       \/
 "-pd":  [str,   False,  False,  True], # Print data
 "-sd":  [float, 1500,   True],  # Default screen depth
 "-ps":  [float, 5.0,    True],  # Maximum pan speed
-"-rs":  [float, 0.1,    True]   # Rotational speed
+"-rs":  [float, 0.1,    True],  # Rotational speed
+"-mk":  [str,   False,  False,  True], # Show marker points
+"-ep":  [int,   360,    True]   # Number of points on each ellipse
 }
 
 # "-d":[int, None, True],
@@ -80,12 +82,14 @@ PRINT_DATA              = args["-pd"][1]
 DEFAULT_SCREEN_DEPTH    = args["-sd"][1]
 maxPan                  = args["-ps"][1]
 rotSpeed                = args["-rs"][1]
+showMarkers             = args["-mk"][1]
+ellipsePoints           = args["-ep"][1]
 
-AUTO_RATE_CONSTANT = 100                   #
+AUTO_RATE_CONSTANT = 100        # A mysterious constant which determines the autoRate speed, 100 works well.
 
 defaultDensity = 1
-radiusLimit = 500
-voidRadius = 1000
+radiusLimit = 50                # Maximum size of particle
+voidRadius = 5000               # Maximum distance of particle from camera
 
 particleList = [ ]
 
@@ -93,24 +97,16 @@ particleList = [ ]
 DEFAULT_ZERO_VEC = [0, 0, 0]
 DEFAULT_UNIT_VEC = [1, 0, 0]
 
-# STAGGERED_SIM = True
-
 CAMERA_UNTRACK_IF_DIE = True
-# G = 500 # Gravitational Constant
-
-# master = Tk()
-# screen = Canvas(master, width = INITIAL_WINDOW_WIDTH, height = INITIAL_WINDOW_HEIGHT)
-# screen.pack()
-# canvas_width = INITIAL_WINDOW_WIDTH
-# canvas_height = INITIAL_WINDOW_HEIGHT
 
 def setup():
     # a = particle(1, vector([25, 1, 0]))
     # camera.drawParticle(a)
-    O = marker(vector([0,   0, 0]), [1, 1, 1])
-    X = marker(vector([100, 0, 0]), [1, 0, 0])
-    Y = marker(vector([0, 100, 0]), [0, 1, 0])
-    Z = marker(vector([0, 0, 100]), [0, 0, 1])
+    if showMarkers:
+        O = marker(vector([0,   0, 0]), [1, 1, 1])
+        X = marker(vector([100, 0, 0]), [1, 0, 0])
+        Y = marker(vector([0, 100, 0]), [0, 1, 0])
+        Z = marker(vector([0, 0, 100]), [0, 0, 1])
 
 def roundList(list, places):
     return [round(x, places) for x in list]
@@ -119,53 +115,24 @@ window = turtle.Screen()
 window.setup(width = 1.0, height = 1.0)
 turtle.bgcolor("black")
 
-turtle.tracer(0, 0) # Makes the turtle's speed instantaneous
+turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
 turtle.hideturtle()
 
+SMART_DRAW = True               # Changes the number of points on each ellipse
+                                # depending on its size
+SMART_DRAW_PARAMETER = 5        # Approx number of pixels between each point
 
-
-# def drawDot(x, y, r, fill = "black"):
-#     screenWidth = screen.winfo_width()
-#     screenHeight = screen.winfo_height()
-#     x += screenWidth/2
-#     y = screenHeight/2 - y
-#     id = screen.create_oval(x - r, y - r, x + r, y + r, fill = fill, outline = fill)
-#     return id
-#
-#
-# def drawDot(x, y, r, Fill=True, colour = [0, 0, 0], actualRadius = 0):
-#     # Draws a dot on the canvas
-#     # global turtle
-#     if (abs(x) - abs(r) > turtle.window_width() / 2 or abs(y) - abs(r) > turtle.window_height()):
-#         return False
-#     if not actualRadius:
-#         actualRadius = r
-#     if Fill:
-#         turtle.up()
-#         turtle.goto(x, y)
-#         if colourful:
-#             turtle.pencolor([actualRadius/radiusLimit, 0, (radiusLimit - actualRadius)/radiusLimit])
-#         else:
-#             turtle.pencolor(colour)
-#         turtle.dot(2 * r)
-#     else:
-#         turtle.up()
-#         turtle.goto(x, y - r)
-#         turtle.down()
-#         turtle.circle(r)
-#         turtle.up()
+MAX_POINTS = 800                # Lazy way of limiting the number of points drawn to stop the program
+                                # grinding to a halt everytime you get too close to a particle
 
 def drawOval(x, y, major, minor, angle, fill = "black"):
-    # screenWidth = screen.winfo_width()
-    # screenHeight = screen.winfo_height()
-    # x1, x2 = x1 + screenWidth/2, x2 + screenWidth/2
-    # y1, y2 = screenHeight/2 - y1, screenHeight/2 - y2
-
-    # id = screen.create_oval(x1, y1, x2, y2, fill = fill, outline = fill)
-
-    # conversion of axes: local axis x, screen axis x'
-    # x' = x cos(shift) - y sin(shift)
-    # y' = y cos(shift) + x sin(shift)
+    global ellipsePoints
+    if SMART_DRAW:
+        perimApprox = 2*pi*sqrt((major**2 + minor**2) / 2)
+        points = int(perimApprox / SMART_DRAW_PARAMETER)
+    else:
+        points = ellipsePoints
+    points = min(points, MAX_POINTS)
     turtle.up()
     localX = major/2
     localY = 0
@@ -174,9 +141,11 @@ def drawOval(x, y, major, minor, angle, fill = "black"):
     turtle.goto(x + screenX, y + screenY)
     turtle.begin_fill()
     turtle.fillcolor(fill)
-    for i in range(360):
-        localX = major/2 * cos(pi * i / 180)
-        localY = minor/2 * sin(pi * i / 180)
+    onScreen = True
+    Drawn = False
+    for i in range(points):
+        localX = major/2 * cos(2 * pi * i / points)
+        localY = minor/2 * sin(2 * pi * i / points)
         screenX = localX * cos(angle) - localY * sin(angle)
         screenY = localY * cos(angle) + localX * sin(angle)
         turtle.goto(x + screenX, y + screenY)
@@ -280,8 +249,9 @@ class MainLoop:
         if ([0, 0, 0] not in pan):
             camera.pan(pan, panAmount)
         if (rotate != [0, 0]):
-            camera.rot.setHeading(rotate[0]*rotSpeed, plane = [0,2], increment = True)
-            camera.rot.setHeading(rotate[1]*rotSpeed, plane = 1,     increment = True)
+            camera.rotate(rotate, rotSpeed)
+            # camera.rot.setHeading(rotate[0]*rotSpeed, plane = [0,2], increment = True)
+            # camera.rot.setHeading(rotate[1]*rotSpeed, plane = 1,     increment = True)
         if draw:
             self.minDistance = None
             for m in sorted(markerList, key = lambda x: abs(x.pos - camera.pos), reverse = True):
@@ -464,12 +434,40 @@ class vector:
     def multiply(self, scalar):
         return vector([x * scalar for x in self.elements])
 
+    def cross(self, other):
+        if (len(self) != 3 or len(other) != 3):
+            print("Unable to do cross product on size {} and {} vectors".format(len(self), len(other)))
+            return None
+        return vector([
+            self[1] * other[2] - self[2] * other[1],
+            self[2] * other[0] - self[0] * other[2],
+            self[0] * other[1] - self[1] * other[0]
+        ])
+
     def dot(self, other):
         product = 0
         if self.dim != other.dim: return False
         for i in range(self.dim):
             product += self.elements[i] * other.elements[i]
         return product
+
+    def rotateAbout(self, other, angle):
+        selfParaOther = self.project(other)
+        selfPerpOther = self - selfParaOther
+        crossProd = self.cross(other)
+        X = cos(angle) / abs(selfPerpOther)
+        Y = sin(angle) / abs(crossProd)
+        result = (selfPerpOther * X + crossProd * Y) * abs(selfPerpOther) + selfParaOther
+        return result
+
+
+    def project(self, other):
+        # Projects self onto other
+        return other * (self.dot(other) / (abs(other) ** 2))
+
+    def projectMag(self, other):
+        # Projects self onto other
+        return (self.dot(other) / abs(other))
 
     def relAngle(self, other, plane=None):
         # plane = None or the plane [axis1, axis2]
@@ -537,6 +535,10 @@ class camera:
 
     def rotate(self, direction, rate):
         # direction as a 2 element list [x, y]
+        self.screenXaxis = self.screenXaxis.rotateAbout(self.screenYaxis, direction[0] * rate)
+        self.screenYaxis = self.screenYaxis.rotateAbout(self.screenXaxis, direction[1] * rate)
+        self.rot = self.screenXaxis.cross(self.screenYaxis)
+        self.rot.setMag(1)
         pass
 
     def panTrackSet(self, target = None):
@@ -619,9 +621,9 @@ class camera:
 
         # X = (-(x_CSP - x_CSC) * z_r + (z_CSP - z_CSC) * x_r) * (x_r ** 2 + z_r ** 2) ** (-1 / 2)
         # Y = -((x_CSP - x_CSC) * x_r * y_r + (y_CSP - y_CSC) * (-x_r ** 2 - z_r ** 2) + (z_CSP - z_CSC) * z_r * y_r) * (x_r ** 2 * y_r ** 2 + (-x_r ** 2 - z_r ** 2) ** 2 + z_r ** 2 * y_r ** 2) ** (-1 / 2)
+
         # X = ((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) * (-z_P + z_C) + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) * (x_P - x_C)) * ((-z_P + z_C) ** 2 + (x_P - x_C) ** 2) ** (-1 / 2)
         # Y = sqrt((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) ** 2 + (SD * y_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (y_P - y_C)) ** 2 + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) ** 2 - ((SD * x_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (x_P - x_C)) * (-z_P + z_C) + (SD * z_r - 1 / SD * (x_r * (x_P - x_C) + y_r * (y_P - y_C) + z_r * (z_P - z_C)) * (z_P - z_C)) * (x_P - x_C)) ** 2 / ((-z_P + z_C) ** 2 + (x_P - x_C) ** 2))
-
 
 
         # majorAxis = SD * (2 * rp * (abs(CP)**2 - rp**2)**(3/2) / (abs(CP)**4 * cos(theta)**2) - sin(theta)**2 * rp**2 / abs(CP)**2)
@@ -753,7 +755,7 @@ class particle:
         # newMass --> determines the mass of the particle after respawning
         # bounds = [turtle.window_width()/2, turtle.window_height()/2]
         radius = voidRadius #sqrt(bounds[0] ** 2 + bounds[1] ** 2) # radius of circle encompassing corners of canvas
-        self.pos = randomVector(3, radius * 0.99)
+        self.pos = randomVector(3, radius * 0.99) + camera.pos
         self.vel = randomVector(3, 5, 15).subtract(self.pos.getClone().setMag(30))
         if not self.newMass: self.mass = random.random() * 2000 + 500
         if self.newMass: self.mass = self.newMass
@@ -868,11 +870,11 @@ def panBack():
     if pan[0] < 1:
         pan[0] += 1
 
-def panUp():
+def panDown():
     if pan[1] > - 1:
         pan[1] -= 1
 
-def panDown():
+def panUp():
     if pan[1] < 1:
         pan[1] += 1
 
@@ -886,19 +888,19 @@ def panSlow():
     shiftL = False
     pan[3] = False
 
-def rotRight():
+def rotLeft():
     if rotate[0] < 1:
         rotate[0] = rotate[0] + 1
 
-def rotLeft():
+def rotRight():
     if rotate[0] > -1:
         rotate[0] = rotate[0] - 1
 
-def rotUp():
+def rotDown():
     if rotate[1] < 1:
         rotate[1] += 1
 
-def rotDown():
+def rotUp():
     if rotate[1] > -1:
         rotate[1] -= 1
 

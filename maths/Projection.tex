@@ -18,10 +18,11 @@
 \newcommand\sinah{\frac{r_p}{\left|\cpv\right|}}
 \newcommand\cosah{\frac{\sqrt{\left|\cpv\right|^2 - r_p^2}}{\left|\cpv\right|}}
 
-\newcommand\dprod[2]{\frac{#1 \cdot #2}{\left|#2\right|^2} #2}
+\newcommand\proj[2]{\frac{#1 \cdot #2}{\left|#2\right|^2} #2}
 
 \newcommand\xp{x\prime\xspace}
 \newcommand\yp{y\prime\xspace}
+\newcommand\vp{v\prime\xspace}
 
 \title{Projecting Spherical Objects onto a 2-Dimensional plane within 3-Dimensional Space}
 
@@ -234,8 +235,64 @@
 		& = C S_P - C S_C \\
 		& = \frac{\left|\overrightarrow{CP}\right|}{\left|\overrightarrow{C S_P}\right|} \overrightarrow{CP} - S_D \hat{\mathbf{r}} 
 			& \left|\overrightarrow{C S_P}\right| \text{is defined in equation (2).} \\
-		& = 
 	\end{align*}
+	Therefore,
+	$$x = \frac{\overrightarrow{S_C S_P} \cdot \xp}{\left|\xp\right|} $$
+	$$y = \frac{\overrightarrow{S_C S_P} \cdot \yp}{\left|\yp\right|} $$
+	
+\section{Rotation of the $x$ and $y$ axes about each other}
+	\paragraph{}
+	In order to rotate the screen, two methods can be used. Either the vector $\ru$ be rotated and the $x, y$ axes $\xp, \yp$ be recalculated for each draw,
+	or the $x$ and $y$ axes be rotated and $\ru$ be recalculated. The latter is preferable as the first method restricts the orientation of the screen such that $\yp$ always passes through the $y$-axis.
+	If the axes can be rotated independently of each other then the user is able to orientate the screen in any direction, 
+	and rotation of the screen about it's $z$-axis becomes possible and feasible. However, to rotate a vector about another vector is no trivial task.
+	\subsection{Rotation of a vector about another vector}
+	\paragraph{}
+	Consider the vectors;
+	\begin{itemize}
+	\item $a$: The axis of rotation
+	\item $v$: The initial vector to be rotated
+	\item $\vp$: The rotation of $v$ about $a$
+	\end{itemize}
+	\paragraph{}
+	For our situation, $a$ and $v$ would be perpendicular, making the problem slightly easier. Although, it is useful to see the general solution.
+	\paragraph{}
+	The vector $v$ can be broken down into $v_{\parallel a} + v_{\perp a}$, the component along $a$ and the component orthogonal to $a$.
+	$v_{\parallel a}$ is simply the projection of $v$ onto $a$, 
+	$$v_{\parallel a} = \proj{a}{v}$$
+	And the orthogonal part is then just $v - v_{\parallel a}$
+	$$v_{\perp a} = v - \proj{a}{v}$$
+
+	\paragraph{}
+	Now, consider the plane orthogonal to $a$, a vector on this plane can hence be made by the linear combination of 
+	$x_1 v_{\perp a} + x_2 a \times v$, both vector components of which are orthogonal to $a$.
+	Thus, to get a rotation by a specific angle $\theta$, let,
+	$$x_1 = \frac{\cos{\theta}}{\left| v_{\perp a} \right|} \text{   and   } x_2 = \frac{\sin{\theta}}{\left| a \times v \right|}$$ 
+	Such that the component of the resulting vector on this plane is 
+	$$\vp_{\perp a} = \left|v_{\perp a} \right| \left( \frac{\cos{\theta} v_{\perp a}}{\left| v_{\perp a} \right|}
+					+ \frac{\sin{\theta} (a \times v)}{\left|a \times v\right|}\right) $$
+	The final result can be given by $\vp = \vp_{\perp a} + v_{\parallel a}$, therefore;
+	\begin{equation}
+	\vp =  \left|v_{\perp a} \right| \left( \frac{\cos{\theta} v_{\perp a}}{\left| v_{\perp a} \right|}
+					+ \frac{\sin{\theta} (a \times v)}{\left|a \times v\right|}\right) + \proj{a}{v}
+	\end{equation}
+	\paragraph{}
+	As stated, in our case $v_{\parallel a} = 0$, and so the last term in the equation drops out. 
+	Thus to rotate $\xp$ about $\yp$ we substitute $a = \yp$ and $v = \xp$, and vice versa. 
+
+\subsection{Re-orientating $\ru$ to the new screen}
+	
+Now, we are able to rotate the vectors about each other, although we haven't changed $\ru$ yet. By definition, $|\ru| = 1$, but is parallel to the normal through $\xp$ and $\yp$ (although in the code the length isn't always assumed to be 1 as a safety net). 
+	Additionally, $S_D$ is fixed and does not change, so we are easily able to find the new direction of $\ru$ and thus the new position of the screen.
+	\paragraph{}
+	Expanding on their definitions,
+	$$\ru \parallel \xp \times \yp$$
+	$$\ru = \frac{\xp \times \yp}{\left|\xp \times \yp\right|}$$
+	Note that this requires $\xp$ and $\yp$ to be in the direction of the right and the top of the screen respectively.
+
+
+
+	 
 
 
 
@@ -248,22 +305,22 @@
 %		\left|\mathbf{n}\right|}
 %	\end{equation}
 	
-	Where $\overrightarrow{C S_P}$ is parallel to $\overrightarrow{CP}$ but with a modulus equal to $\left|CS_P\right|$, defined in equation (2) to be:
-	$$\left|C S_P\right| = \frac{S_D \left|\overrightarrow{CP}\right| }{ \hat{\mathbf{r}} \cdot \overrightarrow{CP}}$$
- 	$$C S_P = \frac{\left|\overrightarrow{CP}\right|}{\left|S_P\right|} \overrightarrow{CP}$$
-	$$C S_P = \frac{\hat{\mathbf{r}} \cdot \overrightarrow{CP}}{S_D} \overrightarrow{CP} $$
-	$$C S_P = \frac{1}{S_D} \left( \begin{pmatrix}x_r\\y_r\\z_r\end{pmatrix} \cdot \begin{pmatrix}x_P-x_C\\y_P - y_C\\z_P - z_C 
-	\end{pmatrix} \right) \begin{pmatrix}x_P-x_C\\y_P - y_C\\z_P - z_C \end{pmatrix}
-	$$
-	And by definition,
-	$$ S_C = S_D \hat{\mathbf{r}}$$
-	Now we have enough information to find $x$. And, now that we know $x$, we can say that $x^2 + y^2 = \left|\overrightarrow{S_P 
-	S_C}\right|^2$, defined in section 2.1. Therefore,
-	\begin{align*}
-		y & = \sqrt{ \left|C S_P\right|^2 - {S_D} ^2 - x^2}\\
-		& = \sqrt{\frac{S_D \left|\overrightarrow{CP}\right| }{ \hat{\mathbf{r}} \cdot \overrightarrow{CP}} - {S_D}^2 - x^2}
-	\end{align*}
-			
+%	Where $\overrightarrow{C S_P}$ is parallel to $\overrightarrow{CP}$ but with a modulus equal to $\left|CS_P\right|$, defined in equation (2) to be:
+%	$$\left|C S_P\right| = \frac{S_D \left|\overrightarrow{CP}\right| }{ \hat{\mathbf{r}} \cdot \overrightarrow{CP}}$$
+% 	$$C S_P = \frac{\left|\overrightarrow{CP}\right|}{\left|S_P\right|} \overrightarrow{CP}$$
+%	$$C S_P = \frac{\hat{\mathbf{r}} \cdot \overrightarrow{CP}}{S_D} \overrightarrow{CP} $$
+%	$$C S_P = \frac{1}{S_D} \left( \begin{pmatrix}x_r\\y_r\\z_r\end{pmatrix} \cdot \begin{pmatrix}x_P-x_C\\y_P - y_C\\z_P - z_C 
+%	\end{pmatrix} \right) \begin{pmatrix}x_P-x_C\\y_P - y_C\\z_P - z_C \end{pmatrix}
+%	$$
+%	And by definition,
+%	$$ S_C = S_D \hat{\mathbf{r}}$$
+%	Now we have enough information to find $x$. And, now that we know $x$, we can say that $x^2 + y^2 = \left|\overrightarrow{S_P 
+%	S_C}\right|^2$, defined in section 2.1. Therefore,
+%	\begin{align*}
+%		y & = \sqrt{ \left|C S_P\right|^2 - {S_D} ^2 - x^2}\\
+%		& = \sqrt{\frac{S_D \left|\overrightarrow{CP}\right| }{ \hat{\mathbf{r}} \cdot \overrightarrow{CP}} - {S_D}^2 - x^2}
+%	\end{align*}
+%			
 
 %\subsection{
 	
