@@ -1,6 +1,6 @@
 # Author: Leo Carnovale (leo.carnovale@gmail.com / l.carnovale@student.unsw.edu.au)
 # Date  : April to May ish?
-# Orbits 4T 
+# Orbits 4T
 
 
 from tkinter import *
@@ -20,7 +20,7 @@ LINUX = False # If true, then non alphanumeric key controls will be replaced wit
 # if false, the algorithm still looks for a value after the key but if no value given the second default value is used.
         #     PUT DEFAULTS HERE
 args = {#       \/
-"-?" :  [None]
+"-?" :  [None],
 "-d" :  [float, 0.05,   True], # Delta time per step
 "-n" :  [int,   10,     True], # Particle count
 "-p" :  [int,   0,      True], # preset
