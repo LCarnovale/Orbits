@@ -8,6 +8,13 @@ from math import *
 import turtle
 import random
 import time
+import vector
+
+vector = vector.vector
+# import sys
+
+# print(sys.path)
+# sys.path.append(sys.path.cur)
 
 
 LINUX = False # If true, then non alphanumeric key controls will be replaced with numbers
@@ -30,7 +37,7 @@ args = {#       \/
 "-w" :  [float, 500,    True],  # Window width
 "-h" :  [float, 600,    True],  # Window height
 "-pd":  [str,   False,  False,  True], # Print data
-"-sd":  [float, 1500,   True],  # Default screen depth
+"-sd":  [float, 2000,   True],  # Default screen depth
 "-ps":  [float, 5.0,    True],  # Maximum pan speed
 "-rs":  [float, 0.1,    True],  # Rotational speed
 "-mk":  [str,   False,  False,  True], # Show marker points
@@ -51,29 +58,32 @@ Arguments:
 -d :*   float,     Delta time per step
 -n :*   int,       Particle count.
 -p :*   int,       Preset (Not used in this version)
--sp:    string,    Start paused
--ss:    string,    Staggered simulation (Hit enter in the terminal to trigger each frame)
+-sp:    bool,      Start paused
+-ss:    bool,      Staggered simulation (Hit enter in the terminal to trigger each frame)
 -g :*   float,     Gravitational constant
 -w :*   float,     Window width (Not used in thie version)
 -h :*   float,     Window height (Not used in thie version)
--pd:    string,    Print debugging data
+-pd:    bool,      Print debugging data
 -sd:*   float,     Default screen depth
 -ps:*   float,     Maximum pan speed
 -rs:*   float,     Rotational speed
--mk:    string,    Show marker points (static X, Y, Z and Origin coloured particles)
+-mk:    bool,      Show marker points (static X, Y, Z and Origin coloured particles)
 -ep:*   int,       Number of points on each ellipse (Irrelevant if SMART_DRAW is on (which it is))
 -sf:*   float,     Rate at which the camera follows its target
--ad:    string,    Always draw. Attempts to draw particles even if they are thought not to be on screen
+-ad:    bool,      Always draw. Attempts to draw particles even if they are thought not to be on screen
 (*) indicates a parameter is required after the argument
 
 Using the program:
   - Use W, A, S, D to move forwards, left, backwards, and right respectively.
   - Use R, F to move up and down respectively.
+  - '[', ']' to decrease and increase delta time.
+  - ',', '.' to decrease and increase the screen depth.
   - Space to pause the simulation. (Movement is still allowed)
   - Click any particle to set the camera to track that particle.
   - To stop tracking, click empty space or another particle.
 
 """)
+        exit()
 
     for i, arg in enumerate(sys.argv):
         if arg in args:
@@ -284,7 +294,7 @@ class MainLoop:
 
         if ([0, 0, 0] not in pan):
             camera.pan(pan, panAmount)
-        if (rotate != [0, 0]):
+        if (rotate != [0, 0, 0]):
             camera.rotate(rotate, rotSpeed)
 
         frameStart = time.time()
@@ -354,229 +364,6 @@ class MainLoop:
         self.Zero()
 
 
-class vector:
-    def __init__(self, elements):
-        self.elements = elements
-        self.dim = len(elements)
-        # self.type = "c" #,'c' --> cartesian, 'p' --> polar
-
-    def __len__(self):
-        return len(self.elements)
-
-    def __abs__(self):
-        return self.getMag()
-
-    def __add__(self, other):
-        return self.add(other)
-
-    def __sub__(self, other):
-        return self.subtract(other)
-
-    def __iadd__(self, other):
-        self.addToMe(other)
-        return self
-
-    def __isub__(self, other):
-        self.subtractToMe(other)
-        return self
-
-    def __neg__(self):
-        return self.reverse()
-
-    def __str__(self):
-        return ("<" + ", ".join([str(x) for x in self.elements]) + ">")
-
-    def __repr__(self):
-        return self.elements
-
-    def __getitem__(self, value):
-        return self.elements[value]
-
-    def __mul__(self, value):
-        if (type(value) in [int, float]):
-            return self.multiply(value)
-        else:
-            return 0
-    def __iter__(self):
-        return self.elements.__iter__()
-
-    def define(self, other):
-        self.elements = other.elements
-        self.dim = len(other.elements)
-        return True
-
-    def elementWiseMultiply(self, other):
-        return vector([self[i] * other[i] for i, x in enumerate(self)])
-
-    def getMag(self):
-        mag = sum([x ** 2 for x in self.elements]) ** (1/2)
-        return mag
-
-    def getHeading(self, axis=0, aCos=True, trueBearing=None, lock=None):
-        # true bearing: an angle will be given in the direction of the axis trueBearing
-        # Uses dot product; cos(angle) = a . b / |a||b|
-        angle = False
-        if self.lock(lock).getMag() == 0:
-            return 0 # Mag of 0 has no angle
-        angle = (self.elements[axis])/self.lock(lock).getMag()
-        if aCos:
-            angle = acos(angle) # Sometimes cos(angle) is all thats needed, this is an attempt to save some processing time
-            if trueBearing:
-                if self.elements[trueBearing] < 0:
-                    angle = -angle
-
-        return angle
-
-    def setHeading(self, angle, plane = [0, 1], increment=False):
-        # plane --> plane of the angle. default XY plane, wil change only x and y values.
-        # Not the same angles as getHeading!, angle must be within (-pi, pi]
-        if (len(self) not in [2, 3]): print("Warning: setHeading used on vector of dimension {}, not 2 or 3.".format(len(self)))
-
-        if (type(plane) == int):
-            radius = self.getMag()
-            if increment:
-                initialAngle = self.relAngle(plane)
-            else:
-                initialAngle = 0
-            if (initialAngle + angle > pi or initialAngle + angle < 0):
-                self.reverseToMe()
-            self.elements[plane] = radius * cos(initialAngle + angle)
-        else:
-            radius = self.lock(plane).getMag()
-            if increment:
-                initialAngle = self.getHeading(axis = plane[0], trueBearing = plane[1], lock = plane)
-            else:
-                initialAngle = 0
-            self.elements[plane[0]] = radius * cos(angle + initialAngle)
-            self.elements[plane[1]] = radius * sin(angle + initialAngle)
-
-
-
-    def getClone(self):
-        # This is pretty useless
-        return vector(self.elements)
-
-    def setMag(self, mag):
-        self.multiplyToMe(mag / self.getMag())
-        return self
-
-    # For most of the following functions (add, subtract etc.) there is a respective 'functionToMe',
-    # The only difference is that the original function returns a new vector without changing any other vector.
-    # functionToMe will change the original vector.
-    # eg. a.add(b) --> c = (a + b), a.addToMe(b) --> a = (a + b)
-    # There might be a better way to do this than have seperate functions?
-
-    def reverseToMe(self):
-        self.define(self.reverse())
-        return True
-
-    def reverse(self):
-        return vector([-x for x in self.elements])
-
-    def addToMe(self, other, element=None):
-        self.define(self.add(other, element))
-        return True
-
-    def add(self, other, element=None):
-        if (not element and (self.dim != other.dim)): return False
-        tempVec = [x for x in self.elements]
-        if element:
-            tempVec[element] += other
-        else:
-            for i in range(self.dim):
-                tempVec[i] = tempVec[i] + other.elements[i]
-        return vector(tempVec)
-
-    def subtractToMe(self, other):
-        self.define(self.subtract(other))
-        return True
-
-    def subtract(self, other, element=None):
-        # tempV = other.reverse()
-        return self.add(other.reverse())
-
-    def multiplyToMe(self, scalar):
-        self.define(self.multiply(scalar))
-        return True
-
-    def multiply(self, scalar):
-        return vector([x * scalar for x in self.elements])
-
-    def cross(self, other):
-        if (len(self) != 3 or len(other) != 3):
-            print("Unable to do cross product on size {} and {} vectors".format(len(self), len(other)))
-            return None
-        return vector([
-            self[1] * other[2] - self[2] * other[1],
-            self[2] * other[0] - self[0] * other[2],
-            self[0] * other[1] - self[1] * other[0]
-        ])
-
-    def dot(self, other):
-        product = 0
-        if self.dim != other.dim: return False
-        for i in range(self.dim):
-            product += self.elements[i] * other.elements[i]
-        return product
-
-    def rotateAbout(self, other, angle):
-        selfParaOther = self.project(other)
-        selfPerpOther = self - selfParaOther
-        crossProd = self.cross(other)
-        X = cos(angle) / abs(selfPerpOther)
-        Y = sin(angle) / abs(crossProd)
-        result = (selfPerpOther * X + crossProd * Y) * abs(selfPerpOther) + selfParaOther
-        return result
-
-
-    def project(self, other):
-        # Projects self onto other
-        return other * (self.dot(other) / (abs(other) ** 2))
-
-    def projectMag(self, other):
-        # Projects self onto other
-        return (self.dot(other) / abs(other))
-
-    def relAngle(self, other, plane=None):
-        # plane = None or the plane [axis1, axis2]
-        if type(other) == int:
-            return acos(self[other] / abs(self))
-        if not plane:
-            cosTheta = self.dot(other) / (self.getMag() * other.getMag())
-            return acos(cosTheta)
-        else:
-            angleSelf = self.lock(plane).getHeading(plane[0], trueBearing = plane[1])
-            angleOther = other.lock(plane).getHeading(plane[0], trueBearing = plane[1])
-            angle = angleSelf - angleOther
-            return angle
-
-    def lock(self, elements, inverse=False):
-        if elements == None:
-            return self
-        tempVec = vector([0 for x in self.elements])
-        for x in enumerate(self.elements):
-            if (x[0] in elements and inverse == False) or (inverse == True and x[0] not in elements):
-                tempVec.elements[x[0]] = x[1]
-        return tempVec
-
-    def makeOrthogonal(self, other, element=2):
-        """element --> index of the array of elements, default 2
-        Maintains magnitude"""
-        initialMag = self.getMag()
-        if self.dim != other.dim: return False
-        result = 0
-        if other.elements[element] == 0:
-            while other.elements[element] == 0:
-                element = (element + 1) % self.dim
-        for i in range(self.dim):
-            if i != element:
-                result += self.elements[i] * other.elements[i]
-        result = -(result / other.elements[element])
-        self.elements[element] = result
-        self.setMag(initialMag)
-        return True
-
-
 class camera:
     # Main job: work out where a dot should go on the screen given the cameras position and rotation and the objects position.
     def __init__(self, pos = vector(DEFAULT_ZERO_VEC), rot = vector(DEFAULT_UNIT_VEC), vel = vector(DEFAULT_ZERO_VEC), screenDepth = DEFAULT_SCREEN_DEPTH):
@@ -591,9 +378,14 @@ class camera:
         self.screenXaxis = vector([-self.rot[2], 0, self.rot[0]]).setMag(1)
         self.screenYaxis = vector([self.rot[0] * self.rot[1], -(self.rot[0]**2 + self.rot[2]**2), self.rot[2] * self.rot[1]]).setMag(1)
 
-        print(self.pos)
-        print(atan((turtle.window_width()/2) / self.screenDepth))
-        print(atan((turtle.window_height()/2) / self.screenDepth))
+    def setScreenDepth(self, value, increment=False):
+        if increment:
+            self.screenDepth += value
+            difference = value
+        else:
+            difference = value - self.screenDepth
+            self.screenDepth = value
+        self.pos -= self.rot * difference
 
     def pan(self, direction, rate):
         # Direction as a vector
@@ -607,6 +399,9 @@ class camera:
         # direction as a 2 element list [x, y]
         self.screenXaxis = self.screenXaxis.rotateAbout(self.screenYaxis, direction[0] * rate)
         self.screenYaxis = self.screenYaxis.rotateAbout(self.screenXaxis, direction[1] * rate)
+        self.screenXaxis = self.screenXaxis.rotateAbout(self.rot,         direction[2] * rate)
+        self.screenYaxis = self.screenYaxis.rotateAbout(self.rot,         direction[2] * rate)
+
         self.rot = self.screenXaxis.cross(self.screenYaxis)
         self.rot.setMag(1)
         if (self.panTrack):     # Makes the rotation appear to be about the centre of the tracked particle
@@ -894,7 +689,7 @@ def randomVector(dim, mag, maxMag=0, fixComponents=[1,1,1]):
 autoRateValue = maxPan
 pan = [0, 0, 0, False]
 shiftL = False
-rotate = [0, 0]
+rotate = [0, 0, 0]
 def panLeft():
     if pan[2] < 1:
         pan[2] += 1
@@ -937,13 +732,21 @@ def rotRight():
     if rotate[0] > -1:
         rotate[0] = rotate[0] - 1
 
-def rotDown():
+def rotUp():
     if rotate[1] < 1:
         rotate[1] += 1
 
-def rotUp():
+def rotDown():
     if rotate[1] > -1:
         rotate[1] -= 1
+
+def rotClockWise():
+    if rotate[2] < 1:
+        rotate[2] += 1
+
+def rotAntiClock():
+    if rotate[2] > -1:
+        rotate[2] -= 1
 
 def escape():
     global Running
@@ -957,6 +760,20 @@ def leftClick(x, y):
 
 def rightClick(x, y):
     MainLoop.clickTarget = [x, y, 1]    # 0 for left click, 1 for right
+
+def upScreenDepth():
+    camera.setScreenDepth(10, True)
+
+def downScreenDepth():
+    camera.setScreenDepth(-10, True)
+
+def upDelta():
+    global Delta
+    Delta *= 1.2
+
+def downDelta():
+    global Delta
+    Delta *= 1 / 1.2
 
 
 turtle.onkeypress(panLeft, "a")
@@ -992,8 +809,20 @@ turtle.onkeyrelease(rotDown, "Up")
 turtle.onkeypress(rotDown, "Down")
 turtle.onkeyrelease(rotUp, "Down")
 
+turtle.onkeypress(rotClockWise, "e")
+turtle.onkeyrelease(rotAntiClock, "e")
+
+turtle.onkeypress(rotAntiClock, "q")
+turtle.onkeyrelease(rotClockWise, "q")
+
 turtle.onkey(escape, "Escape")
 turtle.onkey(pause,  "space")
+
+turtle.onkeypress(upScreenDepth, ".")
+turtle.onkeypress(downScreenDepth, ",")
+
+turtle.onkey(upDelta, "]")
+turtle.onkey(downDelta, "[")
 
 turtle.onscreenclick(leftClick, 1)
 turtle.onscreenclick(rightClick, 3)
@@ -1004,15 +833,14 @@ DEFAULT_ZERO_VEC = vector(DEFAULT_ZERO_VEC)
 DEFAULT_UNIT_VEC = vector(DEFAULT_UNIT_VEC)
 Buffer = buffer()
 MainLoop = MainLoop()
-# camera = camera(rot = vector([0.60275, 0.72042, 0.34307]))
 camera = camera()
 
 setup()
 Running = True
 particle(25000, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]))
+
 for i in range(PARTICLE_COUNT):
     particle(150, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
-# particle(150, vector([223.43434, 266.12801, 157.37214]), vector([0, 0, 0]))
 
 while Running:
     turtle.clear()
