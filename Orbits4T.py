@@ -54,37 +54,39 @@ if len(sys.argv) > 1:
 
         print("""
 Arguments:
+Key|Parameter type|Description
+   | (if needed)  |
+-d :    float,     Delta time per step
+-n :    int,       Particle count.
+-p :    int,       Preset
+-sp:               Start paused
+-ss:               Staggered simulation (Hit enter in the terminal to trigger each frame)
+-g :    float,     Gravitational constant
+-w :    float,     Window width (Not used in thie version)
+-h :    float,     Window height (Not used in thie version)
+-pd:               Print debugging data
+-sd:    float,     Default screen depth
+-ps:    float,     Maximum pan speed
+-rs:    float,     Rotational speed
+-mk:               Show marker points (static X, Y, Z and Origin coloured particles)
+-ep:    int,       Number of points on each ellipse (Irrelevant if SMART_DRAW is on (which it is))
+-sf:    float,     Rate at which the camera follows its target
+-ad:               Always draw. Attempts to draw particles even if they are thought not to be on screen
 -? : Enter this help screen
--d :*   float,     Delta time per step
--n :*   int,       Particle count.
--p :*   int,       Preset
--sp:    bool,      Start paused
--ss:    bool,      Staggered simulation (Hit enter in the terminal to trigger each frame)
--g :*   float,     Gravitational constant
--w :*   float,     Window width (Not used in thie version)
--h :*   float,     Window height (Not used in thie version)
--pd:    bool,      Print debugging data
--sd:*   float,     Default screen depth
--ps:*   float,     Maximum pan speed
--rs:*   float,     Rotational speed
--mk:    bool,      Show marker points (static X, Y, Z and Origin coloured particles)
--ep:*   int,       Number of points on each ellipse (Irrelevant if SMART_DRAW is on (which it is))
--sf:*   float,     Rate at which the camera follows its target
--ad:    bool,      Always draw. Attempts to draw particles even if they are thought not to be on screen
-(*) indicates a parameter is required after the argument
 
 Using the program:
   - Use W, A, S, D to move forwards, left, backwards, and right respectively.
   - Use R, F to move up and down respectively.
   - '[', ']' to decrease and increase delta time.
   - ',', '.' to decrease and increase the screen depth.
+  - 'n', 'm' to start recording and playing the buffer. The simulation will be paused while recording.
   - Space to pause the simulation. (Movement is still allowed)
   - Click any particle to set the camera to track that particle.
   - To stop tracking, click empty space or another particle.
 
 Presets:
 1)  Centre body with -n number of planets orbiting in random places. (Default 10)
-2)  Galaxy (?)
+2)  'Galaxy' kinda thing
 
 """)
         exit()
@@ -106,6 +108,14 @@ Presets:
         else:
             if (arg[0] == "-"):
                 print("Unrecognised argument: '%s'" % (arg))
+
+else:
+    print("You haven't used any arguments.")
+    print("Either you're being lazy or don't know how to use them.")
+    print("For help, run '%s -?'" % (sys.argv[0]))
+    time.sleep(3)
+    print("Now onto a very lame default simulation...")
+    time.sleep(2)
 Delta                   = args["-d"][1]
 PARTICLE_COUNT          = args["-n"][1]
 preset                  = args["-p"][1]
@@ -308,7 +318,9 @@ Paused: %s
             self.FPS, delta, len(particleList),
             pauseString
         )
-        turtle.goto(-500, 350)
+        width = turtle.window_width()
+        height = turtle.window_height()
+        turtle.goto(-width / 2 + 10, height / 2 - 15 * (len(text.split("\n")) - 1))
         turtle.down()
         turtle.pencolor([1, 1, 1])
         turtle.write(text)
