@@ -28,9 +28,9 @@ LINUX = False # If true, then non alphanumeric key controls will be replaced wit
         #     PUT DEFAULTS HERE
 args = {#       \/
 "-?" :  [None],
-"-d" :  [float, 0.05,   True], # Delta time per step
-"-n" :  [int,   10,     True], # Particle count
-"-p" :  [int,   0,      True], # preset
+"-d" :  [float, 0.025,   True], # Delta time per step
+"-n" :  [int,   20,     True], # Particle count
+"-p" :  [int,   1,      True], # preset
 "-sp":  [str,   False,  False,  True], # start paused
 "-ss":  [str,   False,  False,  True], # staggered simulation
 "-g" :  [float, 20,     True],  # Gravitational constant
@@ -39,7 +39,7 @@ args = {#       \/
 "-pd":  [str,   False,  False,  True], # Print data
 "-sd":  [float, 2000,   True],  # Default screen depth
 "-ps":  [float, 5.0,    True],  # Maximum pan speed
-"-rs":  [float, 0.1,    True],  # Rotational speed
+"-rs":  [float, 0.01,    True],  # Rotational speed
 "-mk":  [str,   False,  False,  True], # Show marker points
 "-ep":  [int,   360,    True],  # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
 "-sf":  [float, 0.5,    True],  # Rate at which the camera follows its target
@@ -57,7 +57,7 @@ Arguments:
 -? : Enter this help screen
 -d :*   float,     Delta time per step
 -n :*   int,       Particle count.
--p :*   int,       Preset (Not used in this version)
+-p :*   int,       Preset
 -sp:    bool,      Start paused
 -ss:    bool,      Staggered simulation (Hit enter in the terminal to trigger each frame)
 -g :*   float,     Gravitational constant
@@ -81,6 +81,10 @@ Using the program:
   - Space to pause the simulation. (Movement is still allowed)
   - Click any particle to set the camera to track that particle.
   - To stop tracking, click empty space or another particle.
+
+Presets:
+1)  Centre body with -n number of planets orbiting in random places. (Default 10)
+2)  Galaxy (?)
 
 """)
         exit()
@@ -146,6 +150,8 @@ def setup():
 def roundList(list, places):
     return [round(x, places) for x in list]
 
+
+
 window = turtle.Screen()
 window.setup(width = 1.0, height = 1.0)
 turtle.bgcolor("black")
@@ -207,13 +213,21 @@ def drawLine(pointA, pointB = None, fill = "black", width = 1):
 
 class buffer:
     def __init__(self):
-        self.allshift = DEFAULT_ZERO_VEC
-        self.allrotate = DEFAULT_ZERO_VEC
+        # self.allshift = DEFAULT_ZERO_VEC
+        # self.allrotate = DEFAULT_ZERO_VEC
         self.buffer = {}
         self.bufferMode = 0 # 0: Normal. 1: Recording, sim paused. 2: Playing.
         self.bufferLength = 0
         for p in particleList:
             self.buffer[p] = []
+
+    def bufferModeString(self):
+        if (self.bufferMode == 0):
+            return "Normal"
+        elif (self.bufferMode == 1):
+            return "Recording"
+        elif (self.bufferMode == 2):
+            return "Playing"
 
     def getBuffer(self, particle, index = -1, remove = None):
         if self.bufferLength > 0:
@@ -223,10 +237,16 @@ class buffer:
         else:
             return False
 
-    def addBuffer(self, particle, colour = None):
-        self.buffer[particle].append([particle.pos, particle.radius, particle.colour])
+    def addBuffer(self, particle):#, colour = None):
+        pos = particle.pos.getClone()
+        rad = particle.radius
+        colour = particle.colour
+        self.buffer[particle].append([pos, rad, colour])
 
     def playBuffer(self, particle, index = 0, remove = True):
+        if (not self.buffer[particle]):
+            self.bufferMode = 0
+            return False
         buff = self.buffer[particle][index]
         if remove:
             self.buffer[particle].pop(index)
@@ -236,11 +256,16 @@ class buffer:
         # A kind of autopilot, takes in a position and returns basically what the camera should see.
         if self.bufferMode == 2:
             # playing
-            return self.playBuffer(particle, playIndex, playRemove)
+            # print("Playing particle")
+            play = self.playBuffer(particle, playIndex, playRemove)
+            # if (play):
+            return play
+
         elif self.bufferMode == 1:
             # recording. Don't let the particle move.
+            # print("Recording. Keeping particle frozen.")
             self.addBuffer(particle)
-            return self.buffer[particle][defaultIndex]
+            return self.buffer[particle][0]
         else:
             return False
 
@@ -252,12 +277,13 @@ class MainLoop:
         # Records the movements to all particles
         self.commonShiftPos = DEFAULT_ZERO_VEC
         self.commonShiftVel = DEFAULT_ZERO_VEC
-        self.commonRotate = DEFAULT_ZERO_VEC
+        # self.commonRotate = DEFAULT_ZERO_VEC
         self.minDistance = None
-        self.pause = -1 # 1 for pause, -1 for not paused.
+        self.pause = -1         # 1 for pause, -1 for not paused.
 
         self.clickTarget = None
 
+        self.FPS = 1
         self.frameWarning = False
 
     def Zero(self):
@@ -269,14 +295,33 @@ class MainLoop:
         self.commonShift.addToMe(vectorShift)
         return self.commonShift
 
-    def changeCommonRotate(self, vectorRotate):
-        self.commonRotate.addToMe(vectorRotate)
-        return self.commonRotate
+    def showData(self, delta):
+        pauseString = "True"
+        if self.pause == -1: pauseString = "False"
+
+        text = """
+Buffermode: %s \t Frame Rate: %d
+Particle Count: %d Delta: %lf
+Paused: %s
+        """ % (
+            Buffer.bufferModeString(),
+            self.FPS, delta, len(particleList),
+            pauseString
+        )
+        turtle.goto(-500, 350)
+        turtle.down()
+        turtle.pencolor([1, 1, 1])
+        turtle.write(text)
+
+    # def changeCommonRotate(self, vectorRotate):
+    #     self.commonRotate.addToMe(vectorRotate)
+    #     return self.commonRotate
 
     def abort(self):
+        global Running
+        Running = False
         print("Auto Aborting!!!")
-
-        exit()
+        # exit()
 
     def STEP(self, delta, camera, draw = True):
         # I think it would be slightly more effecient to only do an if comparison once,
@@ -307,6 +352,7 @@ class MainLoop:
             if (self.clickTarget):
                 camera.panTrackSet()
 
+            # print("---")
             for I in range(len(particleList)):
                 # print("I: %d" % (I))
                 p = particleList[I]
@@ -318,7 +364,7 @@ class MainLoop:
                     self.minDistance = abs(p.pos - camera.pos) - p.radius
                 elif ((abs(p.pos - camera.pos) - p.radius) < self.minDistance):
                     self.minDistance = abs(p.pos - camera.pos) - p.radius
-                if (self.pause == -1):
+                if (self.pause == -1 and Buffer.bufferMode != 2):
                     p.step(delta)
                 if (abs(self.commonShiftPos != 0) or abs(self.commonShiftVel) != 0):
                     p.pos.addToMe(self.commonShiftPos)
@@ -327,20 +373,23 @@ class MainLoop:
                 if not buff:
                     drawResult = camera.drawParticle(p)
                     if (self.clickTarget):
-                        # print("clicked")
                         if (drawResult):
-                            # print("%s, drawResult[2, 3]: %lf, %lf. |p - click| = %lf" % (str(vector(self.clickTarget[:-1]) - vector(drawResult[0:2])),
-                            #                                         drawResult[2], drawResult[3], abs(vector(self.clickTarget[:-1]) - vector(drawResult[0:2]))
-                            #                                         ))
                             if (abs(vector(self.clickTarget[:-1]) - vector(drawResult[0:2])) < drawResult[2]):
                                 if (self.clickTarget[2] == 0):
                                     # Left click
                                     camera.panTrackSet(p)
+                                elif (self.clickTarget[2] == 1):
+                                    # Right click
+                                    pass
                 else:
-                    camera.drawAt(buff)
+                    # print("buff returned, drawing somewhere different.")
+                    camera.drawAt(buff[0], buff[1], buff[2])
         else:
+            # print("Got here somehow?")
             for p in particleList:
                 p.step(delta)
+
+
 
         frameEnd = time.time()
         frameLength = frameEnd - frameStart
@@ -348,7 +397,7 @@ class MainLoop:
             FPS = -1
         else:
             FPS = 1 / frameLength
-
+        self.FPS = FPS
         # print("FPS:", FPS)
         if (AUTO_ABORT):
             if (FPS < 1 and FPS != -1):
@@ -359,7 +408,7 @@ class MainLoop:
             else:
                 self.frameWarning = False
 
-
+        self.showData(delta)
         self.clickTarget = None
         self.Zero()
 
@@ -451,10 +500,9 @@ class camera:
         relPosUnit = relPosition.multiply(1 / abs(relPosition))
         relRotation = relPosUnit - self.rot
 
-        rp = particle.radius
-        SD = self.screenDepth
-        CP = pos - self.pos
-
+        # rp = particle.radius
+        # SD = self.screenDepth
+        # CP = pos - self.pos
 
         x_r, y_r, z_r = self.rot.elements
         x_CSP, y_CSP, z_CSP = relPosOnScreen.elements
@@ -462,10 +510,6 @@ class camera:
 
         X = relPosOnScreen.dot(self.screenXaxis) / abs(self.screenXaxis)
         Y = relPosOnScreen.dot(self.screenYaxis) / abs(self.screenYaxis)
-
-        # X = (-(x_CSP - x_CSC) * z_r + (z_CSP - z_CSC) * x_r) * (x_r ** 2 + z_r ** 2) ** (-1 / 2)
-        # Y = -((x_CSP - x_CSC) * x_r * y_r + (y_CSP - y_CSC) * (-x_r ** 2 - z_r ** 2) + (z_CSP - z_CSC) * z_r * y_r) * (x_r ** 2 * y_r ** 2 + (-x_r ** 2 - z_r ** 2) ** 2 + z_r ** 2 * y_r ** 2) ** (-1 / 2)
-
 
         centreAngleX = acos((2 - relRotation.lock([0, 2]).getMag() ** 2) / 2)
         centreAngleY = acos((2 - relRotation.lock([0, 1]).getMag() ** 2) / 2)
@@ -641,18 +685,37 @@ class particle:
 
         return True
 
-    def circularise(self, other, plane = None, inclination = 0):
-        if inclination == "r":
-            inclination = random.random() * 360 - 180
-        speed = sqrt(G * other.mass/(self.pos.subtract(other.pos).getMag()))
+    def circularise(self, other, plane = None, axis=None):
+        # If axis is supplied, the resulting orbit is in the direction of the
+        # cross product of the displacement vector from the body to parent and the axis
+        if type(other) == list:
+            # Can specify a mass at a position instead of a particle
+            # Parse as [mass, position, vel=0]
+            mass = other[0]
+            position = other[1]
+            if (len(other) > 2):
+                otherVel = other[2]
+            else:
+                otherVel = vector([0, 0, 0])
+        else:
+            mass = other.mass
+            position = other.pos
+            otherVel = other.vel
+
+        # if inclination == "r":
+        #     inclination = random.random() * 360 - 180
+        speed = sqrt(G * mass/abs(self.pos - position))
         vel = randomVector(3, 1)
-        vel.makeOrthogonal(other.pos.subtract(self.pos))
-        if plane: vel = vel.lock(plane)#[vel.elements[i] * plane[i] for i in range(len(vel.elements))]
+        if (axis == None):
+            vel.makeOrthogonal(position - self.pos)
+            if plane: vel = vel.lock(plane)#[vel.elements[i] * plane[i] for i in range(len(vel.elements))]
+        else:
+            vel = axis.cross(position - self.pos)
         vel.setMag(speed)
-        vel.addToMe(other.vel)
-        self.vel = vel
+        self.vel = vel + otherVel
         return True
 
+        # if type(other) == particle:
 markerList = []
 
 class marker(particle):
@@ -754,6 +817,8 @@ def escape():
 
 def pause():
     MainLoop.pause *= -1
+    if Buffer.bufferMode == 1:
+        bufferPlay()
 
 def leftClick(x, y):
     MainLoop.clickTarget = [x, y, 0]    # 0 for left click, 1 for right
@@ -774,6 +839,15 @@ def upDelta():
 def downDelta():
     global Delta
     Delta *= 1 / 1.2
+
+def bufferRecord():
+    Buffer.bufferMode = 1
+
+def bufferPlay():
+    if MainLoop.pause == 1:
+        pause()
+    Buffer.bufferMode = 2
+
 
 
 turtle.onkeypress(panLeft, "a")
@@ -827,21 +901,39 @@ turtle.onkey(downDelta, "[")
 turtle.onscreenclick(leftClick, 1)
 turtle.onscreenclick(rightClick, 3)
 
+turtle.onkey(bufferRecord, "n")
+turtle.onkey(bufferPlay, "m")
+
 turtle.listen()
 
 DEFAULT_ZERO_VEC = vector(DEFAULT_ZERO_VEC)
 DEFAULT_UNIT_VEC = vector(DEFAULT_UNIT_VEC)
-Buffer = buffer()
 MainLoop = MainLoop()
 camera = camera()
 
 setup()
 Running = True
-particle(25000, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]))
 
-for i in range(PARTICLE_COUNT):
-    particle(150, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
+if preset == 1:
+    particle(25000, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]))
+    for i in range(PARTICLE_COUNT):
+        particle(150, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
+elif preset == 2:
+    COM = vector([0, 0, 0])     # Centre of mass
+    particleMass = 100
+    for i in range(PARTICLE_COUNT):
+        particle(particleMass, vector([DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 500, [1, 0, 1]))
+        COM += particleList[-1].pos
 
+    COM = COM / PARTICLE_COUNT
+    totalMass = PARTICLE_COUNT * particleMass
+    for p in particleList:
+        p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
+
+
+
+
+Buffer = buffer()
 while Running:
     turtle.clear()
     if STAGGERED_SIM: input()

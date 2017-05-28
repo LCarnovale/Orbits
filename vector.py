@@ -18,6 +18,9 @@ class vector:
     def __sub__(self, other):
         return self.subtract(other)
 
+    def __truediv__(self, other):
+        return self.multiply(1 / other)
+
     def __iadd__(self, other):
         self.addToMe(other)
         return self
