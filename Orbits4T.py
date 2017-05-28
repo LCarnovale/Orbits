@@ -43,7 +43,8 @@ args = {#       \/
 "-mk":  [str,   False,  False,  True], # Show marker points
 "-ep":  [int,   360,    True],  # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
 "-sf":  [float, 0.5,    True],  # Rate at which the camera follows its target
-"-ad":  [str,   False,  False,  True]  # Always draw. Attempts to draw particles even if they are thought not to be on screen
+"-ad":  [str,   False,  False,  True], # Always draw. Attempts to draw particles even if they are thought not to be on screen
+"-vm":  [float, 150,    True]   # Variable mass. Will be used in various places for each preset.
 }
 
 
@@ -72,6 +73,7 @@ Key|Parameter type|Description
 -ep:    int,       Number of points on each ellipse (Irrelevant if SMART_DRAW is on (which it is))
 -sf:    float,     Rate at which the camera follows its target
 -ad:               Always draw. Attempts to draw particles even if they are thought not to be on screen
+-vm:    float,     Variable mass. To be used in relevant places for some presets.
 -? : Enter this help screen
 
 Using the program:
@@ -131,6 +133,7 @@ showMarkers             = args["-mk"][1]
 ellipsePoints           = args["-ep"][1]
 SMOOTH_FOLLOW           = args["-sf"][1]
 ALWAYS_DRAW             = args["-ad"][1]
+variableMass            = args["-vm"][1]
 
 AUTO_RATE_CONSTANT  = 100       # A mysterious constant which determines the autoRate speed, 100 works well.
 
@@ -228,8 +231,15 @@ class buffer:
         self.buffer = {}
         self.bufferMode = 0 # 0: Normal. 1: Recording, sim paused. 2: Playing.
         self.bufferLength = 0
+        self.emptyBuffers = len(particleList)
+        self.bufferCount = self.emptyBuffers
         for p in particleList:
             self.buffer[p] = []
+
+    def addParticle(self, particle):
+        self.buffer[p]    = []
+        self.emptyBuffers += 1
+        self.bufferCount  += 1
 
     def bufferModeString(self):
         if (self.bufferMode == 0):
@@ -239,32 +249,41 @@ class buffer:
         elif (self.bufferMode == 2):
             return "Playing"
 
-    def getBuffer(self, particle, index = -1, remove = None):
-        if self.bufferLength > 0:
-            result = self.buffer[particle][index]
-            if remove != None: self.buffer[particle].pop(remove)
-            return result
-        else:
-            return False
+    # def getBuffer(self, particle, index = -1, remove = None):
+    #     if self.bufferLength > 0:
+    #         result = self.buffer[particle][index]
+    #         if remove != None: self.buffer[particle].pop(remove)
+    #         return result
+    #     else:
+    #         return False
 
     def addBuffer(self, particle):#, colour = None):
         pos = particle.pos.getClone()
         rad = particle.radius
         colour = particle.colour
+        self.bufferLength += 1
+        if (not self.buffer[particle]):
+            self.emptyBuffers -= 1
         self.buffer[particle].append([pos, rad, colour])
+
 
     def playBuffer(self, particle, index = 0, remove = True):
         if (not self.buffer[particle]):
-            self.bufferMode = 0
+            self.emptyBuffers += 1
+            # self.bufferMode = 0
             return False
         buff = self.buffer[particle][index]
         if remove:
+            self.bufferLength -= 1
             self.buffer[particle].pop(index)
         return buff
 
     def processPosition(self, particle, defaultIndex = 0, playIndex = 0, playRemove = True):
         # A kind of autopilot, takes in a position and returns basically what the camera should see.
         if self.bufferMode == 2:
+            if (self.emptyBuffers == self.bufferCount):
+                self.bufferMode = 0
+                return False
             # playing
             # print("Playing particle")
             play = self.playBuffer(particle, playIndex, playRemove)
@@ -278,8 +297,6 @@ class buffer:
             return self.buffer[particle][0]
         else:
             return False
-
-        # if default == 0:
 
 
 class MainLoop:
@@ -310,13 +327,13 @@ class MainLoop:
         if self.pause == -1: pauseString = "False"
 
         text = """
-Buffermode: %s \t Frame Rate: %d
-Particle Count: %d Delta: %lf
+Frame Rate: %d \tBuffermode: %s (%.3lf)
+Particle Count: %d Delta: %f
 Paused: %s
         """ % (
-            Buffer.bufferModeString(),
-            self.FPS, delta, len(particleList),
-            pauseString
+            self.FPS, Buffer.bufferModeString(), Buffer.bufferLength / Buffer.bufferCount,
+            len(particleList),
+            delta, pauseString
         )
         width = turtle.window_width()
         height = turtle.window_height()
@@ -853,6 +870,8 @@ def downDelta():
     Delta *= 1 / 1.2
 
 def bufferRecord():
+    # if MainLoop.pause == 1:
+    #     pause()
     Buffer.bufferMode = 1
 
 def bufferPlay():
@@ -929,7 +948,7 @@ Running = True
 if preset == 1:
     particle(25000, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]))
     for i in range(PARTICLE_COUNT):
-        particle(150, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
+        particle(variableMass, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
 elif preset == 2:
     COM = vector([0, 0, 0])     # Centre of mass
     particleMass = 100
