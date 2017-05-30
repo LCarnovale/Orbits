@@ -35,6 +35,13 @@ class vector:
     def __str__(self):
         return ("<" + ", ".join([str(x) for x in self.elements]) + ">")
 
+    def string(self, rounding=None):
+        if rounding:
+            return ("<" + ", ".join([str(round(x, rounding)) for x in self]) + ">")
+        else:
+            return ("<" + ", ".join([str(x) for x in self.elements]) + ">")
+
+
     def __repr__(self):
         return self.elements
 

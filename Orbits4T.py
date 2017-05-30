@@ -27,24 +27,27 @@ LINUX = False # If true, then non alphanumeric key controls will be replaced wit
 # if false, the algorithm still looks for a value after the key but if no value given the second default value is used.
         #     PUT DEFAULTS HERE
 args = {#       \/
-"-?" :  [None],
-"-d" :  [float, 0.025,   True], # Delta time per step
-"-n" :  [int,   20,     True], # Particle count
-"-p" :  [int,   1,      True], # preset
-"-sp":  [str,   False,  False,  True], # start paused
-"-ss":  [str,   False,  False,  True], # staggered simulation
-"-g" :  [float, 20,     True],  # Gravitational constant
-"-w" :  [float, 500,    True],  # Window width
-"-h" :  [float, 600,    True],  # Window height
-"-pd":  [str,   False,  False,  True], # Print data
-"-sd":  [float, 2000,   True],  # Default screen depth
-"-ps":  [float, 5.0,    True],  # Maximum pan speed
-"-rs":  [float, 0.01,    True],  # Rotational speed
-"-mk":  [str,   False,  False,  True], # Show marker points
-"-ep":  [int,   360,    True],  # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
-"-sf":  [float, 0.5,    True],  # Rate at which the camera follows its target
-"-ad":  [str,   False,  False,  True], # Always draw. Attempts to draw particles even if they are thought not to be on screen
-"-vm":  [float, 150,    True]   # Variable mass. Will be used in various places for each preset.
+"-?"  :  [None],
+"-d"  :  [float, 0.025,  True], # Delta time per step
+"-n"  :  [int,   20,     True], # Particle count
+"-p"  :  [int,   1,      True], # preset
+"-sp" :  [str,   False,  False,  True], # start paused
+"-ss" :  [str,   False,  False,  True], # staggered simulation
+"-g"  :  [float, 20,     True],  # Gravitational constant
+"-w"  :  [float, 500,    True],  # Window width
+"-h"  :  [float, 600,    True],  # Window height
+"-pd" :  [str,   False,  False,  True], # Print data
+"-sd" :  [float, 2000,   True],  # Default screen depth
+"-ps" :  [float, 5.0,    True],  # Maximum pan speed
+"-rs" :  [float, 0.01,    True],  # Rotational speed
+"-mk" :  [str,   False,  False,  True], # Show marker points
+"-ep" :  [int,   360,    True],  # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
+"-sf" :  [float, 0.5,    True],  # Rate at which the camera follows its target
+"-ad" :  [str,   False,  False,  True], # Always draw. Attempts to draw particles even if they are thought not to be on screen
+"-vm" :  [float, 150,    True],  # Variable mass. Will be used in various places for each preset.
+"-vv" :  [str,   False,  False,  True], # Draw velocity vectors
+"-sdp":  [int,   5,      True],  # Smart draw parameter, equivalent to the number of pixels per edge on a shape
+"-AA_OFF": [str, True, False, False]   # Turn off AutoAbort.
 }
 
 
@@ -122,6 +125,7 @@ Delta                   = args["-d"][1]
 PARTICLE_COUNT          = args["-n"][1]
 preset                  = args["-p"][1]
 STAGGERED_SIM           = args["-ss"][1]
+START_PAUSED            = args["-sp"][1]
 G                       = args["-g"][1]
 INITIAL_WINDOW_WIDTH    = args["-w"][1]
 INITIAL_WINDOW_HEIGHT   = args["-h"][1]
@@ -132,19 +136,26 @@ rotSpeed                = args["-rs"][1]
 showMarkers             = args["-mk"][1]
 ellipsePoints           = args["-ep"][1]
 SMOOTH_FOLLOW           = args["-sf"][1]
+DRAW_VEL_VECS           = args["-vv"][1]
 ALWAYS_DRAW             = args["-ad"][1]
 variableMass            = args["-vm"][1]
 
+DEFAULT_ROTATE_FOLLOW_RATE = 0.2
 AUTO_RATE_CONSTANT  = 100       # A mysterious constant which determines the autoRate speed, 100 works well.
 
 defaultDensity      = 1
 radiusLimit         = 50        # Maximum size of particle
 voidRadius          = 5000      # Maximum distance of particle from camera
 
-AUTO_ABORT          = True      # I wouldn't change this unless you know the programs good to go
+AUTO_ABORT          = args["-AA_OFF"][1]      # I wouldn't change this unless you know the programs good to go
+if not AUTO_ABORT:
+    print("Auto abort is off!")
+    print("This should only be done on large simulations where a low frame is expected.")
+    print("If you don't need it off, don't turn it off.")
+    time.sleep(3)
+
 
 particleList = [ ]
-
 
 DEFAULT_ZERO_VEC = [0, 0, 0]
 DEFAULT_UNIT_VEC = [1, 0, 0]
@@ -174,9 +185,9 @@ turtle.hideturtle()
 
 SMART_DRAW = True               # Changes the number of points on each ellipse
                                 # depending on its size
-SMART_DRAW_PARAMETER = 5        # Approx number of pixels between each point
+SMART_DRAW_PARAMETER = args["-sdp"][1]     # Approx number of pixels between each point
 
-MAX_POINTS = 800                # Lazy way of limiting the number of points drawn to stop the program
+MAX_POINTS = 400                # Lazy way of limiting the number of points drawn to stop the program
                                 # grinding to a halt everytime you get too close to a particle
 
 def drawOval(x, y, major, minor, angle, fill = "black"):
@@ -236,6 +247,9 @@ class buffer:
         for p in particleList:
             self.buffer[p] = []
 
+    def __sizeof__(self):
+        return (self.bufferLength * sys.getsizeof(self.buffer[particleList[0]]) * len(particleList))
+
     def addParticle(self, particle):
         self.buffer[p]    = []
         self.emptyBuffers += 1
@@ -261,10 +275,15 @@ class buffer:
         pos = particle.pos.getClone()
         rad = particle.radius
         colour = particle.colour
+        vel = particle.vel.getClone()
+        acc = particle.acc.getClone()
         self.bufferLength += 1
         if (not self.buffer[particle]):
             self.emptyBuffers -= 1
-        self.buffer[particle].append([pos, rad, colour])
+        if (DRAW_VEL_VECS):
+            self.buffer[particle].append([pos, rad, colour, vel, acc])
+        else:
+            self.buffer[particle].append([pos, rad, colour])
 
 
     def playBuffer(self, particle, index = 0, remove = True):
@@ -304,11 +323,10 @@ class MainLoop:
         # Records the movements to all particles
         self.commonShiftPos = DEFAULT_ZERO_VEC
         self.commonShiftVel = DEFAULT_ZERO_VEC
-        # self.commonRotate = DEFAULT_ZERO_VEC
         self.minDistance = None
         self.pause = -1         # 1 for pause, -1 for not paused.
 
-        self.clickTarget = None
+        self.clickTarget = []
 
         self.FPS = 1
         self.frameWarning = False
@@ -325,14 +343,13 @@ class MainLoop:
     def showData(self, delta):
         pauseString = "True"
         if self.pause == -1: pauseString = "False"
-
         text = """
-Frame Rate: %d \tBuffermode: %s (%.3lf)
+Frame Rate: %.2f \tBuffermode: %s (%d) --> (%.2lf Mb)
 Particle Count: %d Delta: %f
 Paused: %s
         """ % (
             self.FPS, Buffer.bufferModeString(), Buffer.bufferLength / Buffer.bufferCount,
-            len(particleList),
+            sys.getsizeof(Buffer) / 1000000, len(particleList),
             delta, pauseString
         )
         width = turtle.window_width()
@@ -358,8 +375,9 @@ Paused: %s
 
         # drawLine((-500, 0), (500, 0), fill = [1, 1, 1])
         global particleList
-
+        global DRAW_VEL_VECS
         camera.panFollow()
+        camera.rotFollow()
 
         if (pan[-1] == False and self.minDistance != None):
             panAmount = self.minDistance * maxPan/(self.minDistance + AUTO_RATE_CONSTANT)
@@ -378,13 +396,19 @@ Paused: %s
                 camera.drawParticle(m)
             # if not particleList:
             #     return None
+            # clicked = False
+            clickTarget = None
             if (self.clickTarget):
-                camera.panTrackSet()
-
+                clickTarget = self.clickTarget.pop(0)
+                if (clickTarget[2] == 0):
+                    camera.panTrackSet()
+                elif (clickTarget[2] == 1):
+                    camera.rotTrackSet()
+                # clicked = True
             # print("---")
-            for I in range(len(particleList)):
+            for I, p  in enumerate(particleList):
                 # print("I: %d" % (I))
-                p = particleList[I]
+                # p = particleList[I]
                 if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
                     # Swap the previous one with the current one
                     particleList = particleList[:I - 1] + [particleList[I], particleList[I-1]] + particleList[I + 1:]
@@ -399,20 +423,46 @@ Paused: %s
                     p.pos.addToMe(self.commonShiftPos)
                     p.pos.addToMe(self.commonShiftVel.multiply(delta))
                 buff = Buffer.processPosition(p)
+                # print("(%d) click target in loop:" % (I), clickTarget)
                 if not buff:
                     drawResult = camera.drawParticle(p)
-                    if (self.clickTarget):
-                        if (drawResult):
-                            if (abs(vector(self.clickTarget[:-1]) - vector(drawResult[0:2])) < drawResult[2]):
-                                if (self.clickTarget[2] == 0):
-                                    # Left click
-                                    camera.panTrackSet(p)
-                                elif (self.clickTarget[2] == 1):
-                                    # Right click
-                                    pass
+                    if DRAW_VEL_VECS and drawResult:
+                        vecResult = camera.drawParticle([p.pos + p.vel, 1, [0, 1, 0]], drawAt=True, point=True)
+                        accResult = camera.drawParticle([p.pos + p.acc * 5, 1, [1, 0, 0]], drawAt=True, point=True)
+                        if vecResult:
+                            drawLine((vecResult[0], vecResult[1]), (drawResult[0], drawResult[1]), fill = [0, 1, 0])
+                        if accResult:
+                            drawLine((accResult[0], accResult[1]), (drawResult[0], drawResult[1]), fill = [1, 0, 0])
+                    # if I == 0:
+
                 else:
-                    # print("buff returned, drawing somewhere different.")
-                    camera.drawAt(buff[0], buff[1], buff[2])
+                    # Buff returned something, which means it wants the camera
+                    # to draw something other than the particle's actual position
+                    drawResult = camera.drawAt(buff[0], buff[1], buff[2])
+                    if DRAW_VEL_VECS and drawResult:
+                        vecResult = camera.drawParticle([buff[0] + buff[3], 1, [0, 1, 0]], drawAt=True, point=True)
+                        accResult = camera.drawParticle([buff[0] + buff[4] * 5, 1, [1, 0, 0]], drawAt=True, point=True)
+                        if vecResult:
+                            drawLine((vecResult[0], vecResult[1]), (drawResult[0], drawResult[1]), fill = [0, 1, 0])
+                        if accResult:
+                            drawLine((accResult[0], accResult[1]), (drawResult[0], drawResult[1]), fill = [1, 0, 0])
+
+                if (clickTarget):
+                    if (drawResult):
+                        clickX   = clickTarget[0]
+                        clickY   = clickTarget[1]
+                        clickBut = clickTarget[2]
+                        drawX   = drawResult[0]
+                        drawY   = drawResult[1]
+                        drawRad = drawResult[2]
+                        # print("Distance from particle of mass %d: %.3lf" % (p.mass, abs(vector([clickX, clickY]) - vector([drawX, drawY]))))
+                        if (abs(vector([clickX, clickY]) - vector([drawX, drawY])) < drawRad):
+                            if (clickBut == 0):
+                                # Left click
+                                camera.panTrackSet(p)
+                            elif (clickBut == 1):
+                                # Right click
+                                camera.rotTrackSet(p)
         else:
             # print("Got here somehow?")
             for p in particleList:
@@ -438,7 +488,8 @@ Paused: %s
                 self.frameWarning = False
 
         self.showData(delta)
-        self.clickTarget = None
+        if self.clickTarget:
+            print("Click target:", self.clickTarget)
         self.Zero()
 
 
@@ -447,7 +498,7 @@ class camera:
     def __init__(self, pos = vector(DEFAULT_ZERO_VEC), rot = vector(DEFAULT_UNIT_VEC), vel = vector(DEFAULT_ZERO_VEC), screenDepth = DEFAULT_SCREEN_DEPTH):
         self.pos = pos
         self.rot = rot.setMag(1)
-        self.vel = vel
+        # self.vel = vel
         self.panTrack = None
         self.rotTrack = None
         self.trackDistance = 100
@@ -477,20 +528,22 @@ class camera:
         # direction as a 2 element list [x, y]
         self.screenXaxis = self.screenXaxis.rotateAbout(self.screenYaxis, direction[0] * rate)
         self.screenYaxis = self.screenYaxis.rotateAbout(self.screenXaxis, direction[1] * rate)
+        self.rot = self.screenXaxis.cross(self.screenYaxis)
         self.screenXaxis = self.screenXaxis.rotateAbout(self.rot,         direction[2] * rate)
         self.screenYaxis = self.screenYaxis.rotateAbout(self.rot,         direction[2] * rate)
 
-        self.rot = self.screenXaxis.cross(self.screenYaxis)
         self.rot.setMag(1)
         if (self.panTrack):     # Makes the rotation appear to be about the centre of the tracked particle
             self.panFollow(1)   # There is probably a better way to do this, this way is a bit shifty
 
 
     def panTrackSet(self, target = None):
+        # print("Setting pan")
         self.panTrack = target
         return target
 
     def rotTrackSet(self, target = None):
+        # print("Setting rot")
         self.rotTrack = target
         return target
 
@@ -502,12 +555,11 @@ class camera:
         MainLoop.commonShiftPos = self.pos.negate()
         MainLoop.commonShiftVel = self.vel.negate()
 
-    def drawParticle(self, particle, drawAt = False):
+    def drawParticle(self, particle, drawAt = False, point=False):
         # drawAt: if the desired particle isn't actually where we want to draw it, parse [pos, radius [, colour]] and set drawAt = True
-        # self.rot.setMag(1)
         prin = "-\n"
-        screenAngleX = atan((turtle.window_width()/2) / self.screenDepth)
-        screenAngleY = atan((turtle.window_height()/2) / self.screenDepth)
+        screenAngleX = atan(( turtle.window_width() / 2 ) / self.screenDepth)
+        screenAngleY = atan(( turtle.window_height() / 2 ) / self.screenDepth)
         if drawAt:
             pos = particle[0]
             radius = particle[1]
@@ -529,10 +581,6 @@ class camera:
         relPosUnit = relPosition.multiply(1 / abs(relPosition))
         relRotation = relPosUnit - self.rot
 
-        # rp = particle.radius
-        # SD = self.screenDepth
-        # CP = pos - self.pos
-
         x_r, y_r, z_r = self.rot.elements
         x_CSP, y_CSP, z_CSP = relPosOnScreen.elements
         x_CSC, y_CSC, z_CSC = scrCent.elements
@@ -545,17 +593,19 @@ class camera:
         prin += "centreAngleX: " + str(round(centreAngleX, 5)) + ", centreAngleY: " + str(round(centreAngleY, 5)) + "\n"
         # offset: angle either side of centre angle which is slightly distorted due to the 3d bulge of the sphere.
         distance = relPosition.getMag()
-        if (radius >= distance):
+        if (radius >= distance and not point):
             prin += ("Inside particle, not drawing")
             if PRINT_DATA: print(prin)
             return False
         offset = asin(radius/distance)
-        if (not ALWAYS_DRAW and ((abs(centreAngleX) - abs(offset)) > screenAngleX or (abs(centreAngleY) - abs(offset)) > screenAngleY)):
+        if (not point and not ALWAYS_DRAW and ((abs(centreAngleX) - abs(offset)) > screenAngleX or (abs(centreAngleY) - abs(offset)) > screenAngleY)):
             prin = prin + ("Outside of screen, x angle: " + str(centreAngleX) + ", y angle: " + str(centreAngleY) + ", offset: " + str(offset))
             return False
-
-        majorAxis = 2 * (sqrt(X ** 2 + Y ** 2) - self.screenDepth * tan(atan(sqrt(X ** 2 + Y ** 2)/self.screenDepth) - offset))
-        minorAxis = 2 * self.screenDepth * tan(offset)
+        if point:
+            majorAxis, minorAxis = 1, 1
+        else:
+            majorAxis = 2 * (sqrt(X ** 2 + Y ** 2) - self.screenDepth * tan( atan(sqrt(X ** 2 + Y ** 2) / self.screenDepth ) - offset))
+            minorAxis = 2 * self.screenDepth * tan(offset)
         if X != 0:
             angle = atan(Y / X)
         elif X == 0 and Y == 0:
@@ -582,6 +632,15 @@ class camera:
         if self.panTrack == None: return False
         self.pos += ((self.panTrack.pos - (self.rot * self.trackDistance)) - self.pos) * followRate
 
+    def rotFollow(self, followRate=DEFAULT_ROTATE_FOLLOW_RATE):
+        if self.rotTrack == None: return False
+        # print("Rot: %s" % (self.rot.string(3)), end = "-->")
+        self.rot += (self.rotTrack.pos - self.pos).setMag(1) * followRate
+        self.rot.setMag(1)
+        # print("%s" % (self.rot.string(3)))
+        self.screenXaxis = self.screenYaxis.cross(self.rot)
+        self.screenYaxis = self.rot.cross(self.screenXaxis)
+        return True
 
 
 class particle:
@@ -621,7 +680,7 @@ class particle:
         self.setColour()
 
     def calcAcc(self, other):
-        force = (G * self.mass * other.mass)/(self.pos.subtract(other.pos).getMag() ** 2)
+        force = (G * self.mass * other.mass) / (abs(self.pos - other.pos) ** 2)
         forceVector = other.pos.subtract(self.pos)
         # drawVector(forceVector.setMag(force/self.mass), self.pos)
         self.acc.addToMe(forceVector.setMag(force/self.mass))
@@ -702,6 +761,7 @@ class particle:
     def step(self, delta, draw=True, drawVel=False, onlyDraw = False, bufferMode = 0):
         # self.checkCollisionList(particleList)
         # self.calcAccList(particleList)
+        self.acc.multiplyToMe(0)
         self.runLoop()
         if self.radius > radiusLimit:
             self.die()
@@ -710,13 +770,14 @@ class particle:
         self.pos.addToMe(self.vel.multiply(delta))
         self.checkOutOfBounds()
         # if self.acc.getMag(): #print(self.acc.elements)
-        self.acc.multiplyToMe(0)
 
         return True
 
     def circularise(self, other, plane = None, axis=None):
         # If axis is supplied, the resulting orbit is in the direction of the
         # cross product of the displacement vector from the body to parent and the axis
+        if other == self:
+            return False
         if type(other) == list:
             # Can specify a mass at a position instead of a particle
             # Parse as [mass, position, vel=0]
@@ -850,10 +911,12 @@ def pause():
         bufferPlay()
 
 def leftClick(x, y):
-    MainLoop.clickTarget = [x, y, 0]    # 0 for left click, 1 for right
+    print("left clicked")
+    MainLoop.clickTarget.append([x, y, 0])    # 0 for left click, 1 for right
 
 def rightClick(x, y):
-    MainLoop.clickTarget = [x, y, 1]    # 0 for left click, 1 for right
+    print("right clicked")
+    MainLoop.clickTarget.append([x, y, 1])    # 0 for left click, 1 for right
 
 def upScreenDepth():
     camera.setScreenDepth(10, True)
@@ -940,31 +1003,49 @@ turtle.listen()
 DEFAULT_ZERO_VEC = vector(DEFAULT_ZERO_VEC)
 DEFAULT_UNIT_VEC = vector(DEFAULT_UNIT_VEC)
 MainLoop = MainLoop()
-camera = camera()
+
+
+camera = camera(pos = vector([DEFAULT_SCREEN_DEPTH, -DEFAULT_SCREEN_DEPTH, 0]))
+camera.rotate([0, 1, 0], -pi/2)
 
 setup()
 Running = True
 
 if preset == 1:
-    particle(25000, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]))
+    # Cloud of particles orbiting a big thing
+    particle(25000, vector([DEFAULT_SCREEN_DEPTH, 0, 0]))
     for i in range(PARTICLE_COUNT):
         particle(variableMass, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
 elif preset == 2:
+    # Galaxy kinda thing
+    minDist, maxDist = 25, 250
     COM = vector([0, 0, 0])     # Centre of mass
-    particleMass = 100
+    particleMass = variableMass
+    centreVec = vector([DEFAULT_SCREEN_DEPTH, 0, 0])
     for i in range(PARTICLE_COUNT):
-        particle(particleMass, vector([DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 500, [1, 0, 1]))
+        randomVec = randomVector(3, minDist, maxDist, [1, 0, 1])
+        randomVec = randomVec.setMag(maxDist * (abs(randomVec) / maxDist)**2)
+        particle(particleMass, centreVec + randomVec + randomVector(3, 25))
         COM += particleList[-1].pos
 
     COM = COM / PARTICLE_COUNT
-    totalMass = PARTICLE_COUNT * particleMass
+    # totalMass = PARTICLE_COUNT * particleMass
     for p in particleList:
-        p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
+        forceVec = vector([0, 0, 0])
+        for p2 in particleList:
+            if p2 == p: continue
+            forceVec += (p.pos - p2.pos).setMag(G * p.mass * p2.mass / (abs(p.pos - p2.pos)**2))
+        velVec = forceVec.cross(vector([0, 1, 0]))
+        velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)))
+        p.vel = velVec
+        # p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
 
 
 
 
 Buffer = buffer()
+if START_PAUSED:
+    pause()
 while Running:
     turtle.clear()
     if STAGGERED_SIM: input()
