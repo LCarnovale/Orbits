@@ -51,6 +51,7 @@ args = {#       \/
 "-ds" :  [str,	 False,	 False,  True], # Draw stars, ie, make the minimum size 1 pixel, regardless of distance.
 "-sdp":  [int,   5,      True],  # Smart draw parameter, equivalent to the number of pixels per edge on a shape
 "-ab" :  [int,   False,  False,  20], # Make asteroid belt (Wouldn't recommend on presets other than 3..)
+"-es" :  [int,	 False,  False,  5],
 "-df" :  [str, "SolSystem.txt", True], # Path of the data file
 "-AA_OFF": [str, True, False, False]   # Turn off AutoAbort.
 }
@@ -152,12 +153,15 @@ variableMass            = args["-vm"][1]
 DATA_FILE				= args["-df"][1]
 drawStars				= args["-ds"][1]
 makeAsteroids 			= args["-ab"][1]
+makeSatellites			= args["-es"][1]
 
-AsteroidsStart 	 = 249.23 * 10**9
-AsteroidsEnd 	 = 740.52 * 10**9
+AsteroidsStart 	 = 49.23 * 10**9
+AsteroidsEnd 	 = 240.52 * 10**9
 AsteroidsMinMass = 0.0001 * 10**15
 AsteroidsMaxMass = 1	  * 10**23
 AsteroidsDensity = 1500
+
+ALL_IMMUNE = False
 
 
 DEFAULT_ROTATE_FOLLOW_RATE = 0.2
@@ -384,8 +388,8 @@ class MainLoop:
 		else:
 			timeString = "0 days 00:00"
 		if self.pause == -1: pauseString = "False"
-		text = """
-Frame Rate: %s \tBuffermode: %s (%d) --> (%.2lf Mb)
+		text = """Frame Rate: %s
+Buffermode: %s (%d) --> (%.2lf Mb)
 Particle Count: %d Delta: %f
 Paused: %s         Time:  %s
 		""" % (
@@ -448,6 +452,7 @@ Paused: %s         Time:  %s
 		frameStart = time.time()
 		if self.pause == -1 and Buffer.bufferMode != 2: self.Time += delta
 		if draw:
+			doStep = (self.pause == -1 and Buffer.bufferMode != 2)
 			self.closestParticle = None
 			for m in sorted(markerList, key = lambda x: abs(x.pos - camera.pos), reverse = True):
 				camera.drawParticle(m)
@@ -463,6 +468,15 @@ Paused: %s         Time:  %s
 					camera.rotTrackSet()
 				# clicked = True
 			# print("---")
+			if camera.panTrack:
+				if doStep: camera.panTrack.step(delta)
+				camera.panFollow()
+			if camera.rotTrack and camera.rotTrack != camera.panTrack:
+				if doStep: camera.rotTrack.step(delta)
+				camera.rotFollow()
+			elif camera.rotTrack:
+				camera.rotFollow()
+
 			for I, p  in enumerate(particleList):
 				# print("I: %d" % (I))
 				# p = particleList[I]
@@ -474,11 +488,15 @@ Paused: %s         Time:  %s
 					self.closestParticle = p#abs(p.pos - camera.pos) - p.radius
 				elif ((abs(p.pos - camera.pos) - p.radius) < abs(self.closestParticle.pos - camera.pos)):
 					self.closestParticle = p
-				if (self.pause == -1 and Buffer.bufferMode != 2):
+				if (doStep and (p != camera.rotTrack and p != camera.panTrack)):
 					p.step(delta)
-				if (abs(self.commonShiftPos != 0) or abs(self.commonShiftVel) != 0):
-					p.pos.addToMe(self.commonShiftPos)
-					p.pos.addToMe(self.commonShiftVel.multiply(delta))
+				# if p == camera.panTrack:
+				# 	camera.panFollow()
+				# if p == camera.rotTrack:
+				# 	camera.rotFollow()
+				# if (abs(self.commonShiftPos != 0) or abs(self.commonShiftVel) != 0):
+				# 	p.pos.addToMe(self.commonShiftPos)
+				# 	p.pos.addToMe(self.commonShiftVel.multiply(delta))
 				buff = Buffer.processPosition(p)
 				# print("(%d) click target in loop:" % (I), clickTarget)
 				if not buff:
@@ -520,8 +538,6 @@ Paused: %s         Time:  %s
 							elif (clickBut == 1):
 								# Right click
 								camera.rotTrackSet(p)
-			camera.panFollow()
-			camera.rotFollow()
 
 		else:
 			# print("Got here somehow?")
@@ -791,7 +807,7 @@ class particle:
 	def checkOutOfBounds(self): #bounds=[turtle.window_width()/2, turtle.window_height()/2]):
 		# self.vel.multiplyToMe(0)
 		# return
-		if self.immune: return False
+		if self.immune or ALL_IMMUNE: return False
 		out = False
 		if self.pos.subtract(camera.pos).getMag() > voidRadius:
 			out = True
@@ -1131,6 +1147,7 @@ elif preset == 2:
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
 elif preset == 3:
+	ALL_IMMUNE = True
 	planets = {}
 	colours = {
 		"Moon"		: [1,	1, 	 1],
@@ -1155,7 +1172,7 @@ elif preset == 3:
 			density = data["DENSITY"]
 			new = particle(mass, pos, vel, density=density, autoColour=False,
 						colour=(colours[planet] if planet in colours else [0.5, 0.5, 0.5]), limitRadius=False)
-			new.immune = True
+			# new.immune = True
 			planets[planet] = new
 			MainLoop.addData(planet, "int(abs(camera.pos - planets['{}'].pos))".format(planet), True)
 			# print("{} radius: {}".format(planet, new.radius))
@@ -1174,7 +1191,18 @@ elif preset == 3:
 			mass = random.random() * (AsteroidsMaxMass - AsteroidsMinMass) + AsteroidsMinMass
 			new = particle(mass, planets["Sun"].pos + pos + offset, autoColour=False, colour = "grey", limitRadius=False)
 			new.circularise(planets["Sun"], axis = vector([0, 0, -1]))
-			new.immune = True
+
+	earthVec = planets["Earth"].pos
+	radius   = planets["Earth"].radius + 150000
+	if makeSatellites:
+		for i in range(makeSatellites):
+			offset = randomVector(3, radius)
+			particle(1000, earthVec + offset, autoColour = False, colour = "grey").circularise(planets["Earth"])
+
+	# sat1 = earthVec + vector([1, 0.8, 0]).setMag(radius)
+	# sat2 = earthVec + vector([0.8, 1, 0]).setMag(radius)
+	# particle(1000, sat1).circularise(planets["Earth"], axis=vector([0, 0, -1]))
+	# particle(1000, sat2).circularise(planets["Earth"], axis=vector([0, 0, 1]))
 
 
 Buffer = buffer()
