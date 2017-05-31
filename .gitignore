@@ -62,3 +62,5 @@ Orbits3.py
 __pycache__/vector.cpython-36.pyc
 *.un~
 *.tex~
+quicky.py
+*.pyc
