@@ -35,7 +35,7 @@ args = {#       \/
 "-p"  :  [int,   1,      True], # preset
 "-sp" :  [str,   False,  False,  True], # start paused
 "-ss" :  [str,   False,  False,  True], # staggered simulation
-"-g"  :  [float, 20,     True],  # Gravitational constant
+"-G"  :  [float, 20,     True],  # Gravitational constant
 "-w"  :  [float, 500,    True],  # Window width
 "-h"  :  [float, 600,    True],  # Window height
 "-pd" :  [str,   False,  False,  True], # Print data
@@ -51,11 +51,13 @@ args = {#       \/
 "-ds" :  [str,	 False,	 False,  True], # Draw stars, ie, make the minimum size 1 pixel, regardless of distance.
 "-sdp":  [int,   5,      True],  # Smart draw parameter, equivalent to the number of pixels per edge on a shape
 "-ab" :  [int,   False,  False,  20], # Make asteroid belt (Wouldn't recommend on presets other than 3..)
-"-es" :  [int,	 False,  False,  5],
+"-es" :  [int,	 False,  False,  5],  # Make earth satellites
+"-flim": [float, False,  True],  # Frame limit
 "-df" :  [str, "SolSystem.txt", True], # Path of the data file
 "-AA_OFF": [str, True, False, False]   # Turn off AutoAbort.
 }
 
+originalG = args["-G"][1]
 
 if len(sys.argv) > 1:
 	if ("-?" in sys.argv):
@@ -71,7 +73,7 @@ Key|Parameter type|Description
 -p :    int,       Preset
 -sp:               Start paused
 -ss:               Staggered simulation (Hit enter in the terminal to trigger each frame)
--g :    float,     Gravitational constant
+-G :    float,     Gravitational constant
 -w :    float,     Window width (Not used in thie version)
 -h :    float,     Window height (Not used in thie version)
 -pd:               Print debugging data
@@ -137,7 +139,7 @@ PARTICLE_COUNT          = args["-n"][1]
 preset                  = args["-p"][1]
 STAGGERED_SIM           = args["-ss"][1]
 START_PAUSED            = args["-sp"][1]
-G                       = args["-g"][1]
+G                       = args["-G"][1]
 INITIAL_WINDOW_WIDTH    = args["-w"][1]
 INITIAL_WINDOW_HEIGHT   = args["-h"][1]
 PRINT_DATA              = args["-pd"][1]
@@ -154,6 +156,7 @@ DATA_FILE				= args["-df"][1]
 drawStars				= args["-ds"][1]
 makeAsteroids 			= args["-ab"][1]
 makeSatellites			= args["-es"][1]
+FRAME_LIMIT 			= args["-flim"][1]
 
 AsteroidsStart 	 = 49.23 * 10**9
 AsteroidsEnd 	 = 240.52 * 10**9
@@ -213,8 +216,9 @@ SMART_DRAW_PARAMETER = args["-sdp"][1]     # Approx number of pixels between eac
 
 MAX_POINTS = 400                # Lazy way of limiting the number of points drawn to stop the program
 								# grinding to a halt everytime you get too close to a particle
+MIN_BOX_WIDTH = 50
 
-def drawOval(x, y, major, minor, angle, fill = "black"):
+def drawOval(x, y, major, minor, angle, fill = "black", box = False):
 	global ellipsePoints
 	global drawStars
 	if SMART_DRAW:
@@ -227,6 +231,17 @@ def drawOval(x, y, major, minor, angle, fill = "black"):
 	localY = 0
 	screenX = localX * cos(angle) - localY * sin(angle)
 	screenY = localY * cos(angle) + localX * sin(angle)
+	if box:
+		boxRadius = max(MIN_BOX_WIDTH, major * 1.4) / 2
+		turtle.up()
+		turtle.pencolor("white")
+		turtle.goto(x - boxRadius, y - boxRadius)
+		turtle.down()
+		turtle.goto(x - boxRadius, y + boxRadius)
+		turtle.goto(x + boxRadius, y + boxRadius)
+		turtle.goto(x + boxRadius, y - boxRadius)
+		turtle.goto(x - boxRadius, y - boxRadius)
+		turtle.up()
 	if (points > 2):
 		turtle.up()
 		turtle.goto(x + screenX, y + screenY)
@@ -361,7 +376,7 @@ class MainLoop:
 		self.pause = -1         # 1 for pause, -1 for not paused.
 
 		self.clickTarget = []
-
+		self.target = None
 		self.FPS = 1
 		self.frameWarning = False
 		self.DataDisplay = {
@@ -377,16 +392,19 @@ class MainLoop:
 		self.commonShift.addToMe(vectorShift)
 		return self.commonShift
 
-	def addData(self, name, data, isExpression=False):
-		self.DataDisplay[name] = [isExpression, data]
+	def addData(self, name, data, isExpression=False, default=None):
+		self.DataDisplay[name] = [isExpression, data, default]
+
+	def addDataLine(self):
+		self.DataDisplay["\n"] = None
 
 	def showData(self, delta):
 		global planets
 		pauseString = "True"
 		if self.Time != 0:
-			timeString = "%d days %d:%d:%.2f" % (int(self.Time / (24*3600)), int((self.Time / 3600) % 3600) % 24, int(self.Time/60) % 60, self.Time % 60)
+			timeString = "%d years, %d days, %d:%d:%.2f" % (int(self.Time / (24*3600*365)), int(self.Time / (24*3600)) % 365, int((self.Time / 3600) % 3600) % 24, int(self.Time/60) % 60, self.Time % 60)
 		else:
-			timeString = "0 days 00:00"
+			timeString = "00:00"
 		if self.pause == -1: pauseString = "False"
 		text = """Frame Rate: %s
 Buffermode: %s (%d) --> (%.2lf Mb)
@@ -404,10 +422,15 @@ Paused: %s         Time:  %s
 
 		for data in self.DataDisplay:
 			text += "\n"
+			if self.DataDisplay[data] == None:
+				continue
 			text += data + ":\t"
 			if (self.DataDisplay[data][0]):
 				# print(self.DataDisplay[data][1])
-				value = eval(self.DataDisplay[data][1])
+				try:
+					value = eval(self.DataDisplay[data][1])
+				except Exception:
+					value = self.DataDisplay[data][2]
 			else:
 				value = self.DataDisplay[data][1]
 			text += str(value)
@@ -434,6 +457,7 @@ Paused: %s         Time:  %s
 		# even if means a few lines are duplicated.
 
 		# drawLine((-500, 0), (500, 0), fill = [1, 1, 1])
+		global FRAME_LIMIT
 		global particleList
 		global DRAW_VEL_VECS
 		global panRate
@@ -456,9 +480,6 @@ Paused: %s         Time:  %s
 			self.closestParticle = None
 			for m in sorted(markerList, key = lambda x: abs(x.pos - camera.pos), reverse = True):
 				camera.drawParticle(m)
-			# if not particleList:
-			#     return None
-			# clicked = False
 			clickTarget = None
 			if (self.clickTarget):
 				clickTarget = self.clickTarget.pop(0)
@@ -490,37 +511,26 @@ Paused: %s         Time:  %s
 					self.closestParticle = p
 				if (doStep and (p != camera.rotTrack and p != camera.panTrack)):
 					p.step(delta)
-				# if p == camera.panTrack:
-				# 	camera.panFollow()
-				# if p == camera.rotTrack:
-				# 	camera.rotFollow()
-				# if (abs(self.commonShiftPos != 0) or abs(self.commonShiftVel) != 0):
-				# 	p.pos.addToMe(self.commonShiftPos)
-				# 	p.pos.addToMe(self.commonShiftVel.multiply(delta))
 				buff = Buffer.processPosition(p)
-				# print("(%d) click target in loop:" % (I), clickTarget)
 				if not buff:
-					drawResult = camera.drawParticle(p)
-					if DRAW_VEL_VECS and drawResult:
-						vecResult = camera.drawParticle([p.pos + p.vel * DRAW_VEL_VECS, 1, [0, 1, 0]], drawAt=True, point=True)
-						accResult = camera.drawParticle([p.pos + p.acc * DRAW_VEL_VECS * 5, 1, [1, 0, 0]], drawAt=True, point=True)
-						if vecResult:
-							drawLine((vecResult[0], vecResult[1]), (drawResult[0], drawResult[1]), fill = [0, 1, 0])
-						if accResult:
-							drawLine((accResult[0], accResult[1]), (drawResult[0], drawResult[1]), fill = [1, 0, 0])
-					# if I == 0:
-
+					if self.target == p:
+						drawResult = camera.drawParticle(p, box = True)
+					else:
+						drawResult = camera.drawParticle(p)
 				else:
 					# Buff returned something, which means it wants the camera
 					# to draw something other than the particle's actual position
-					drawResult = camera.drawAt(buff[0], buff[1], buff[2])
-					if DRAW_VEL_VECS and drawResult:
-						vecResult = camera.drawParticle([buff[0] + buff[3] * DRAW_VEL_VECS, 1, [0, 1, 0]], drawAt=True, point=True)
-						accResult = camera.drawParticle([buff[0] + buff[4] * DRAW_VEL_VECS * 5, 1, [1, 0, 0]], drawAt=True, point=True)
-						if vecResult:
-							drawLine((vecResult[0], vecResult[1]), (drawResult[0], drawResult[1]), fill = [0, 1, 0])
-						if accResult:
-							drawLine((accResult[0], accResult[1]), (drawResult[0], drawResult[1]), fill = [1, 0, 0])
+					if self.target == p:
+						drawResult = camera.drawAt(buff[0], buff[1], buff[2], box = True)
+					else:
+						drawResult = camera.drawAt(buff[0], buff[1], buff[2])
+				if DRAW_VEL_VECS and drawResult:
+					vecResult = camera.drawParticle([buff[0] + buff[3] * DRAW_VEL_VECS, 1, [0, 1, 0]], drawAt=True, point=True)
+					accResult = camera.drawParticle([buff[0] + buff[4] * DRAW_VEL_VECS * 5, 1, [1, 0, 0]], drawAt=True, point=True)
+					if vecResult:
+						drawLine((vecResult[0], vecResult[1]), (drawResult[0], drawResult[1]), fill = [0, 1, 0])
+					if accResult:
+						drawLine((accResult[0], accResult[1]), (drawResult[0], drawResult[1]), fill = [1, 0, 0])
 
 				if (clickTarget):
 					if (drawResult):
@@ -538,7 +548,6 @@ Paused: %s         Time:  %s
 							elif (clickBut == 1):
 								# Right click
 								camera.rotTrackSet(p)
-
 		else:
 			# print("Got here somehow?")
 			for p in particleList:
@@ -552,7 +561,26 @@ Paused: %s         Time:  %s
 			FPS = -1
 		else:
 			FPS = 1 / frameLength
+		if FRAME_LIMIT:
+			if (FPS > FRAME_LIMIT):
+				time.sleep(1/FRAME_LIMIT - 1/FPS)
+				frameEnd = time.time()
+				frameLength = frameEnd - frameStart
+				if (frameLength == 0):
+					FPS = -1
+				else:
+					FPS = 1 / frameLength
+			elif (FPS == -1):
+				time.sleep(1/FRAME_LIMIT)
+				frameEnd = time.time()
+				frameLength = frameEnd - frameStart
+				if (frameLength == 0):
+					FPS = -1
+				else:
+					FPS = 1 / frameLength
+
 		self.FPS = FPS
+
 		# print("FPS:", FPS)
 		if (AUTO_ABORT):
 			if (FPS < 1 and FPS != -1):
@@ -564,8 +592,6 @@ Paused: %s         Time:  %s
 				self.frameWarning = False
 
 		self.showData(delta)
-		# if self.clickTarget:
-			# print("Click target:", self.clickTarget)
 		self.Zero()
 
 
@@ -577,7 +603,7 @@ class camera:
 		# self.vel = vel
 		self.panTrack = None
 		self.rotTrack = None
-		self.trackDistance = 100
+		self.trackSeparate = vector([100, 0, 0])
 		self.rotTrackOrigin = DEFAULT_UNIT_VEC
 		self.screenDepth = screenDepth
 		self.screenXaxis = vector([-self.rot[2], 0, self.rot[0]]).setMag(1)
@@ -603,7 +629,7 @@ class camera:
 		if self.panTrack == None:
 			self.pos += ((self.screenXaxis * direction[2]) + (self.screenYaxis * -direction[1]) + (screenZaxis * direction[0])) * -rate
 		else:
-			self.trackDistance += direction[0] * rate
+			self.trackSeparate += ((self.screenXaxis * direction[2]) + (self.screenYaxis * -direction[1]) + (screenZaxis * direction[0])) * -rate
 	def rotate(self, direction, rate):
 		# direction as a 2 element list [x, y]
 		self.screenXaxis = self.screenXaxis.rotateAbout(self.screenYaxis, direction[0] * rate)
@@ -621,7 +647,9 @@ class camera:
 		# print("Setting pan")
 		self.panTrack = target
 		self.panTrackLock = False
-		if target: self.trackDistance = max(self.trackDistance, 3 * target.radius)
+		if target:
+			mag = (10 * target.radius)
+			self.trackSeparate = (-target.pos + self.pos).setMag(mag)
 		return target
 
 	def rotTrackSet(self, target = None):
@@ -638,7 +666,7 @@ class camera:
 		MainLoop.commonShiftPos = self.pos.negate()
 		MainLoop.commonShiftVel = self.vel.negate()
 
-	def drawParticle(self, particle, drawAt = False, point=False):
+	def drawParticle(self, particle, drawAt = False, point=False, box=False):
 		# drawAt: if the desired particle isn't actually where we want to draw it, parse [pos, radius [, colour]] and set drawAt = True
 		prin = "-\n"
 		screenAngleX = atan(( turtle.window_width() / 2 ) / self.screenDepth)
@@ -700,22 +728,25 @@ class camera:
 			prin += "CentreX = 0 != centreY, particle is perpendicular to camera. This shouldn't be possible?"
 			if PRINT_DATA: print(prin)
 			return False
-		drawOval(X, Y, majorAxis, minorAxis, angle, colour)
+		drawOval(X, Y, majorAxis, minorAxis, angle, colour, box)
 		prin = prin + ("X: " + str(round(X, 5)) + ", Y: " + str(round(Y, 5)))
 		if PRINT_DATA: print(prin)
 		return [X, Y, majorAxis, minorAxis]
 
-	def drawAt(self, posVector, radius, colour = None):
-		return self.drawParticle([posVector, radius, colour], True)
+	def drawAt(self, posVector, radius, colour = None, box=False):
+		return self.drawParticle([posVector, radius, colour], True, box=box)
 
 	def panFollow(self, followRate=SMOOTH_FOLLOW):
 		global SMOOTH_FOLLOW
 		if self.panTrack == None: return False
 		if self.panTrackLock:
-			followRate = 1
-		self.pos += ((self.panTrack.pos - (self.rot * self.trackDistance)) - self.pos) * followRate
-		if not self.panTrackLock and abs((self.panTrack.pos - (self.rot * self.trackDistance)) - self.pos) < 0.1 * self.trackDistance:
+			self.pos = self.panTrack.pos + self.trackSeparate
+			return True
+		panShift = ((self.panTrack.pos - self.pos) + self.trackSeparate) * followRate
+		self.pos += panShift
+		if abs(panShift) < 10:
 			self.panTrackLock = True
+		return True
 
 	def rotFollow(self, followRate=DEFAULT_ROTATE_FOLLOW_RATE):
 		if self.rotTrack == None: return False
@@ -736,12 +767,13 @@ class particle:
 	def __init__(
 				self, mass, position, velocity=0, acceleration=0,
 				density=defaultDensity, autoColour=True, colour=[0, 0, 1],
-				limitRadius=True):
+				limitRadius=True, name=None):
 		self.mass = mass
 		self.pos = position
 		self.dim = len(position.elements)
 		self.density = density
 		self.limitRadius = limitRadius
+		self.name = name
 		if velocity == 0:
 			self.vel = vector([0 for i in range(self.dim)])
 		else:
@@ -1044,7 +1076,35 @@ def bufferPlay():
 		pause()
 	Buffer.bufferMode = 2
 
+def togglePanTrack():
+	if MainLoop.target:
+		if camera.panTrack:
+			camera.panTrackSet()
+		else:
+			camera.panTrackSet(MainLoop.target)
+def toggleRotTrack():
+	if MainLoop.target:
+		if camera.rotTrack:
+			camera.rotTrackSet()
+		else:
+			camera.rotTrackSet(MainLoop.target)
 
+def cycleTargets():
+	global planetList
+	global shiftL
+	if not shiftL:
+		if MainLoop.target:
+			MainLoop.target = (planetList + [planetList[0]])[planetList.index(MainLoop.target) + 1]
+		else:
+			MainLoop.target = planetList[0]
+	else:
+		if MainLoop.target:
+			MainLoop.target = planetList[planetList.index(MainLoop.target) - 1]
+		else:
+			MainLoop.target = planetList[-1]
+
+def clearTarget():
+	MainLoop.target = None
 
 turtle.onkeypress(panLeft, "a")
 turtle.onkeyrelease(panRight , "a")
@@ -1088,6 +1148,12 @@ turtle.onkeyrelease(rotClockWise, "q")
 turtle.onkey(escape, "Escape")
 turtle.onkey(pause,  "space")
 
+
+turtle.onkey(cycleTargets, "Tab")
+turtle.onkey(togglePanTrack, "t")
+turtle.onkey(toggleRotTrack, "y")
+turtle.onkey(clearTarget,    "c")
+
 turtle.onkeypress(upScreenDepth, ".")
 turtle.onkeypress(downScreenDepth, ",")
 
@@ -1108,7 +1174,7 @@ MainLoop = MainLoop()
 
 panRate = 0 # Will be used to store the pan rate of each step
 
-camera = camera(pos = vector([DEFAULT_SCREEN_DEPTH, -DEFAULT_SCREEN_DEPTH, 0]))
+camera = camera(pos = vector([100000000000, -DEFAULT_SCREEN_DEPTH, 0]))
 camera.rotate([0, 1, 0], -pi/2)
 
 setup()
@@ -1147,7 +1213,11 @@ elif preset == 2:
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
 elif preset == 3:
+	if G == originalG:
+		# G hasn't been declared explicitly in the arguments
+		G = 6.67408e-11
 	ALL_IMMUNE = True
+	planetList = []
 	planets = {}
 	colours = {
 		"Moon"		: [1,	1, 	 1],
@@ -1162,6 +1232,15 @@ elif preset == 3:
 		"Neptune"	: [0.2, 0.2, 1]
 	}
 	Data = loadSystem.loadFile(DATA_FILE)
+	MainLoop.addDataLine()
+	MainLoop.addData("Track target", "MainLoop.target.name", True, "None")
+	MainLoop.addData("Distance to Target", "")
+	MainLoop.addData("Centre", "round(abs(MainLoop.target.pos - camera.pos), 2)", True, "---")
+	MainLoop.addData("Surface", "round(abs(MainLoop.target.pos - camera.pos) - MainLoop.target.radius, 2)", True, "---")
+	MainLoop.addData("Mass", "MainLoop.target.mass", True, "---")
+	MainLoop.addData("Radius", "round(MainLoop.target.radius, 2)", True, "---")
+	MainLoop.addData("XYZ Velocity", "(MainLoop.target.vel.string(2)) + ', mag: ' + str(round(abs(MainLoop.target.vel), 5))", True, "---")
+	MainLoop.addDataLine()
 	for planet in Data:
 		data = Data[planet]
 		if data["valid"]:
@@ -1171,14 +1250,18 @@ elif preset == 3:
 			mass = data["MASS"]
 			density = data["DENSITY"]
 			new = particle(mass, pos, vel, density=density, autoColour=False,
-						colour=(colours[planet] if planet in colours else [0.5, 0.5, 0.5]), limitRadius=False)
+						colour=(colours[planet] if planet in colours else [0.5, 0.5, 0.5]),
+						limitRadius=False, name=planet)
 			# new.immune = True
+			planetList.append(new)
 			planets[planet] = new
-			MainLoop.addData(planet, "int(abs(camera.pos - planets['{}'].pos))".format(planet), True)
+			# MainLoop.addData(planet, "int(abs(camera.pos - planets['{}'].pos))".format(planet), True)
 			# print("{} radius: {}".format(planet, new.radius))
-			if (planet == "Earth"):
-				camera.panTrackSet(new)
-				camera.trackDistance = 10 * new.radius
+			# if (planet == "Earth"):
+	MainLoop.target = planets["Earth"]
+	camera.panTrackSet(planets["Earth"])
+	camera.trackDistance = 10 * planets["Earth"].radius
+
 	if makeAsteroids:
 		beltRadius = (AsteroidsEnd - AsteroidsStart) / 2
 		beltCentre = (AsteroidsEnd + AsteroidsStart) / 2
