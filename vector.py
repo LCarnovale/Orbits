@@ -23,11 +23,11 @@ class vector:
 		return self.multiply(1 / other)
 
 	def __iadd__(self, other):
-		self.addToMe(other)
+		self = self + other
 		return self
 
 	def __isub__(self, other):
-		self.subtractToMe(other)
+		self = self - other
 		return self
 
 	def __neg__(self):
@@ -53,7 +53,16 @@ class vector:
 		if (type(value) in [int, float]):
 			return self.multiply(value)
 		else:
+			raise Exception("Invalid types for multiplying vector, must be <vector> and a scalar")
 			return 0
+
+	def __rmul__(self, value):
+		return self * value
+
+	def __imul__(self, value):
+		self = self * value
+		return self
+
 	def __iter__(self):
 		return self.elements.__iter__()
 
@@ -114,7 +123,7 @@ class vector:
 		return vector(self.elements)
 
 	def setMag(self, mag):
-		self.multiplyToMe(mag / self.getMag())
+		self.define(self / abs(self) * mag)
 		return self
 
 	# For most of the following functions (add, subtract etc.) there is a respective 'functionToMe',
@@ -130,9 +139,9 @@ class vector:
 	def reverse(self):
 		return vector([-x for x in self.elements])
 
-	def addToMe(self, other, element=None):
-		self.define(self.add(other, element))
-		return True
+	# def addToMe(self, other, element=None):
+	# 	self.define(self.add(other, element))
+	# 	return True
 
 	def add(self, other, element=None):
 		if (not element and (self.dim != other.dim)): return False
@@ -144,17 +153,17 @@ class vector:
 				tempVec[i] = tempVec[i] + other.elements[i]
 		return vector(tempVec)
 
-	def subtractToMe(self, other):
-		self.define(self.subtract(other))
-		return True
+	# def subtractToMe(self, other):
+	# 	self.define(self.subtract(other))
+	# 	return True
 
 	def subtract(self, other, element=None):
 		# tempV = other.reverse()
 		return self.add(other.reverse())
 
-	def multiplyToMe(self, scalar):
-		self.define(self.multiply(scalar))
-		return True
+	# def multiplyToMe(self, scalar):
+	# 	self.define(self.multiply(scalar))
+	# 	return True
 
 	def multiply(self, scalar):
 		return vector([x * scalar for x in self.elements])
@@ -199,12 +208,16 @@ class vector:
 		if type(other) == int:
 			return acos(self[other] / abs(self))
 		if not plane:
-			cosTheta = self.dot(other) / (self.getMag() * other.getMag())
+			cosTheta = self.dot(other) / (abs(self) * abs(other))
+			if cosTheta > 1:
+				cosTheta = 1
+			elif cosTheta < -1:
+				cosTheta = -1
 			return acos(cosTheta)
 		else:
-			angleSelf = self.lock(plane).getHeading(plane[0], trueBearing = plane[1])
-			angleOther = other.lock(plane).getHeading(plane[0], trueBearing = plane[1])
-			angle = angleSelf - angleOther
+			angleSelf 	= self.lock(plane).getHeading(plane[0], trueBearing = plane[1])
+			angleOther 	= other.lock(plane).getHeading(plane[0], trueBearing = plane[1])
+			angle 		= angleSelf - angleOther
 			return angle
 
 	def lock(self, elements, inverse=False):

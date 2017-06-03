@@ -21,40 +21,42 @@ vector = vector.vector
 
 LINUX = False # If true, then non alphanumeric key controls will be replaced with numbers
 
-
-# args:
-# <key> : [<type>, <default value>, <requires parameter>, [<second default value>]]
-# second default value is only necessary if <requires parameter> is true.
-# if true, then the algorithm looks for a value after the key.
-# if false, the algorithm still looks for a value after the key but if no value given the second default value is used.
-		#     PUT DEFAULTS HERE
-args = {#       \/
+#############################################################################################################################
+# args:																														#
+# <key> : [<type>, <default value>, <requires parameter>, [<second default value>], [changed]]								#
+# second default value is only necessary if <requires parameter> is true.													#
+# if true, then the algorithm looks for a value after the key.																#
+# if false, the algorithm still looks for a value after the key but if no value is given the second default value is used.	#
+# The final value indicates if the argument has been supplied, to know if the user has specified a value					#
+# 	 (Useful if the default varies depending on other arguments)															#
+#																															#
+########### PUT DEFAULTS HERE ###############################################################################################
+args = {#         \/
 "-?"  :  [None],
-"-d"  :  [float, 0.025,  True], # Delta time per step
-"-n"  :  [int,   20,     True], # Particle count
-"-p"  :  [int,   1,      True], # preset
-"-sp" :  [str,   False,  False,  True], # start paused
-"-ss" :  [str,   False,  False,  True], # staggered simulation
-"-G"  :  [float, 20,     True],  # Gravitational constant
-"-w"  :  [float, 500,    True],  # Window width
-"-h"  :  [float, 600,    True],  # Window height
-"-pd" :  [str,   False,  False,  True], # Print data
-"-sd" :  [float, 2000,   True],  # Default screen depth
-"-ps" :  [float, 5.0,    True],  # Maximum pan speed
-"-rs" :  [float, 0.01,    True],  # Rotational speed
-"-mk" :  [str,   False,  False,  True], # Show marker points
-"-ep" :  [int,   360,    True],  # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
-"-sf" :  [float, 0.5,    True],  # Rate at which the camera follows its target
-"-ad" :  [str,   False,  False,  True], # Always draw. Attempts to draw particles even if they are thought not to be on screen
-"-vm" :  [float, 150,    True],  # Variable mass. Will be used in various places for each preset.
-"-vv" :  [int,   False,  False,  1], # Draw velocity vectors
-"-ds" :  [str,	 False,	 False,  True], # Draw stars, ie, make the minimum size 1 pixel, regardless of distance.
-"-sdp":  [int,   5,      True],  # Smart draw parameter, equivalent to the number of pixels per edge on a shape
-"-ab" :  [int,   False,  False,  20], # Make asteroid belt (Wouldn't recommend on presets other than 3..)
-"-es" :  [int,	 False,  False,  5],  # Make earth satellites
-"-flim": [float, False,  True],  # Frame limit
-"-df" :  [str, "SolSystem.txt", True], # Path of the data file
-"-AA_OFF": [str, True, False, False]   # Turn off AutoAbort.
+"-d"  :  [float, 0.025,  True, 	False], # Delta time per step
+"-n"  :  [int,   20,     True, 	False], # Particle count
+"-p"  :  [int,   1,      True, 	False], # preset
+"-sp" :  [str,   False,  False,  True, 	False], # start paused
+"-ss" :  [str,   False,  False,  True, 	False], # staggered simulation
+"-G"  :  [float, 20,     True, 	False],  # Gravitational constant
+"-pd" :  [str,   False,  False,  True, 	False], # Print data
+"-sd" :  [float, 2000,   True, 	False],  # Default screen depth
+"-ps" :  [float, 5.0,    True, 	False],  # Maximum pan speed
+"-rs" :  [float, 0.01,    True, 	False],  # Rotational speed
+"-mk" :  [str,   False,  False,  True, 	False], # Show marker points
+"-ep" :  [int,   360,    True, 	False],  # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
+"-sf" :  [float, 0.5,    True, 	False],  # Rate at which the camera follows its target
+"-ad" :  [str,   False,  False,  True, 	False], # Always draw. Attempts to draw particles even if they are thought not to be on screen
+"-vm" :  [float, 150,    True, 	False],  # Variable mass. Will be used in various places for each preset.
+"-vv" :  [float, False,  False,  1, 	False], # Draw velocity vectors
+"-ds" :  [str,	 False,	 False,  True, 	False], # Draw stars, ie, make the minimum size 1 pixel, regardless of distance.
+"-sdp":  [int,   5,      True, 	False],  # Smart draw parameter, equivalent to the number of pixels per edge on a shape
+"-ab" :  [int,   False,  False,  20, 	False], # Make asteroid belt (Wouldn't recommend on presets other than 3..)
+"-es" :  [int,	 False,  False,  5, 	False],  # Make earth satellites
+"-WB" :  [str,   False,  False,	 True, 	False], # Write buffer to file
+"-flim": [float, False,  True, 	False],  # Frame limit
+"-df" :  [str, "SolSystem.txt", True, 	False], # Path of the data file
+"-AA_OFF": [str, True, False, False, 	False]   # Turn off AutoAbort.
 }
 
 originalG = args["-G"][1]
@@ -68,26 +70,35 @@ if len(sys.argv) > 1:
 Arguments:
 Key|Parameter type|Description
    | (if needed)  |
--d :    float,     Delta time per step
--n :    int,       Particle count.
--p :    int,       Preset
--sp:               Start paused
--ss:               Staggered simulation (Hit enter in the terminal to trigger each frame)
--G :    float,     Gravitational constant
--w :    float,     Window width (Not used in thie version)
--h :    float,     Window height (Not used in thie version)
--pd:               Print debugging data
--sd:    float,     Default screen depth
--ps:    float,     Maximum pan speed
--rs:    float,     Rotational speed
--mk:               Show marker points (static X, Y, Z and Origin coloured particles)
--ep:    int,       Number of points on each ellipse (Irrelevant if SMART_DRAW is on (which it is))
--sf:    float,     Rate at which the camera follows its target
--ad:               Always draw. Attempts to draw particles even if they are thought not to be on screen
--vm:    float,     Variable mass. To be used in relevant places for some presets.
--vv:               Draw velocity and acceleration vectors. Note that while velocity vectors are to scale,
-                       acceleration vectors are multiplied by 5 when being drawn. (Otherwise they are too short)
--? : Enter this help screen
+-d :    float,		Delta time per step
+-n :    int,		Particle count, where applicable
+-p :    int,		Preset
+-sp:				Start paused
+-ss:				Staggered simulation (Hit enter in the terminal to trigger each step)
+-G :    float,		Gravitational constant
+-pd:				Print debugging data
+-sd:    float,		Default screen depth
+-ps:    float,		Maximum pan speed
+-rs:    float,		Rotational speed
+-mk:				Show marker points (static X, Y, Z and Origin coloured particles)
+-ep:    int,		Number of points on each ellipse (Irrelevant if SMART_DRAW is on (which it is))
+-sf:    float,		Rate at which the camera follows its target
+-ad:				Always draw. Attempts to draw particles even if they are thought not to be on screen
+-vm:    float,		Variable mass. To be used in relevant places for some presets.
+-vv:				Draw velocity and acceleration vectors. Note that while velocity vectors are to scale,
+						acceleration vectors are multiplied by 5 when being drawn. (Otherwise they are too short)
+						Give a number parameter to scale each vector.
+-ds  :				Draw stars, ie, make the minimum size 1 pixel, regardless of distance.
+-sdp :  int,		Smart draw parameter, equivalent to the number of pixels per edge on a shape
+-ab  :  int,		Make asteroid belt (Wouldn't recommend on presets other than 3..)
+-es  :  int,		Make earth satellites
+-WB  :				Write buffer to file
+-flim:  float,		Frame limit
+-df  :  str,		Path of the data file
+-AA_OFF:			Turn off AutoAbort. (AutoAbort will kill the simulation if two consecutive frames
+						last longer than a second, it's only trying to help you not bring your
+						computer to a standstill, be careful if you choose to abandon it)
+-? : Enter this help screen then exit
 
 Using the program:
   - Use W, A, S, D to move forwards, left, backwards, and right respectively.
@@ -97,17 +108,25 @@ Using the program:
   - 'n', 'm' to start recording and playing the buffer. The simulation will be paused while recording.
   - Space to pause the simulation. (Movement is still allowed)
   - Click any particle to set the camera to track that particle.
+  - Right click any particle to fix the camera's rotation on that particle.
+  - Cycle through targeted particles with Tab/shift-Tab.
+  		Once a particle is targeted, pressing T and Y will toggle pan and rotational
+		tracking respectively.
   - To stop tracking, click empty space or another particle.
+  - To clear the target selection, press C
+  - End the simulation with Esc.
 
 Presets:
 1)  Centre body with -n number of planets orbiting in random places. (Default 10)
-2)  'Galaxy' kinda thing
-
+2)  'Galaxy' kinda thing (Miserable failure, don't waste your time with this one)
+3)  Our very own Solar System!
 """)
 		exit()
 	argv = sys.argv
 	for i, arg in enumerate(argv):
 		if arg in args:
+			if (args[arg][-1]):
+				print("%s supplied multiple times." % (arg))
 			try:
 				if args[arg][2]:
 					if argv[i + 1] in args:
@@ -118,6 +137,7 @@ Presets:
 						args[arg][1] = args[arg][0](argv[i + 1])
 					else:
 						args[arg][1] = args[arg][3]
+				args[arg][-1] = True
 			except ValueError:
 				print("Wrong usage of {}".format(arg))
 			except IndexError:
@@ -140,8 +160,6 @@ preset                  = args["-p"][1]
 STAGGERED_SIM           = args["-ss"][1]
 START_PAUSED            = args["-sp"][1]
 G                       = args["-G"][1]
-INITIAL_WINDOW_WIDTH    = args["-w"][1]
-INITIAL_WINDOW_HEIGHT   = args["-h"][1]
 PRINT_DATA              = args["-pd"][1]
 DEFAULT_SCREEN_DEPTH    = args["-sd"][1]
 maxPan                  = args["-ps"][1]
@@ -167,8 +185,8 @@ AsteroidsDensity = 1500
 ALL_IMMUNE = False
 
 
-DEFAULT_ROTATE_FOLLOW_RATE = 0.2
-AUTO_RATE_CONSTANT  = 1000000000  # A mysterious constant which determines the autoRate speed, 100 works well.
+DEFAULT_ROTATE_FOLLOW_RATE = 0.04
+AUTO_RATE_CONSTANT  = 1000  # A mysterious constant which determines the autoRate speed, 100 works well.
 
 defaultDensity      = 1
 radiusLimit         = 50        # Maximum size of particle
@@ -389,7 +407,7 @@ class MainLoop:
 		self.commonRotate = DEFAULT_ZERO_VEC
 
 	def changeCommonShift(self, vectorShift):
-		self.commonShift.addToMe(vectorShift)
+		self.commonShift += vectorShift
 		return self.commonShift
 
 	def addData(self, name, data, isExpression=False, default=None):
@@ -601,17 +619,18 @@ class camera:
 		self.pos = pos
 		self.rot = rot.setMag(1)
 		# self.vel = vel
-		self.panTrack = None
-		self.rotTrack = None
 		self.trackSeparate = vector([100, 0, 0])
 		self.rotTrackOrigin = DEFAULT_UNIT_VEC
 		self.screenDepth = screenDepth
 		self.screenXaxis = vector([-self.rot[2], 0, self.rot[0]]).setMag(1)
 		self.screenYaxis = vector([self.rot[0] * self.rot[1], -(self.rot[0]**2 + self.rot[2]**2), self.rot[2] * self.rot[1]]).setMag(1)
-		self.panTrackLock = False
-		self.rotTrackLock = False
 
-
+	panTrack = None
+	rotTrack = None
+	panTrackLock = False # Once the pan or rotation tracking has sufficiently closed in on the target,
+	rotTrackLock = False # don't allow any 'slippage', ie lock on firmly to the target
+	moving = False # To go to a particle, just activate pan and rotational
+				   # tracking on the target until they both have locked on
 
 	def setScreenDepth(self, value, increment=False):
 		if increment:
@@ -621,6 +640,17 @@ class camera:
 			difference = value - self.screenDepth
 			self.screenDepth = value
 		self.pos -= self.rot * difference
+
+	#   Checks if the camera is still moving to the particle or if it has arrived
+	def checkMoving(self):
+		if (self.moving):
+			if not (self.panTrack or self.rotTrack):
+				self.moving = False
+
+	def goTo(self, particle):
+		self.moving = True
+		self.panTrackSet(particle)
+		self.rotTrackSet(particle)
 
 	def pan(self, direction, rate):
 		# Direction as a vector
@@ -639,8 +669,8 @@ class camera:
 		self.screenYaxis = self.screenYaxis.rotateAbout(self.rot,         direction[2] * rate)
 
 		self.rot.setMag(1)
-		if (self.panTrack):     # Makes the rotation appear to be about the centre of the tracked particle
-			self.panFollow(1)   # There is probably a better way to do this, this way is a bit shifty
+		# if (self.panTrack):     # Makes the rotation appear to be about the centre of the tracked particle
+		# 	self.panFollow(1)   # There is probably a better way to do this, this way is a bit shifty
 
 
 	def panTrackSet(self, target = None):
@@ -668,6 +698,7 @@ class camera:
 
 	def drawParticle(self, particle, drawAt = False, point=False, box=False):
 		# drawAt: if the desired particle isn't actually where we want to draw it, parse [pos, radius [, colour]] and set drawAt = True
+		self.rot.setMag(1)
 		prin = "-\n"
 		screenAngleX = atan(( turtle.window_width() / 2 ) / self.screenDepth)
 		screenAngleY = atan(( turtle.window_height() / 2 ) / self.screenDepth)
@@ -689,9 +720,8 @@ class camera:
 			return False
 		ScreenParticleDistance = sd * abs(relPosition) * abs(self.rot) / (relPosition.dot(self.rot)) #self.screenDepth * relPosition.getMag() / self.rot.dot(relPosition) # A factor to multiply the relPosition vector by to get a vector on a plane on the screen.
 		relPosOnScreen = relPosition.multiply(ScreenParticleDistance/abs(relPosition))
-		relPosUnit = relPosition.multiply(1 / abs(relPosition))
+		relPosUnit = relPosition * (1 / abs(relPosition))
 		relRotation = relPosUnit - self.rot
-
 		x_r, y_r, z_r = self.rot.elements
 		x_CSP, y_CSP, z_CSP = relPosOnScreen.elements
 		x_CSC, y_CSC, z_CSC = scrCent.elements
@@ -699,8 +729,8 @@ class camera:
 		X = relPosOnScreen.dot(self.screenXaxis) / abs(self.screenXaxis)
 		Y = relPosOnScreen.dot(self.screenYaxis) / abs(self.screenYaxis)
 
-		centreAngleX = acos((2 - relRotation.lock([0, 2]).getMag() ** 2) / 2)
-		centreAngleY = acos((2 - relRotation.lock([0, 1]).getMag() ** 2) / 2)
+		centreAngleX = acos((2 - abs(relRotation.lock([0, 2])) ** 2) / 2)
+		centreAngleY = acos((2 - abs(relRotation.lock([0, 1])) ** 2) / 2)
 		prin += "centreAngleX: " + str(round(centreAngleX, 5)) + ", centreAngleY: " + str(round(centreAngleY, 5)) + "\n"
 		# offset: angle either side of centre angle which is slightly distorted due to the 3d bulge of the sphere.
 		distance = relPosition.getMag()
@@ -742,25 +772,47 @@ class camera:
 		if self.panTrackLock:
 			self.pos = self.panTrack.pos + self.trackSeparate
 			return True
+		if self.moving:
+			followRate = (self.rot.dot(self.panTrack.pos - self.pos) / abs(self.panTrack.pos - self.pos))**10 * followRate
 		panShift = ((self.panTrack.pos - self.pos) + self.trackSeparate) * followRate
 		self.pos += panShift
-		if abs(panShift) < 10:
-			self.panTrackLock = True
+		if abs(panShift) / abs(self.trackSeparate) < 0.01:
+			self.lockPan()
 		return True
 
 	def rotFollow(self, followRate=DEFAULT_ROTATE_FOLLOW_RATE):
 		if self.rotTrack == None: return False
-		# print("Rot: %s" % (self.rot.string(3)), end = "-->")
 		if self.rotTrackLock:
 			followRate = 1
-		self.rot += (self.rotTrack.pos - self.pos).setMag(1) * followRate
-		self.rot.setMag(1)
-		if not self.rotTrackLock and abs((self.rotTrack.pos - self.pos).setMag(1) - self.rot) < 0.1 * abs(self.rotTrack.pos - self.pos):
-			self.rotTrackLock = True
-		# print("%s" % (self.rot.string(3)))
+		rotShift = ((self.rotTrack.pos - self.pos).setMag(1) - self.rot)
+		self.rot = self.rot + rotShift * followRate
+
+		if not self.rotTrackLock and abs(rotShift) < 0.001:
+			self.lockRot()
 		self.screenXaxis = self.screenYaxis.cross(self.rot)
 		self.screenYaxis = self.rot.cross(self.screenXaxis)
+
+		self.screenXaxis.setMag(1)
+		self.screenYaxis.setMag(1)
+		self.rot.setMag(1)
 		return True
+
+	def lockPan(self):
+		if (self.moving):
+			if self.rotTrack == None:
+				self.panTrackSet()
+				self.moving = False
+		else:
+			self.panTrackLock = True
+
+	def lockRot(self):
+		if (self.moving):
+			self.rotTrackSet()
+			if self.panTrack == None:
+				self.moving = False
+		else:
+			self.rotTrackLock = True
+
 
 
 class particle:
@@ -819,11 +871,11 @@ class particle:
 		force = (G * self.mass * other.mass) / (abs(self.pos - other.pos) ** 2)
 		forceVector = other.pos.subtract(self.pos)
 		# drawVector(forceVector.setMag(force/self.mass), self.pos)
-		self.acc.addToMe(forceVector.setMag(force/self.mass))
+		self.acc += (forceVector.setMag(force/self.mass))
 		# print("calcAcc:", self.acc.elements)
 
 	def checkCollision(self, other):
-		if other.alive and (self.pos.subtract(other.pos).getMag() < self.radius + other.radius):
+		if other.alive and (abs(self.pos.subtract(other.pos)) < self.radius + other.radius):
 			self.contest(other)
 			return True
 		else:
@@ -841,12 +893,10 @@ class particle:
 		# return
 		if self.immune or ALL_IMMUNE: return False
 		out = False
-		if self.pos.subtract(camera.pos).getMag() > voidRadius:
+		if abs(self.pos.subtract(camera.pos)) > voidRadius:
 			out = True
 		# print("Checking")
 		if out and not self.inbound:
-			# print("Out")
-			#if self.acc.getMag() < 1:
 			if self.respawn:
 				self.respawn()
 			else:
@@ -897,13 +947,13 @@ class particle:
 	def step(self, delta, draw=True, drawVel=False, onlyDraw = False, bufferMode = 0):
 		# self.checkCollisionList(particleList)
 		# self.calcAccList(particleList)
-		self.acc.multiplyToMe(0)
+		self.acc *= 0
 		self.runLoop()
 		if self.radius > radiusLimit and self.limitRadius:
 			self.die()
 			return False
-		self.vel.addToMe(self.acc.multiply(delta))
-		self.pos.addToMe(self.vel.multiply(delta))
+		self.vel += self.acc * delta
+		self.pos += self.vel * delta
 		self.checkOutOfBounds()
 		# if self.acc.getMag(): #print(self.acc.elements)
 
@@ -956,29 +1006,11 @@ class marker(particle):
 	def step(self, delta):
 		pass
 
-
-# def randomVector(dim, mag, maxMag=0, fixComponents=[1,1,1]):
-# 	"""dimensions, magnitude, maximum magnitude (defaults to magnitude),
-# 	fixComponents: default [1,1,1], multiplies each randomly generated component
-# 	by the respective component in fixComponents, eg. [1,0,0] will limit the
-# 	generated vector to the X-axis."""
-# 	if dim != len(fixComponents) and fixComponents != [1,1,1]: return False
-# 	tempVec = []
-# 	X = (random.random() - 1/2) * 2 * fixComponents[0]
-# 	for i in range(dim):
-# 		tempVec.append((random.random() - 1/2) * 2 * fixComponents[i])
-# 	if maxMag == 0:
-# 		endMag = mag
-# 	else:
-# 		endMag = random.random() * abs(maxMag - mag) + mag
-# 	return vector(tempVec).setMag(endMag)
-
-
-
 autoRateValue = maxPan
 pan = [0, 0, 0, False]
 shiftL = False
 rotate = [0, 0, 0]
+
 def panLeft():
 	if pan[2] < 1:
 		pan[2] += 1
@@ -1066,6 +1098,10 @@ def downDelta():
 	global Delta
 	Delta *= 1 / 1.2
 
+def revDelta():
+	global Delta
+	Delta *= -1
+
 def bufferRecord():
 	# if MainLoop.pause == 1:
 	#     pause()
@@ -1088,6 +1124,10 @@ def toggleRotTrack():
 			camera.rotTrackSet()
 		else:
 			camera.rotTrackSet(MainLoop.target)
+
+def goToTarget():
+	if MainLoop.target:
+		camera.goTo(MainLoop.target)
 
 def cycleTargets():
 	global planetList
@@ -1153,12 +1193,14 @@ turtle.onkey(cycleTargets, "Tab")
 turtle.onkey(togglePanTrack, "t")
 turtle.onkey(toggleRotTrack, "y")
 turtle.onkey(clearTarget,    "c")
+turtle.onkey(goToTarget,	 "g")
 
 turtle.onkeypress(upScreenDepth, ".")
 turtle.onkeypress(downScreenDepth, ",")
 
 turtle.onkey(upDelta, "]")
 turtle.onkey(downDelta, "[")
+turtle.onkey(revDelta, "\\")
 
 turtle.onscreenclick(leftClick, 1)
 turtle.onscreenclick(rightClick, 3)
@@ -1174,15 +1216,15 @@ MainLoop = MainLoop()
 
 panRate = 0 # Will be used to store the pan rate of each step
 
-camera = camera(pos = vector([100000000000, -DEFAULT_SCREEN_DEPTH, 0]))
-camera.rotate([0, 1, 0], -pi/2)
+
+camera = camera(pos = vector([0, 0, 0]))
 
 setup()
 Running = True
 
-MainLoop.addData("Pan speed:", "panRate", True)
-MainLoop.addData("Camera pan lock:", "camera.panTrackLock", True)
-MainLoop.addData("Camera rot lock:", "camera.rotTrackLock", True)
+MainLoop.addData("Pan speed", "round(panRate, 2)", True)
+MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
+MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
 
 if preset == 1:
 	# Cloud of particles orbiting a big thing
@@ -1213,15 +1255,19 @@ elif preset == 2:
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
 elif preset == 3:
-	if G == originalG:
-		# G hasn't been declared explicitly in the arguments
-		G = 6.67408e-11
+	if (not args["-G"][-1]): G = 6.67408e-11
+
+	if (not args["-ps"][-1]): maxPan = 10e6
+
+	if (not args["-sf"][-1]): SMOOTH_FOLLOW = 0.1
+
+	AUTO_RATE_CONSTANT = 1.0e9
 	ALL_IMMUNE = True
 	planetList = []
 	planets = {}
 	colours = {
-		"Moon"		: [1,	1, 	 1],
-		"Earth"		: [0,   0.5, 1],
+		"Moon"		: [1,	1, 	 1],  # Photo realistic moon white
+		"Earth"		: [0,   0.5, 1],  # Photo realistic ocean blue
 		"Sun"		: [1,   1,   0],
 		"Mercury"	: [1,   0.5, 0],
 		"Venus"		: [1,   0.3, 0],
@@ -1244,7 +1290,6 @@ elif preset == 3:
 	for planet in Data:
 		data = Data[planet]
 		if data["valid"]:
-			# print("planet:", planet)
 			pos = vector([data["X"], data["Y"], data["Z"]]) * 1000
 			vel = vector([data["VX"], data["VY"], data["VZ"]]) * 1000
 			mass = data["MASS"]
@@ -1252,14 +1297,10 @@ elif preset == 3:
 			new = particle(mass, pos, vel, density=density, autoColour=False,
 						colour=(colours[planet] if planet in colours else [0.5, 0.5, 0.5]),
 						limitRadius=False, name=planet)
-			# new.immune = True
 			planetList.append(new)
 			planets[planet] = new
-			# MainLoop.addData(planet, "int(abs(camera.pos - planets['{}'].pos))".format(planet), True)
-			# print("{} radius: {}".format(planet, new.radius))
-			# if (planet == "Earth"):
 	MainLoop.target = planets["Earth"]
-	camera.panTrackSet(planets["Earth"])
+	camera.goTo(planets["Earth"])
 	camera.trackDistance = 10 * planets["Earth"].radius
 
 	if makeAsteroids:
@@ -1295,16 +1336,4 @@ while Running:
 	turtle.clear()
 	if STAGGERED_SIM: input()
 	MainLoop.STEP(Delta, camera)
-	# for p in particleList:
-	#     print(p, p.pos.elements, p.vel.elements, p.acc.elements)
-	# print("step")
-	if PRINT_DATA: print(particleList[0], particleList[0].pos.elements, particleList[0].vel.elements)
-	# camera.rot.setHeading(pi/360, plane = [0,2], increment = True)
 	turtle.update()
-
-
-
-
-
-
-		# self.vel.elements[2] = speed + other.vel.elements[2]
