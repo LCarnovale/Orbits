@@ -67,6 +67,12 @@ if len(sys.argv) > 1:
 		print("Welcome to Orbits4T!")
 
 		print("""
+This version contains 3 presets:
+1)  Centre body with -n number of planets orbiting in random places. (Default 10)
+2)  'Galaxy' kinda thing (Miserable failure, don't waste your time with this one)
+3)  Our very own Solar System!
+The third one is way better, don't even bother with the other two. They were just practice.
+
 Arguments:
 Key|Parameter type|Description
    | (if needed)  |
@@ -109,17 +115,13 @@ Using the program:
   - Space to pause the simulation. (Movement is still allowed)
   - Click any particle to set the camera to track that particle.
   - Right click any particle to fix the camera's rotation on that particle.
-  - Cycle through targeted particles with Tab/shift-Tab.
+  - Cycle through targeted particles with Tab/shift-Tab. (Available only in preset 3)
   		Once a particle is targeted, pressing T and Y will toggle pan and rotational
 		tracking respectively.
+  - Press 'G' to go to a selected target.
   - To stop tracking, click empty space or another particle.
   - To clear the target selection, press C
   - End the simulation with Esc.
-
-Presets:
-1)  Centre body with -n number of planets orbiting in random places. (Default 10)
-2)  'Galaxy' kinda thing (Miserable failure, don't waste your time with this one)
-3)  Our very own Solar System!
 """)
 		exit()
 	argv = sys.argv
@@ -174,10 +176,11 @@ DATA_FILE				= args["-df"][1]
 drawStars				= args["-ds"][1]
 makeAsteroids 			= args["-ab"][1]
 makeSatellites			= args["-es"][1]
+writeBuffer				= args["-WB"][1]
 FRAME_LIMIT 			= args["-flim"][1]
 
-AsteroidsStart 	 = 49.23 * 10**9
-AsteroidsEnd 	 = 240.52 * 10**9
+AsteroidsStart 	 = 249.23 * 10**9
+AsteroidsEnd 	 = 740.52 * 10**9
 AsteroidsMinMass = 0.0001 * 10**15
 AsteroidsMaxMass = 1	  * 10**23
 AsteroidsDensity = 1500
@@ -298,7 +301,25 @@ def drawLine(pointA, pointB = None, fill = "black", width = 1):
 	turtle.goto(x2, y2)
 	turtle.up()
 
-
+# These must be in descending order:
+prefixes = {
+	"P":1e15,
+	"T":1e12,
+	"G":1e9,
+	"M":1e6,
+	"k":1e3,
+	"m":1e-3,
+	u"\u03BC":1e-6
+}
+# Returns a string of num reduced with the appropriate prefix
+def numPrefix(num, unit, rounding=3):
+	# unit is a string, ie 'm', 'g'
+	global prefixes
+	for p in prefixes:
+		if (num > prefixes[p]):
+			result = str(round(num / prefixes[p], rounding)) + p + unit
+			return result
+	return str(num) + unit
 
 class buffer:
 	def __init__(self):
@@ -316,7 +337,7 @@ class buffer:
 		return (self.bufferLength * sys.getsizeof(self.buffer[particleList[0]]) * len(particleList))
 
 	def addParticle(self, particle):
-		self.buffer[p]    = []
+		self.buffer[p]    = [] * (bufferLength + 1)
 		self.emptyBuffers += 1
 		self.bufferCount  += 1
 
@@ -420,7 +441,7 @@ class MainLoop:
 		global planets
 		pauseString = "True"
 		if self.Time != 0:
-			timeString = "%d years, %d days, %d:%d:%.2f" % (int(self.Time / (24*3600*365)), int(self.Time / (24*3600)) % 365, int((self.Time / 3600) % 3600) % 24, int(self.Time/60) % 60, self.Time % 60)
+			timeString = ("-" if self.Time < 0 else "") + "%d years, %d days, %d:%d:%.2f" % (int(self.Time / (24*3600*365)), int(self.Time / (24*3600)) % 365, int((self.Time / 3600) % 3600) % 24, int(self.Time/60) % 60, self.Time % 60)
 		else:
 			timeString = "00:00"
 		if self.pause == -1: pauseString = "False"
@@ -479,9 +500,12 @@ Paused: %s         Time:  %s
 		global particleList
 		global DRAW_VEL_VECS
 		global panRate
-		if (pan[-1] == False and self.closestParticle != None):
+		if (self.closestParticle != None):
 			# panAmount = self.closestParticle * maxPan/(self.closestParticle + AUTO_RATE_CONSTANT)
 			panAmount = (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius) * maxPan/(AUTO_RATE_CONSTANT)
+			if (pan[-1]):
+				panAmount = max(panAmount, maxPan)
+
 		else:
 			panAmount = maxPan
 		panRate = panAmount
@@ -631,6 +655,16 @@ class camera:
 	rotTrackLock = False # don't allow any 'slippage', ie lock on firmly to the target
 	moving = False # To go to a particle, just activate pan and rotational
 				   # tracking on the target until they both have locked on
+
+	def __getattr__(self, attr):
+		if (attr == 'vel'):
+			if (self.panTrack):
+				return self.panTrack.vel
+			else:
+				return DEFAULT_ZERO_VEC
+
+		else:
+			raise Exception("Invalid attribute requested")
 
 	def setScreenDepth(self, value, increment=False):
 		if increment:
@@ -1222,17 +1256,21 @@ camera = camera(pos = vector([0, 0, 0]))
 setup()
 Running = True
 
-MainLoop.addData("Pan speed", "round(panRate, 2)", True)
-MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
-MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
 
 if preset == 1:
 	# Cloud of particles orbiting a big thing
+	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
+	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
+	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
 	particle(25000, vector([DEFAULT_SCREEN_DEPTH, 0, 0]))
 	for i in range(PARTICLE_COUNT):
 		particle(variableMass, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
 elif preset == 2:
 	# Galaxy kinda thing
+	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
+	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
+	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
+
 	minDist, maxDist = 25, 250
 	COM = vector([0, 0, 0])     # Centre of mass
 	particleMass = variableMass
@@ -1259,7 +1297,11 @@ elif preset == 3:
 
 	if (not args["-ps"][-1]): maxPan = 10e6
 
-	if (not args["-sf"][-1]): SMOOTH_FOLLOW = 0.1
+	if (not args["-sf"][-1]): SMOOTH_FOLLOW = 0.04
+
+	MainLoop.addData("Pan speed", "numPrefix(panRate, 'm/step', 2)", True)
+	MainLoop.addData("Camera pan lock", "camera.panTrackLock and camera.panTrack.name", True)
+	MainLoop.addData("Camera rot lock", "camera.rotTrackLock and camera.rotTrack.name", True)
 
 	AUTO_RATE_CONSTANT = 1.0e9
 	ALL_IMMUNE = True
@@ -1280,13 +1322,16 @@ elif preset == 3:
 	Data = loadSystem.loadFile(DATA_FILE)
 	MainLoop.addDataLine()
 	MainLoop.addData("Track target", "MainLoop.target.name", True, "None")
+	MainLoop.addData("Mass", "str(MainLoop.target.mass) + 'kg'", True, "---")
+	MainLoop.addData("Radius", "numPrefix(round(MainLoop.target.radius, 2), 'm')", True, "---")
+	MainLoop.addData("XYZ Velocity", "(MainLoop.target.vel.string(2)) + ', mag: ' + numPrefix(round(abs(MainLoop.target.vel), 5), 'm/s')", True, "---")
 	MainLoop.addData("Distance to Target", "")
-	MainLoop.addData("Centre", "round(abs(MainLoop.target.pos - camera.pos), 2)", True, "---")
-	MainLoop.addData("Surface", "round(abs(MainLoop.target.pos - camera.pos) - MainLoop.target.radius, 2)", True, "---")
-	MainLoop.addData("Mass", "MainLoop.target.mass", True, "---")
-	MainLoop.addData("Radius", "round(MainLoop.target.radius, 2)", True, "---")
-	MainLoop.addData("XYZ Velocity", "(MainLoop.target.vel.string(2)) + ', mag: ' + str(round(abs(MainLoop.target.vel), 5))", True, "---")
+	MainLoop.addData("Centre", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ), 2 ), 'm' )", True, "---")
+	MainLoop.addData("Surface", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ) - MainLoop.target.radius, 2 ), 'm' )", True, "---")
+	MainLoop.addData("Relative speed of camera", "numPrefix(abs(camera.vel - MainLoop.target.vel), 'm/s', 2)", True, "---")
 	MainLoop.addDataLine()
+
+	bigVec = vector([0, 0, 0])
 	for planet in Data:
 		data = Data[planet]
 		if data["valid"]:
@@ -1299,6 +1344,8 @@ elif preset == 3:
 						limitRadius=False, name=planet)
 			planetList.append(new)
 			planets[planet] = new
+			bigVec += new.pos
+	camera.pos = bigVec
 	MainLoop.target = planets["Earth"]
 	camera.goTo(planets["Earth"])
 	camera.trackDistance = 10 * planets["Earth"].radius
