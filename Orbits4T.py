@@ -441,7 +441,7 @@ class MainLoop:
 		global planets
 		pauseString = "True"
 		if self.Time != 0:
-			timeString = ("-" if self.Time < 0 else "") + "%d years, %d days, %d:%d:%.2f" % (int(self.Time / (24*3600*365)), int(self.Time / (24*3600)) % 365, int((self.Time / 3600) % 3600) % 24, int(self.Time/60) % 60, self.Time % 60)
+			timeString = ("-" if self.Time < 0 else "") + "%d years, %d days, %d:%d:%.2f" % (int(abs(self.Time) / (24*3600*365)), int(self.Time / (24*3600)) % 365, int((self.Time / 3600) % 3600) % 24, int(self.Time/60) % 60, self.Time % 60)
 		else:
 			timeString = "00:00"
 		if self.pause == -1: pauseString = "False"
@@ -1334,6 +1334,10 @@ elif preset == 3:
 	bigVec = vector([0, 0, 0])
 	for planet in Data:
 		data = Data[planet]
+		if (planet == "$VAR"):
+			if ("TIME" in Data[planet]): MainLoop.Time = Data[planet]["TIME"]
+
+			continue
 		if data["valid"]:
 			pos = vector([data["X"], data["Y"], data["Z"]]) * 1000
 			vel = vector([data["VX"], data["VY"], data["VZ"]]) * 1000

@@ -3,7 +3,8 @@
 # Data calculated for 2017-01-01 00:00
 # Put together by Leo Carnovale
 #
-#
+# TIME: time of the initial state in seconds (2017*365*24*60*60)
+$TIME = 63608112000
 #				(km)					(km)					(km)					(km/s)					(km/s)					(km/s)					(kg)		(kg/m^3)
 NAME			X						Y						Z						VX						VY						VZ						MASS		DENSITY
 Sun				5.064702305943604E+05	5.889102377519094E+05	-2.335506963855098E+04	-4.528770171532725E-03	1.162145548819547E-02	9.255801942556659E-05	1.989e+30	1.410e+3

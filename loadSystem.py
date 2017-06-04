@@ -15,13 +15,18 @@ def loadFile(path):
 
 	lines = stripComments(FILE)
 	table = []
+	data = {}
+	data["$VAR"] = {}
 	for line in lines:
 		if not line: continue
+		if line[0] == "$":
+			words = line[1:].split("=")
+			data["$VAR"][words[0].strip()] = float(words[1])
+			continue
 		row = [x for x in line.split("\t") if x]
 		table.append(row)
 
 	# The table is now stored as a 2D list
-	data = {}
 	for row in table[1:]:
 		data[row[0]] = {}
 		data[row[0]]["valid"] = True
