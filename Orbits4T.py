@@ -31,32 +31,33 @@ LINUX = False # If true, then non alphanumeric key controls will be replaced wit
 # 	 (Useful if the default varies depending on other arguments)															#
 #																															#
 ########### PUT DEFAULTS HERE ###############################################################################################
-args = {#         \/
+args = {#         \/	Req.Pmtr		Is changed (Not supplied by user)
 "-?"  :  [None],
-"-d"  :  [float, 0.025,  True, 	False], # Delta time per step
-"-n"  :  [int,   20,     True, 	False], # Particle count
-"-p"  :  [int,   1,      True, 	False], # preset
-"-sp" :  [str,   False,  False,  True, 	False], # start paused
-"-ss" :  [str,   False,  False,  True, 	False], # staggered simulation
-"-G"  :  [float, 20,     True, 	False],  # Gravitational constant
-"-pd" :  [str,   False,  False,  True, 	False], # Print data
-"-sd" :  [float, 2000,   True, 	False],  # Default screen depth
-"-ps" :  [float, 5.0,    True, 	False],  # Maximum pan speed
-"-rs" :  [float, 0.01,    True, 	False],  # Rotational speed
-"-mk" :  [str,   False,  False,  True, 	False], # Show marker points
-"-ep" :  [int,   360,    True, 	False],  # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
-"-sf" :  [float, 0.5,    True, 	False],  # Rate at which the camera follows its target
-"-ad" :  [str,   False,  False,  True, 	False], # Always draw. Attempts to draw particles even if they are thought not to be on screen
-"-vm" :  [float, 150,    True, 	False],  # Variable mass. Will be used in various places for each preset.
-"-vv" :  [float, False,  False,  1, 	False], # Draw velocity vectors
-"-ds" :  [str,	 False,	 False,  True, 	False], # Draw stars, ie, make the minimum size 1 pixel, regardless of distance.
-"-sdp":  [int,   5,      True, 	False],  # Smart draw parameter, equivalent to the number of pixels per edge on a shape
-"-ab" :  [int,   False,  False,  20, 	False], # Make asteroid belt (Wouldn't recommend on presets other than 3..)
-"-es" :  [int,	 False,  False,  5, 	False],  # Make earth satellites
-"-WB" :  [str,   False,  False,	 True, 	False], # Write buffer to file
-"-flim": [float, False,  True, 	False],  # Frame limit
-"-df" :  [str, "SolSystem.txt", True, 	False], # Path of the data file
-"-AA_OFF": [str, True, False, False, 	False]   # Turn off AutoAbort.
+"-d"  :  	[float,	0.025,	True, 			False], # Delta time per step
+"-n"  :  	[int,   20,		True, 			False], # Particle count
+"-p"  :  	[int,   1,		True, 			False], # preset
+"-sp" :  	[str,   False,	False,  True, 	False], # start paused
+"-ss" :  	[str,   False,	False,  True, 	False], # staggered simulation
+"-G"  :  	[float, 20,		True, 			False], # Gravitational constant
+"-pd" :  	[str,   False,	False,  True, 	False], # Print data
+"-sd" :  	[float, 2000,	True, 			False], # Default screen depth
+"-ps" :  	[float, 5.0,	True, 			False], # Maximum pan speed
+"-rs" :  	[float, 0.01,	True,	 		False], # Rotational speed
+"-mk" :  	[str,   False,	False,  True, 	False], # Show marker points
+"-ep" :  	[int,   360,	True, 			False], # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
+"-sf" :  	[float, 0.5,	True, 			False], # Rate at which the camera follows its target
+"-ad" :  	[str,   False,	False,  True, 	False], # Always draw. Attempts to draw particles even if they are thought not to be on screen
+"-vm" :  	[float, 150,	True, 			False], # Variable mass. Will be used in various places for each preset.
+"-vv" :  	[float, False,	False,  1, 		False], # Draw velocity vectors
+"-ds" :  	[str,	False,	False,  True, 	False], # Draw stars, ie, make the minimum size 1 pixel, regardless of distance.
+"-sdp":  	[int,   5,		True, 			False], # Smart draw parameter, equivalent to the number of pixels per edge on a shape
+"-ab" :  	[int,   False,	False,  20, 	False], # Make asteroid belt (Wouldn't recommend on presets other than 3..)
+"-es" :  	[int,	False,	False,  5, 		False], # Make earth satellites
+"-WB" :  	[str,   False,	False,	True, 	False], # Write buffer to file
+"-flim": 	[float, False,	True, 			False], # Frame limit
+"-df" :  	[str, "SolSystem.txt", True, 	False], # Path of the data file
+"-test": 	[str,	 False, False, True, 	False], # Test mode
+"-AA_OFF": [str, True, 	False, 	False, 	False]   # Turn off AutoAbort.
 }
 
 originalG = args["-G"][1]
@@ -153,9 +154,10 @@ else:
 	print("You haven't used any arguments.")
 	print("Either you're being lazy or don't know how to use them.")
 	print("For help, run '%s -?'" % (sys.argv[0]))
-	time.sleep(3)
+	time.sleep(1)
 	print("Now onto a very lame default simulation...")
-	time.sleep(2)
+	time.sleep(1)
+
 Delta                   = args["-d"][1]
 PARTICLE_COUNT          = args["-n"][1]
 preset                  = args["-p"][1]
@@ -179,14 +181,55 @@ makeSatellites			= args["-es"][1]
 writeBuffer				= args["-WB"][1]
 FRAME_LIMIT 			= args["-flim"][1]
 
-AsteroidsStart 	 = 249.23 * 10**9
-AsteroidsEnd 	 = 740.52 * 10**9
+TestMode 				= args["-test"][1]
+
+MINUTE 	= 60
+HOUR 	= 60 *	MINUTE
+DAY  	= 24 *	HOUR
+YEAR 	= 365 * DAY
+
+if TestMode:
+	if preset == 3:
+		# Test data:
+		testData = {# [[<Name>, <Time>, <Pos>, <vel>], ...]
+			"ISS":
+			[(2017 * YEAR + 92 * MINUTE), # 2017 years, 1 hour 32 minutes, ie 1 hour 32 mins after start, should be one orbit.
+			vector([-2.652741416195131E+07,  1.451863591737731E+08, -2.246871177630126E+04]) * 1000, # Both given in km/s, convert to m/s
+			vector([-2.268856357268088E+01, -8.202616782054283E+00, -1.309397555344641E+00]) * 1000],
+			"Moon":
+			[(2017 * YEAR + 92 * MINUTE),
+			vector([-2.626413928789543E+07,  1.449000582187190E+08, -1.580188827935606E+04]) * 1000,
+			vector([-2.906316391048909E+01, -4.878152316231304E+00, -8.298362677803639E-02]) * 1000],
+			"Earth":
+			[(2017 * YEAR + 92 * MINUTE),
+			vector([-2.652775232714054E+07,  1.451886523109221E+08, -2.883530398781598E+04]) * 1000,
+			vector([-2.977993074888063E+01, -5.581820507958473E+00,  1.472498187503835E-03]) * 1000],
+			"Mercury":
+			[(2017 * YEAR + 31 * DAY),
+			vector([-3.491563712116394E+07, -5.847758798545337E+07, -1.603576528303239E+06]) * 1000,
+			vector([3.195297711109924E+01, -2.269718543834500E+01, -4.787363119651942E+00]) * 1000],
+			"Voyager2":
+			[(2017 * YEAR + 31 * DAY),
+			vector([4.678084657944870E+09, -1.291984823213759E+10, -9.959551510991798E+09]) * 1000,
+			vector([4.245078194430032E+00, -9.418854886561272E+00, -1.138382248152680E+01]) * 1000]
+		}
+		if (not testData):
+			print("No test data given to test with. Aborting.")
+			exit()
+		else:
+			print("Testing positions and velocities for:", ", ".join([x for x in testData]))
+
+	else:
+		print("Testing not available for this preset (%d)." %(preset))
+
+AsteroidsStart 	 = 249.23 * 10**9 # Places the belt roughly between Mars and Jupiter.
+AsteroidsEnd 	 = 740.52 * 10**9 # Couldn't find the actual boundaries (They're probably pretty fuzzy)
 AsteroidsMinMass = 0.0001 * 10**15
 AsteroidsMaxMass = 1	  * 10**23
 AsteroidsDensity = 1500
 
-ALL_IMMUNE = False
-
+ALL_IMMUNE 	= False
+REAL_TIME 	= False
 
 DEFAULT_ROTATE_FOLLOW_RATE = 0.04
 AUTO_RATE_CONSTANT  = 1000  # A mysterious constant which determines the autoRate speed, 100 works well.
@@ -223,13 +266,13 @@ def roundList(list, places):
 	return [round(x, places) for x in list]
 
 
+if not TestMode:
+	window = turtle.Screen()
+	window.setup(width = 1.0, height = 1.0)
+	turtle.bgcolor("black")
 
-window = turtle.Screen()
-window.setup(width = 1.0, height = 1.0)
-turtle.bgcolor("black")
-
-turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
-turtle.hideturtle()
+	turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
+	turtle.hideturtle()
 
 SMART_DRAW = True               # Changes the number of points on each ellipse
 								# depending on its size
@@ -308,6 +351,7 @@ prefixes = {
 	"G":1e9,
 	"M":1e6,
 	"k":1e3,
+	"" :1e0,
 	"m":1e-3,
 	u"\u03BC":1e-6
 }
@@ -320,6 +364,26 @@ def numPrefix(num, unit, rounding=3):
 			result = str(round(num / prefixes[p], rounding)) + p + unit
 			return result
 	return str(num) + unit
+
+def timeString(seconds, rounding=3):
+	if seconds < 60:
+		return ("{}s".format(round(seconds, rounding)))
+
+	minutes = seconds / 60
+	minutes = int(minutes)
+	if minutes < 60:
+		return ("{}:{}s".format(int(minutes), round(seconds % 60, rounding)))
+
+	hours = minutes / 60
+	if hours < 24:
+		return ("{}:{}:{}s".format(int(hours), int(minutes % 60), round(seconds % 60, rounding)))
+
+	days = hours / 24
+	if days < 365:
+		return ("{} days, {}:{}:{}s".format(int(days), int(hours % 24), int(minutes % 60), round(seconds % 60, rounding)))
+
+	years = days / 365
+	return ("{} years, {} days, {}:{}:{}s".format(int(years), int(days % 365), int(hours % 24), int(minutes % 60), round(seconds % 60, rounding)))
 
 class buffer:
 	def __init__(self):
@@ -450,7 +514,7 @@ Buffermode: %s (%d) --> (%.2lf Mb)
 Particle Count: %d Delta: %f
 Paused: %s         Time:  %s
 		""" % (
-			(("%.2f"%self.FPS) if self.FPS > 0 else "INFINITY!!"),
+			(("%.2f"%self.FPS) if self.FPS != 999 else "INFINITY!!"),
 			Buffer.bufferModeString(), Buffer.bufferLength / Buffer.bufferCount,
 			sys.getsizeof(Buffer) / 1000000,
 			len(particleList),
@@ -476,7 +540,10 @@ Paused: %s         Time:  %s
 
 		width = turtle.window_width()
 		height = turtle.window_height()
-		turtle.goto(-width / 2 + 10, height / 2 - 15 * (len(text.split("\n")) - 1))
+		textX = -width / 2 + 10
+		textY = height / 2 - 15 * (len(text.split("\n")) - 1) # Origin of the text box is bottom left corner
+		if (text[-1] != "\n"): textY -= 15
+		turtle.goto(textX, textY)
 		turtle.down()
 		turtle.pencolor([1, 1, 1])
 		turtle.write(text)
@@ -549,7 +616,7 @@ Paused: %s         Time:  %s
 
 				if (self.closestParticle == None):
 					self.closestParticle = p#abs(p.pos - camera.pos) - p.radius
-				elif ((abs(p.pos - camera.pos) - p.radius) < abs(self.closestParticle.pos - camera.pos)):
+				elif ((abs(p.pos - camera.pos) - p.radius) < (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius)):
 					self.closestParticle = p
 				if (doStep and (p != camera.rotTrack and p != camera.panTrack)):
 					p.step(delta)
@@ -600,7 +667,7 @@ Paused: %s         Time:  %s
 		frameEnd = time.time()
 		frameLength = frameEnd - frameStart
 		if (frameLength == 0):
-			FPS = -1
+			FPS = 999
 		else:
 			FPS = 1 / frameLength
 		if FRAME_LIMIT:
@@ -609,15 +676,15 @@ Paused: %s         Time:  %s
 				frameEnd = time.time()
 				frameLength = frameEnd - frameStart
 				if (frameLength == 0):
-					FPS = -1
+					FPS = 999
 				else:
 					FPS = 1 / frameLength
-			elif (FPS == -1):
+			elif (FPS == 999):
 				time.sleep(1/FRAME_LIMIT)
 				frameEnd = time.time()
 				frameLength = frameEnd - frameStart
 				if (frameLength == 0):
-					FPS = -1
+					FPS = 999
 				else:
 					FPS = 1 / frameLength
 
@@ -625,7 +692,7 @@ Paused: %s         Time:  %s
 
 		# print("FPS:", FPS)
 		if (AUTO_ABORT):
-			if (FPS < 1 and FPS != -1):
+			if (FPS < 1):
 				if (self.frameWarning):
 					self.abort()
 				else:
@@ -712,8 +779,8 @@ class camera:
 		self.panTrack = target
 		self.panTrackLock = False
 		if target:
-			mag = (10 * target.radius)
-			self.trackSeparate = (-target.pos + self.pos).setMag(mag)
+			mag = min((20 * target.radius), abs(self.pos - target.pos))
+			self.trackSeparate = (self.pos - target.pos).setMag(mag)
 		return target
 
 	def rotTrackSet(self, target = None):
@@ -925,7 +992,8 @@ class particle:
 	def checkOutOfBounds(self): #bounds=[turtle.window_width()/2, turtle.window_height()/2]):
 		# self.vel.multiplyToMe(0)
 		# return
-		if self.immune or ALL_IMMUNE: return False
+		global TestMode
+		if self.immune or ALL_IMMUNE or TestMode: return False
 		out = False
 		if abs(self.pos.subtract(camera.pos)) > voidRadius:
 			out = True
@@ -981,13 +1049,17 @@ class particle:
 	def step(self, delta, draw=True, drawVel=False, onlyDraw = False, bufferMode = 0):
 		# self.checkCollisionList(particleList)
 		# self.calcAccList(particleList)
+		oldAcc = self.acc
 		self.acc *= 0
 		self.runLoop()
 		if self.radius > radiusLimit and self.limitRadius:
 			self.die()
 			return False
-		self.vel += self.acc * delta
-		self.pos += self.vel * delta
+
+		self.vel += (oldAcc + self.acc) * (delta / 2)
+		self.pos += self.vel * delta# + self.acc * (delta**2 / 2)
+		# self.vel += self.acc * delta
+		# self.pos += self.vel * delta
 		self.checkOutOfBounds()
 		# if self.acc.getMag(): #print(self.acc.elements)
 
@@ -1136,6 +1208,10 @@ def revDelta():
 	global Delta
 	Delta *= -1
 
+def toggleRealTime():
+	global REAL_TIME
+	REAL_TIME = False if REAL_TIME else True
+
 def bufferRecord():
 	# if MainLoop.pause == 1:
 	#     pause()
@@ -1180,69 +1256,70 @@ def cycleTargets():
 def clearTarget():
 	MainLoop.target = None
 
-turtle.onkeypress(panLeft, "a")
-turtle.onkeyrelease(panRight , "a")
+if not TestMode:
+	turtle.onkeypress(panLeft, "a")
+	turtle.onkeyrelease(panRight , "a")
 
-turtle.onkeypress(panRight, "d")
-turtle.onkeyrelease(panLeft , "d")
+	turtle.onkeypress(panRight, "d")
+	turtle.onkeyrelease(panLeft , "d")
 
-turtle.onkeypress(panForward, "w")
-turtle.onkeyrelease(panBack , "w")
+	turtle.onkeypress(panForward, "w")
+	turtle.onkeyrelease(panBack , "w")
 
-turtle.onkeypress(panBack, "s")
-turtle.onkeyrelease(panForward , "s")
+	turtle.onkeypress(panBack, "s")
+	turtle.onkeyrelease(panForward , "s")
 
-turtle.onkeypress(panUp, "r")
-turtle.onkeyrelease(panDown , "r")
+	turtle.onkeypress(panUp, "r")
+	turtle.onkeyrelease(panDown , "r")
 
-turtle.onkeypress(panDown, "f")
-turtle.onkeyrelease(panUp , "f")
+	turtle.onkeypress(panDown, "f")
+	turtle.onkeyrelease(panUp , "f")
 
-turtle.onkeypress(panFast, "Shift_L")
-turtle.onkeyrelease(panSlow, "Shift_L")
+	turtle.onkeypress(panFast, "Shift_L")
+	turtle.onkeyrelease(panSlow, "Shift_L")
 
-turtle.onkeypress(rotRight, "Right")
-turtle.onkeyrelease(rotLeft, "Right")
+	turtle.onkeypress(rotRight, "Right")
+	turtle.onkeyrelease(rotLeft, "Right")
 
-turtle.onkeypress(rotLeft, "Left")
-turtle.onkeyrelease(rotRight, "Left")
+	turtle.onkeypress(rotLeft, "Left")
+	turtle.onkeyrelease(rotRight, "Left")
 
-turtle.onkeypress(rotUp, "Up")
-turtle.onkeyrelease(rotDown, "Up")
+	turtle.onkeypress(rotUp, "Up")
+	turtle.onkeyrelease(rotDown, "Up")
 
-turtle.onkeypress(rotDown, "Down")
-turtle.onkeyrelease(rotUp, "Down")
+	turtle.onkeypress(rotDown, "Down")
+	turtle.onkeyrelease(rotUp, "Down")
 
-turtle.onkeypress(rotClockWise, "e")
-turtle.onkeyrelease(rotAntiClock, "e")
+	turtle.onkeypress(rotClockWise, "e")
+	turtle.onkeyrelease(rotAntiClock, "e")
 
-turtle.onkeypress(rotAntiClock, "q")
-turtle.onkeyrelease(rotClockWise, "q")
+	turtle.onkeypress(rotAntiClock, "q")
+	turtle.onkeyrelease(rotClockWise, "q")
 
-turtle.onkey(escape, "Escape")
-turtle.onkey(pause,  "space")
+	turtle.onkey(escape, "Escape")
+	turtle.onkey(pause,  "space")
 
 
-turtle.onkey(cycleTargets, "Tab")
-turtle.onkey(togglePanTrack, "t")
-turtle.onkey(toggleRotTrack, "y")
-turtle.onkey(clearTarget,    "c")
-turtle.onkey(goToTarget,	 "g")
+	turtle.onkey(cycleTargets, "Tab")
+	turtle.onkey(togglePanTrack, "t")
+	turtle.onkey(toggleRotTrack, "y")
+	turtle.onkey(clearTarget,    "c")
+	turtle.onkey(goToTarget,	 "g")
+	turtle.onkey(toggleRealTime, "i")
 
-turtle.onkeypress(upScreenDepth, ".")
-turtle.onkeypress(downScreenDepth, ",")
+	turtle.onkeypress(upScreenDepth, ".")
+	turtle.onkeypress(downScreenDepth, ",")
 
-turtle.onkey(upDelta, "]")
-turtle.onkey(downDelta, "[")
-turtle.onkey(revDelta, "\\")
+	turtle.onkey(upDelta, "]")
+	turtle.onkey(downDelta, "[")
+	turtle.onkey(revDelta, "\\")
 
-turtle.onscreenclick(leftClick, 1)
-turtle.onscreenclick(rightClick, 3)
+	turtle.onscreenclick(leftClick, 1)
+	turtle.onscreenclick(rightClick, 3)
 
-turtle.onkey(bufferRecord, "n")
-turtle.onkey(bufferPlay, "m")
+	turtle.onkey(bufferRecord, "n")
+	turtle.onkey(bufferPlay, "m")
 
-turtle.listen()
 
 DEFAULT_ZERO_VEC = vector(DEFAULT_ZERO_VEC)
 DEFAULT_UNIT_VEC = vector(DEFAULT_UNIT_VEC)
@@ -1380,11 +1457,99 @@ elif preset == 3:
 	# particle(1000, sat2).circularise(planets["Earth"], axis=vector([0, 0, 1]))
 
 
+
+if TestMode:
+	try:
+		print("Running simulation...")
+	# 	print("""	Note that with leapfrog arithmetic,
+	# velocity and position are technically never both known at the same time,
+	# but that shouldn't affect results significantly.""")
+		Time = MainLoop.Time
+		checkTimes = sorted([testData[x][0] for x in testData])
+		# checkNames = [x for x in testData]
+		flag = False
+		# We know there is test data because otherwise the program would have exited by now
+		startTime = Time
+		stepCounter = 1
+		startSim = time.time()
+		# [print(x.name) for x in particleList]
+		tempDelta = False
+		progressStep = 1
+		progressPoint = 0
+		print("Progress :..", end = "")
+		while checkTimes:
+			progress = 100 * (Time - startTime) / (checkTimes[0] - startTime)
+			if (progress >= progressPoint):
+				print("\rProgress: %d%%" % (progressPoint), end = "")
+				progressPoint += progressStep
+			# print("\rProgress: %.2f%%" % (100 * (Time - startTime) / (checkTimes[-1] - startTime)), end = "")
+			sys.stdout.flush()
+
+			if Time >= checkTimes[0]:
+				for p in particleList:
+					if ((p.name in testData) and (False if not checkTimes else checkTimes[0] == testData[p.name][0])):
+						# Check the data.
+						targetData = testData[p.name]
+						targetTime = targetData[0]
+						targetPos  = targetData[1]
+						targetVel  = targetData[2]
+						print("\nAt time: %lf, for %s:" %(Time, p.name))
+						print("\tShould be at:    %s\twith vel: %s (mag: %s)" % (targetPos.string(2), targetVel.string(2), numPrefix(abs(targetVel), "m/s")))
+						print("\tWas actually at: %s\twith vel: %s (mag: %s)" % (p.pos.string(2), p.vel.string(2), numPrefix(abs(p.vel), "m/s")))
+						print("\tOffset by %s (mag: %s) over %d steps of %lfs, average %s/step or %s" % (
+							(p.pos - targetPos).string(2),
+							numPrefix(abs(p.pos - targetPos), "m", 3),
+							stepCounter, (Delta if not tempDelta else tempDelta),
+							numPrefix(abs(p.pos - targetPos) / stepCounter, "m", 3),
+							numPrefix(abs(p.pos - targetPos) / (stepCounter * Delta), "m/s", 3))
+						)
+						print()
+						checkTimes.pop(0)
+						progressPoint = 0
+						# flag = len(checkTimes)
+					p.step(Delta)
+			else:
+				if (tempDelta):
+					Delta = tempDelta
+					tempDelta = False
+				if (Time + Delta > checkTimes[0]):
+					tempDelta = Delta
+					# print("Time + Delta = %lf, greater than %f, setting Delta to %f" % (Time + Delta, checkTimes[0], checkTimes[0] - Time))
+					Delta = checkTimes[0] - Time
+				for p in particleList:
+					p.step(Delta)
+			Time += Delta
+			stepCounter += 1
+			if stepCounter == 100:
+				interval = time.time() - startSim
+				# Covered 50 * Delta in interval seconds, ie (50*Delta simSeconds / interval realSeconds)
+				simSpeed = 100*Delta / interval
+				remainingTimeFirst = checkTimes[0] - Time
+				if len(checkTimes) > 1:
+					remainingTimeLast = checkTimes[-1] - Time
+					remainingSimTimeFirst = remainingTimeFirst / simSpeed
+					remainingSimTimeLast  = remainingTimeLast  / simSpeed
+					print("\nEstimated remaining time for first data: %s, and for last: %s" % (timeString(round(remainingSimTimeFirst, 2)), timeString(round(remainingSimTimeLast, 2))))
+				else:
+					remaingSimTime = remainingTimeFirst / (simSpeed)
+					print("\nEstimated remaining time: %s" % (timeString(round(remaingSimTime, 2))))
+	except KeyboardInterrupt:
+		print("\nStopping.")
+		exit()
+	exit()
+
 Buffer = buffer()
+turtle.listen()
+
+# if REAL_TIME:
 if START_PAUSED:
 	pause()
 while Running:
+	frameStart = time.time()
 	turtle.clear()
 	if STAGGERED_SIM: input()
 	MainLoop.STEP(Delta, camera)
+	if REAL_TIME:
+		Delta = time.time() - frameStart
+		frameStart = time.time()
 	turtle.update()
