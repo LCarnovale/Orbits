@@ -505,9 +505,9 @@ class MainLoop:
 		global planets
 		pauseString = "True"
 		if self.Time != 0:
-			timeString = ("-" if self.Time < 0 else "") + "%d years, %d days, %d:%d:%.2f" % (int(abs(self.Time) / (24*3600*365)), int(self.Time / (24*3600)) % 365, int((self.Time / 3600) % 3600) % 24, int(self.Time/60) % 60, self.Time % 60)
+			time = ("-" if self.Time < 0 else "") + timeString(abs(self.Time))
 		else:
-			timeString = "00:00"
+			time = "00:00"
 		if self.pause == -1: pauseString = "False"
 		text = """Frame Rate: %s
 Buffermode: %s (%d) --> (%.2lf Mb)
@@ -520,7 +520,7 @@ Paused: %s         Time:  %s
 			len(particleList),
 			delta,
 			pauseString,
-			timeString
+			time
 		)
 
 		for data in self.DataDisplay:
