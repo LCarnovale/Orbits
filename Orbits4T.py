@@ -10,15 +10,17 @@ import random
 import time
 import vector
 import loadSystem
+import particle as Pmodule
 
 randomVector = vector.randomVector
 vector = vector.vector
-# import sys
 
-# print(sys.path)
-# sys.path.append(sys.path.cur)
+particleList = Pmodule.particleList
+markerList   = Pmodule.markerList
 
-
+marker   = Pmodule.marker
+particle = Pmodule.particle
+# particle
 LINUX = False # If true, then non alphanumeric key controls will be replaced with numbers
 
 #############################################################################################################################
@@ -58,7 +60,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-flim": 	[float, False,	True], # Frame limit
 "-df" :  	[str, "SolSystem.txt", True], # Path of the data file
 "-test": 	[str,	 False, False, True], # Test mode
-"-getStars": [int,  False,	False, 100], # Get stars from the datafile.
+"-getStars": [float,  False,	False, 4], # Get stars from the datafile.
 "-AA_OFF": [str, True, 	False, 	False]   # Turn off AutoAbort.
 }
 
@@ -166,22 +168,22 @@ else:
 	print("Now onto a very lame default simulation...")
 	time.sleep(1)
 
-Delta                   = args["-d"][1]
-PARTICLE_COUNT          = args["-n"][1]
-preset                  = args["-p"][1]
-STAGGERED_SIM           = args["-ss"][1]
-START_PAUSED            = args["-sp"][1]
-G                       = args["-G"][1]
-PRINT_DATA              = args["-pd"][1]
-DEFAULT_SCREEN_DEPTH    = args["-sd"][1]
-maxPan                  = args["-ps"][1]
-rotSpeed                = args["-rs"][1]
-showMarkers             = args["-mk"][1]
-ellipsePoints           = args["-ep"][1]
-SMOOTH_FOLLOW           = args["-sf"][1]
-DRAW_VEL_VECS           = args["-vv"][1]
-ALWAYS_DRAW             = args["-ad"][1]
-variableMass            = args["-vm"][1]
+Delta					= args["-d"][1]
+PARTICLE_COUNT			= args["-n"][1]
+preset					= args["-p"][1]
+STAGGERED_SIM			= args["-ss"][1]
+START_PAUSED			= args["-sp"][1]
+particle.G				= args["-G"][1]
+PRINT_DATA				= args["-pd"][1]
+DEFAULT_SCREEN_DEPTH	= args["-sd"][1]
+maxPan					= args["-ps"][1]
+rotSpeed				= args["-rs"][1]
+showMarkers				= args["-mk"][1]
+ellipsePoints			= args["-ep"][1]
+SMOOTH_FOLLOW			= args["-sf"][1]
+DRAW_VEL_VECS			= args["-vv"][1]
+ALWAYS_DRAW				= args["-ad"][1]
+variableMass			= args["-vm"][1]
 DATA_FILE				= args["-df"][1]
 drawStars				= args["-ds"][1]
 makeAsteroids 			= args["-ab"][1]
@@ -191,7 +193,7 @@ FRAME_LIMIT 			= args["-flim"][1]
 getStars 				= args["-getStars"][1]
 
 TestMode 				= args["-test"][1]
-
+particle.TestMode = TestMode
 PRESET_4_MIN_RADIUS = 40
 PRESET_4_MAX_RADIUS = 400
 
@@ -200,28 +202,29 @@ HOUR 	= 60 *	MINUTE
 DAY  	= 24 *	HOUR
 YEAR 	= 365 * DAY
 
+LIGHT_SPEED = 299792458
+LIGHT_YEAR  = LIGHT_SPEED * YEAR
 AU		= 149597870700
 PARSEC  = 3.085677581e+16
-
 AsteroidsStart 	 = 249.23 * 10**9 # Places the belt roughly between Mars and Jupiter.
 AsteroidsEnd 	 = 740.52 * 10**9 # Couldn't find the actual boundaries (They're probably pretty fuzzy)
 AsteroidsMinMass = 0.0001 * 10**15
 AsteroidsMaxMass = 1	  * 10**23
 AsteroidsDensity = 1500
 
-ALL_IMMUNE 	= False
+particle.ALL_IMMUNE 	= False
 REAL_TIME 	= False
 
 DEFAULT_ROTATE_FOLLOW_RATE = 0.04
-AUTO_RATE_CONSTANT  = 1000  # A mysterious constant which determines the autoRate speed, 100 works well.
+AUTO_RATE_CONSTANT  = 10    # A mysterious constant which determines the autoRate speed, 100 works well.
 
-defaultDensity      = 1
-radiusLimit         = 50        # Maximum size of particle
+particle.defaultDensity		= 1
+particle.radiusLimit		= 250       # Maximum size of particle
 voidRadius          = 5000      # Maximum distance of particle from camera
 
 AUTO_ABORT          = args["-AA_OFF"][1]      # I wouldn't change this unless you know the programs good to go
 
-particleList = [ ]
+# particleList = [ ]
 
 DEFAULT_ZERO_VEC = [0, 0, 0]
 DEFAULT_UNIT_VEC = [1, 0, 0]
@@ -290,13 +293,7 @@ def roundList(list, places):
 	return [round(x, places) for x in list]
 
 
-if not TestMode:
-	window = turtle.Screen()
-	window.setup(width = 1.0, height = 1.0)
-	turtle.bgcolor("black")
 
-	turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
-	turtle.hideturtle()
 
 def screenWidth():
 	return turtle.window_width()
@@ -369,7 +366,8 @@ def drawLine(pointA, pointB = None, fill = "black", width = 1):
 
 # These must be in descending order:
 prefixes = {
-	"!Parsec":PARSEC,
+	"! Parsecs":PARSEC,
+	"! light years":LIGHT_YEAR,
 	"P":1e15,
 	"T":1e12,
 	"G":1e9,
@@ -385,8 +383,8 @@ def numPrefix(num, unit, rounding=3):
 	global prefixes
 	for p in prefixes:
 		if (num > prefixes[p]):
-			if (p[0] == "!"):
-				result = str(round(num / prefixes[p[1:]], rounding)) + p
+			if (p and p[0] == "!"):
+				result = str(round(num / prefixes[p], rounding)) + p[1:] + unit[1:]
 			else:
 				result = str(round(num / prefixes[p], rounding)) + p + unit
 			return result
@@ -540,14 +538,17 @@ class MainLoop:
 Buffermode: %s (%d) --> (%.2lf Mb)
 Particle Count: %d Delta: %f
 Paused: %s         Time:  %s
+Distance to closest particle: %s
 		""" % (
 			(("%.2f"%self.FPS) if self.FPS != 999 else "INFINITY!!"),
-			Buffer.bufferModeString(), Buffer.bufferLength / Buffer.bufferCount,
+			Buffer.bufferModeString(),
+			(0 if Buffer.bufferCount == 0 else Buffer.bufferLength / Buffer.bufferCount),
 			sys.getsizeof(Buffer) / 1000000,
 			len(particleList),
 			delta,
 			pauseString,
-			time
+			time,
+			("---" if not self.closestParticle else numPrefix(abs(camera.pos - self.closestParticle.pos), "m"))
 		)
 
 		for data in self.DataDisplay:
@@ -596,7 +597,7 @@ Paused: %s         Time:  %s
 		global panRate
 		if (self.closestParticle != None):
 			# panAmount = self.closestParticle * maxPan/(self.closestParticle + AUTO_RATE_CONSTANT)
-			panAmount = (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius) * maxPan/(AUTO_RATE_CONSTANT)
+			panAmount = (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius) * 0.01#maxPan/(AUTO_RATE_CONSTANT)
 			if (pan[-1]):
 				panAmount = max(panAmount, maxPan)
 
@@ -615,6 +616,7 @@ Paused: %s         Time:  %s
 		# if draw:
 		doStep = (self.pause == -1 and Buffer.bufferMode != 2)
 		camera.step(delta, doStep)
+		self.commonShiftPos = -camera.pos
 		self.closestParticle = None
 		for m in sorted(markerList, key = lambda x: abs(x.pos - camera.pos), reverse = True):
 			camera.drawParticle(m)
@@ -628,17 +630,21 @@ Paused: %s         Time:  %s
 			# clicked = True
 		# print("---")
 		if camera.panTrack:
-			if doStep: camera.panTrack.step(delta)
+			if doStep: camera.panTrack.step(delta, camera)
 			camera.panFollow()
 		if camera.rotTrack and (camera.rotTrack != camera.panTrack):
-			if doStep: camera.rotTrack.step(delta)
+			if doStep: camera.rotTrack.step(delta, camera)
 			camera.rotFollow()
 		elif camera.rotTrack:
 			camera.rotFollow()
 
+		camera.pos += self.commonShiftPos
 		for I, p  in enumerate(particleList):
 			# print("I: %d" % (I))
 			# p = particleList[I]
+			if self.commonShiftPos:
+				p.pos += self.commonShiftPos
+
 			if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
 				# Swap the previous one with the current one
 				particleList = particleList[:I - 1] + [particleList[I], particleList[I-1]] + particleList[I + 1:]
@@ -648,7 +654,7 @@ Paused: %s         Time:  %s
 			elif ((abs(p.pos - camera.pos) - p.radius) < (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius)):
 				self.closestParticle = p
 			if (doStep and (p != camera.rotTrack and p != camera.panTrack)):
-				p.step(delta)
+				p.step(delta, camera)
 			buff = Buffer.processPosition(p)
 			if not buff:
 				if self.target == p:
@@ -690,7 +696,6 @@ Paused: %s         Time:  %s
 		# 	# print("Got here somehow?")
 			# for p in particleList:
 			# 	p.step(delta)
-
 
 
 		frameEnd = time.time()
@@ -828,7 +833,7 @@ class camera:
 		return target
 
 	def autoRate(self, rate, distance):
-		newRate = dist * rate/(dist + AUTO_RATE_CONSTANT)
+		newRate = dist * 0.5# * rate/(AUTO_RATE_CONSTANT)
 		return newRate
 
 	def zeroCameraPosVel(self):
@@ -950,204 +955,7 @@ class camera:
 		else:
 			self.rotTrackLock = True
 
-
-
-class particle:
-	def __init__(
-				self, mass, position, velocity=0, acceleration=0,
-				density=defaultDensity, autoColour=True, colour=[0, 0, 1],
-				limitRadius=True, name=None, static=False):
-		self.mass = mass
-		self.pos = position
-		self.dim = len(position.elements)
-		self.density = density
-		self.limitRadius = limitRadius
-		self.name = name
-		self.static = static
-		if velocity == 0:
-			self.vel = vector([0 for i in range(self.dim)])
-		else:
-			self.vel = velocity
-		if acceleration == 0:
-			self.acc = vector([0 for i in range(self.dim)])
-		else:
-			self.acc = acceleration
-		self.autoColour = autoColour
-		self.setRadius()
-		if not autoColour:
-			self.setColour(colour)
-		particleList.append(self)
-		if self.pos.dim != self.vel.dim:
-			print("This class is badly made! (non consistant dimensions):", self)
-		# self.setColour()
-		# self.colour = [self.radius/radiusLimit, 0, (radiusLimit - self.radius)/radiusLimit]
-
-
-	alive = True
-	respawn = True
-	specialColour = False
-	colour = [0, 0, 0]
-
-	inbound = False
-	immune = False
-
-	newMass = False # the mass of the particle after it respawns
-	# colour parameter only used if autoColour is off
-	def setColour(self, colour=None):
-		if self.autoColour:
-			self.colour = [self.radius/radiusLimit, 0, (radiusLimit - self.radius)/radiusLimit]
-		elif colour:
-			self.colour = colour
-		else:
-			return False
-
-	def setRadius(self):
-		self.radius = (0.75 * (self.mass/self.density) / pi) ** (1/3)
-		self.setColour()
-
-	def calcAcc(self, other):
-		force = (G * self.mass * other.mass) / (abs(self.pos - other.pos) ** 2)
-		forceVector = other.pos.subtract(self.pos)
-		# drawVector(forceVector.setMag(force/self.mass), self.pos)
-		self.acc += (forceVector.setMag(force/self.mass))
-		# print("calcAcc:", self.acc.elements)
-
-	def checkCollision(self, other):
-		if other.alive and (abs(self.pos.subtract(other.pos)) < self.radius + other.radius):
-			self.contest(other)
-			return True
-		else:
-			return False
-
-	def runLoop(self):
-		for p in particleList:
-			if p != self and type(p) != marker and not p.static:
-				if not self.checkCollision(p):
-					self.calcAcc(p)
-
-
-	def checkOutOfBounds(self): #bounds=[turtle.window_width()/2, turtle.window_height()/2]):
-		# self.vel.multiplyToMe(0)
-		# return
-		global TestMode
-		if self.immune or ALL_IMMUNE or TestMode: return False
-		out = False
-		if abs(self.pos.subtract(camera.pos)) > voidRadius:
-			out = True
-		# print("Checking")
-		if out and not self.inbound:
-			if self.respawn:
-				self.respawn()
-			else:
-				self.die()
-		elif not out and self.inbound:
-			self.inbound = False
-
-
-	def respawn(self):
-		# newMass --> determines the mass of the particle after respawning
-		# bounds = [turtle.window_width()/2, turtle.window_height()/2]
-		radius = voidRadius #sqrt(bounds[0] ** 2 + bounds[1] ** 2) # radius of circle encompassing corners of canvas
-		self.pos = randomVector(3, radius * 0.99) + camera.pos
-		self.vel = randomVector(3, 5, 15).subtract(self.pos.getClone().setMag(30))
-		if not self.newMass: self.mass = random.random() * 2000 + 500
-		if self.newMass: self.mass = self.newMass
-		self.setRadius()
-		# self.inbound = True
-		# print("Respawning to: {}".format([self.pos.elements[0], self.pos.elements[1], self.pos.elements[2]]))
-
-	def die(self, killer=None):
-		# print(self,"Dying!")
-		if self.respawn:
-			if CAMERA_UNTRACK_IF_DIE and camera.panTrack == self:
-				camera.panTrackSet(killer)
-			self.respawn()
-		else:
-			if self in particleList:
-				if camera.panTrack: camera.panTrackSet()
-				if buffer != 0:
-					BUFFER[self].append(False)
-				particleList.remove(self)
-			self.alive = False
-
-	def contest(self, other):
-		if self.mass >= other.mass:
-			self.vel = (self.vel.multiply(self.mass).add(other.vel.multiply(other.mass))).multiply(1/(self.mass + other.mass))
-			self.mass += other.mass
-			# Using (mv)_1 + (mv)_2 = (m_1 + m_2)v:
-			self.setRadius()
-			other.die(self)
-		else:
-			other.vel = (self.vel.multiply(self.mass).add(other.vel.multiply(other.mass))).multiply(1/(self.mass + other.mass))
-			other.mass += self.mass
-			other.setRadius()
-			self.die(other)
-
-	def step(self, delta, draw=True, drawVel=False, onlyDraw = False, bufferMode = 0):
-		if self.static:
-			return False
-		oldAcc = self.acc
-		self.acc *= 0
-		self.runLoop()
-		if self.radius > radiusLimit and self.limitRadius:
-			self.die()
-			return False
-
-		self.vel += (oldAcc + self.acc) * (delta / 2)
-		self.pos += self.vel * delta# + self.acc * (delta**2 / 2)
-		# self.vel += self.acc * delta
-		# self.pos += self.vel * delta
-		self.checkOutOfBounds()
-		# if self.acc.getMag(): #print(self.acc.elements)
-
-		return True
-
-	def circularise(self, other, plane = None, axis=None):
-		# If axis is supplied, the resulting orbit is in the direction of the
-		# cross product of the displacement vector from the body to parent and the axis
-		if other == self:
-			return False
-		if type(other) == list:
-			# Can specify a mass at a position instead of a particle
-			# Parse as [mass, position, vel=0]
-			mass = other[0]
-			position = other[1]
-			if (len(other) > 2):
-				otherVel = other[2]
-			else:
-				otherVel = vector([0, 0, 0])
-		else:
-			mass = other.mass
-			position = other.pos
-			otherVel = other.vel
-
-		# if inclination == "r":
-		#     inclination = random.random() * 360 - 180
-		speed = sqrt(G * mass/abs(self.pos - position))
-		vel = randomVector(3, 1)
-		if (axis == None):
-			vel.makeOrthogonal(position - self.pos)
-			if plane: vel = vel.lock(plane)#[vel.elements[i] * plane[i] for i in range(len(vel.elements))]
-		else:
-			vel = axis.cross(position - self.pos)
-		vel.setMag(speed)
-		self.vel = vel + otherVel
-		return True
-
-		# if type(other) == particle:
 markerList = []
-
-class marker(particle):
-	def __init__(self, position, colour, radius = 20):
-		self.pos = position
-		self.colour = colour
-		self.radius = radius
-		markerList.append(self)
-	def set_colour(self, colour):
-		self.colour = colour
-
-	def step(self, delta):
-		pass
 
 autoRateValue = maxPan
 pan = [0, 0, 0, False]
@@ -1296,7 +1104,219 @@ def cycleTargets():
 def clearTarget():
 	MainLoop.target = None
 
+
+
+def search():
+	term = turtle.textinput("Search for a body", "Enter a search term:")
+	if not term:
+		turtle.listen()
+		return
+	# bestMatch = 0
+	bestBody = None
+	for body in Pmodule.particleList:
+		if not body.name: continue
+		if term == body.name:
+			MainLoop.target = body
+			break
+		else:
+			if term.lower() in body.name.lower():
+				if bestBody:
+					if bestBody.name > body.name:
+						bestBody = body
+				else:
+					bestBody = body
+			# match = (sum([(1 if term[i].lower() == body.name[i].lower() else 0) for i in range(minLength)]) / minLength)
+			# if (match > bestMatch):
+			# 	bestMatch = match
+			# 	bestBody = body
+	# if bestMatch:
+	# 	MainLoop.target = bestBody
+	if bestBody:
+		MainLoop.target = bestBody
+	turtle.listen()
+
+
+
+DEFAULT_ZERO_VEC = vector(DEFAULT_ZERO_VEC)
+DEFAULT_UNIT_VEC = vector(DEFAULT_UNIT_VEC)
+MainLoop = MainLoop()
+
+panRate = 0 # Will be used to store the pan rate of each step
+
+
+camera = camera(pos = vector([0, 0, 0]))
+
+setup()
+Running = True
+
+
+if preset == 1:
+	# Cloud of particles orbiting a big thing
+	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
+	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
+	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
+	particle(25000, vector([DEFAULT_SCREEN_DEPTH, 0, 0]))
+	for i in range(PARTICLE_COUNT):
+		particle(variableMass, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
+elif preset == 2:
+	# Galaxy kinda thing
+	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
+	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
+	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
+
+	minDist, maxDist = 25, 250
+	COM = vector([0, 0, 0])     # Centre of mass
+	particleMass = variableMass
+	centreVec = vector([DEFAULT_SCREEN_DEPTH, 0, 0])
+	for i in range(PARTICLE_COUNT):
+		randomVec = randomVector(3, minDist, maxDist, [1, 0, 1])
+		randomVec = randomVec.setMag(maxDist * (abs(randomVec) / maxDist)**2)
+		particle(particleMass, centreVec + randomVec + randomVector(3, 25))
+		COM += particleList[-1].pos
+
+	COM = COM / PARTICLE_COUNT
+	# totalMass = PARTICLE_COUNT * particleMass
+	for p in particleList:
+		forceVec = vector([0, 0, 0])
+		for p2 in particleList:
+			if p2 == p: continue
+			forceVec += (p.pos - p2.pos).setMag(particle.G * p.mass * p2.mass / (abs(p.pos - p2.pos)**2))
+		velVec = forceVec.cross(vector([0, 1, 0]))
+		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)))
+		p.vel = velVec
+		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
+elif preset == 3:
+	if (not args["-G"][-1]): particle.G = 6.67408e-11
+
+	if (not args["-ps"][-1]): maxPan = 10e6
+
+	if (not args["-sf"][-1]): SMOOTH_FOLLOW = 0.04
+
+	MainLoop.addData("Pan speed", "numPrefix(panRate, 'm/step', 2)", True)
+	MainLoop.addData("Camera pan lock", "camera.panTrackLock and camera.panTrack.name", True)
+	MainLoop.addData("Camera rot lock", "camera.rotTrackLock and camera.rotTrack.name", True)
+
+	AUTO_RATE_CONSTANT = 1.0e9
+	Pmodule.ALL_IMMUNE = True
+	planetList = []
+	planets = {}
+	colours = {
+		"Moon"		: [1,	1, 	 1],  # Photo realistic moon white
+		"Earth"		: [0,   0.5, 1],  # Photo realistic ocean blue
+		"Sun"		: [1,   1,   0],
+		"Mercury"	: [1,   0.5, 0],
+		"Venus"		: [1,   0.3, 0],
+		"Mars"		: [1,   0,   0],
+		"Jupiter"	: [1,   0.6, 0.2],
+		"Saturn" 	: [1,   0.8, 0.5],
+		"Uranus"	: [0.5, 0.5, 1],
+		"Neptune"	: [0.2, 0.2, 1]
+	}
+	Data = loadSystem.loadFile(DATA_FILE)
+	MainLoop.addDataLine()
+	MainLoop.addData("Track target", "MainLoop.target.name", True, "None")
+	MainLoop.addData("Mass", "str(MainLoop.target.mass) + 'kg'", True, "---")
+	MainLoop.addData("Radius", "numPrefix(round(MainLoop.target.radius, 2), 'm')", True, "---")
+	MainLoop.addData("XYZ Velocity", "(MainLoop.target.vel.string(2)) + ', mag: ' + numPrefix(round(abs(MainLoop.target.vel), 5), 'm/s')", True, "---")
+	MainLoop.addData("Distance to Target", "")
+	MainLoop.addData("Centre", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ), 2 ), 'm' )", True, "---")
+	MainLoop.addData("Surface", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ) - MainLoop.target.radius, 2 ), 'm' )", True, "---")
+	MainLoop.addData("Relative speed of camera", "numPrefix(abs((camera.vel + camera.panMotion) - MainLoop.target.vel), 'm/s', 2)", True, "---")
+	MainLoop.addDataLine()
+
+	bigVec = vector([0, 0, 0])
+	for planet in Data:
+		data = Data[planet]
+		if (planet == "$VAR"):
+			if ("TIME" in Data[planet]): MainLoop.Time = Data[planet]["TIME"]
+
+			continue
+		if data["$valid"]:
+			pos = vector([data["X"], data["Y"], data["Z"]]) * 1000
+			vel = vector([data["VX"], data["VY"], data["VZ"]]) * 1000
+			mass = data["MASS"]
+			density = data["DENSITY"]
+			new = particle(mass, pos, vel, density=density, autoColour=False,
+						colour=(colours[planet] if planet in colours else [0.5, 0.5, 0.5]),
+						limitRadius=False, name=planet)
+			planetList.append(new)
+			planets[planet] = new
+			bigVec += new.pos
+	camera.pos = bigVec
+	MainLoop.target = planets["Earth"]
+	if "Phobos" in planets:
+		planets["Phobos"].immune = False # Screw you phobos
+	# camera.goTo(planets["Earth"])
+	# camera.trackDistance = 10 * planets["Earth"].radius
+
+	if makeAsteroids:
+		beltRadius = (AsteroidsEnd - AsteroidsStart) / 2
+		beltCentre = (AsteroidsEnd + AsteroidsStart) / 2
+		for i in range(makeAsteroids):
+			pos = randomVector(3, beltCentre, fixComponents=[1, 1, 0])
+			offset = randomVector(3, 0, beltRadius)
+			offset *= (abs(offset) / beltRadius) ** 2
+			offset.elements[2] *= 1/5
+			density = AsteroidsDensity
+			mass = random.random() * (AsteroidsMaxMass - AsteroidsMinMass) + AsteroidsMinMass
+			new = particle(mass, planets["Sun"].pos + pos + offset, autoColour=False, colour = "grey", limitRadius=False)
+			new.circularise(planets["Sun"], axis = vector([0, 0, -1]))
+
+	earthVec = planets["Earth"].pos
+	radius   = planets["Earth"].radius + 150000
+	if makeSatellites:
+		for i in range(makeSatellites):
+			offset = randomVector(3, radius)
+			particle(1000, earthVec + offset, autoColour = False, colour = "grey").circularise(planets["Earth"])
+
+	if getStars:
+		print("Loading stars...")
+		MainLoop.addData("Earth magnitude", "MainLoop.target.info['mag']", True, "---")
+		MainLoop.addData("Hipparcos catalog id", "MainLoop.target.info['HIP id']", True, "---")
+		STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)])
+		for STAR_key in STARS_DATA:
+			if STAR_key == "$VAR" or STAR_key[0] in ["~", "!"]: continue
+			STAR = STARS_DATA[STAR_key]
+			X = STAR["x"]
+			Y = STAR["y"]
+			Z = STAR["z"]
+			vX = STAR["vx"]
+			vY = STAR["vy"]
+			vZ = STAR["vz"]
+			# print("Looking at star:", STAR["proper"], end = "")
+			massIndex = random.random() * 10 + 30
+			new = particle(10**(massIndex), vector([X, Y, Z]) * PARSEC,
+				vector([vX, vY, vZ]) * PARSEC / YEAR, static=True,
+				name=STAR["proper"], density=1e3)
+			planetList.append(new)
+			new.info["mag"] = STAR["mag"]
+			new.info["HIP id"] = "None" if not STAR["hip"] else int(STAR["hip"])
+			# if new.name:
+			# 	new.static = False
+				# print("Including star, name:", new.name, end = "")
+
+			# print()
+			# if new.name:
+elif preset == 4:
+	# defaultDensity = 10
+	Sun = particle(300000, vector([0, 0, 0]), density=10, name="Sun")
+	for i in range(PARTICLE_COUNT):
+		radius = i / (PARTICLE_COUNT - 1) * (PRESET_4_MAX_RADIUS - PRESET_4_MIN_RADIUS) + PRESET_4_MIN_RADIUS
+		particle(variableMass, vector([radius, 0, 0]), density=10)
+		particleList[-1].circularise(Sun, axis = vector([0, -1, 0]))
+	camera.pos = vector([0, 0, radius])
+	camera.rotTrackSet(Sun)
+
+# if not TestMode:
+
 if not TestMode:
+	window = turtle.Screen()
+	window.setup(width = 1.0, height = 1.0)
+	turtle.bgcolor("black")
+
+	turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
+	turtle.hideturtle()
+
 	turtle.onkeypress(panLeft, "a")
 	turtle.onkeyrelease(panRight , "a")
 
@@ -1360,167 +1380,7 @@ if not TestMode:
 	turtle.onkey(bufferRecord, "n")
 	turtle.onkey(bufferPlay, "m")
 
-
-DEFAULT_ZERO_VEC = vector(DEFAULT_ZERO_VEC)
-DEFAULT_UNIT_VEC = vector(DEFAULT_UNIT_VEC)
-MainLoop = MainLoop()
-
-panRate = 0 # Will be used to store the pan rate of each step
-
-
-camera = camera(pos = vector([0, 0, 0]))
-
-setup()
-Running = True
-
-
-if preset == 1:
-	# Cloud of particles orbiting a big thing
-	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
-	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
-	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
-	particle(25000, vector([DEFAULT_SCREEN_DEPTH, 0, 0]))
-	for i in range(PARTICLE_COUNT):
-		particle(variableMass, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
-elif preset == 2:
-	# Galaxy kinda thing
-	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
-	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
-	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
-
-	minDist, maxDist = 25, 250
-	COM = vector([0, 0, 0])     # Centre of mass
-	particleMass = variableMass
-	centreVec = vector([DEFAULT_SCREEN_DEPTH, 0, 0])
-	for i in range(PARTICLE_COUNT):
-		randomVec = randomVector(3, minDist, maxDist, [1, 0, 1])
-		randomVec = randomVec.setMag(maxDist * (abs(randomVec) / maxDist)**2)
-		particle(particleMass, centreVec + randomVec + randomVector(3, 25))
-		COM += particleList[-1].pos
-
-	COM = COM / PARTICLE_COUNT
-	# totalMass = PARTICLE_COUNT * particleMass
-	for p in particleList:
-		forceVec = vector([0, 0, 0])
-		for p2 in particleList:
-			if p2 == p: continue
-			forceVec += (p.pos - p2.pos).setMag(G * p.mass * p2.mass / (abs(p.pos - p2.pos)**2))
-		velVec = forceVec.cross(vector([0, 1, 0]))
-		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)))
-		p.vel = velVec
-		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
-elif preset == 3:
-	if (not args["-G"][-1]): G = 6.67408e-11
-
-	if (not args["-ps"][-1]): maxPan = 10e6
-
-	if (not args["-sf"][-1]): SMOOTH_FOLLOW = 0.04
-
-	MainLoop.addData("Pan speed", "numPrefix(panRate, 'm/step', 2)", True)
-	MainLoop.addData("Camera pan lock", "camera.panTrackLock and camera.panTrack.name", True)
-	MainLoop.addData("Camera rot lock", "camera.rotTrackLock and camera.rotTrack.name", True)
-
-	AUTO_RATE_CONSTANT = 1.0e9
-	ALL_IMMUNE = True
-	planetList = []
-	planets = {}
-	colours = {
-		"Moon"		: [1,	1, 	 1],  # Photo realistic moon white
-		"Earth"		: [0,   0.5, 1],  # Photo realistic ocean blue
-		"Sun"		: [1,   1,   0],
-		"Mercury"	: [1,   0.5, 0],
-		"Venus"		: [1,   0.3, 0],
-		"Mars"		: [1,   0,   0],
-		"Jupiter"	: [1,   0.6, 0.2],
-		"Saturn" 	: [1,   0.8, 0.5],
-		"Uranus"	: [0.5, 0.5, 1],
-		"Neptune"	: [0.2, 0.2, 1]
-	}
-	Data = loadSystem.loadFile(DATA_FILE)
-	MainLoop.addDataLine()
-	MainLoop.addData("Track target", "MainLoop.target.name", True, "None")
-	MainLoop.addData("Mass", "str(MainLoop.target.mass) + 'kg'", True, "---")
-	MainLoop.addData("Radius", "numPrefix(round(MainLoop.target.radius, 2), 'm')", True, "---")
-	MainLoop.addData("XYZ Velocity", "(MainLoop.target.vel.string(2)) + ', mag: ' + numPrefix(round(abs(MainLoop.target.vel), 5), 'm/s')", True, "---")
-	MainLoop.addData("Distance to Target", "")
-	MainLoop.addData("Centre", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ), 2 ), 'm' )", True, "---")
-	MainLoop.addData("Surface", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ) - MainLoop.target.radius, 2 ), 'm' )", True, "---")
-	MainLoop.addData("Relative speed of camera", "numPrefix(abs((camera.vel + camera.panMotion) - MainLoop.target.vel), 'm/s', 2)", True, "---")
-	MainLoop.addDataLine()
-
-	bigVec = vector([0, 0, 0])
-	for planet in Data:
-		data = Data[planet]
-		if (planet == "$VAR"):
-			if ("TIME" in Data[planet]): MainLoop.Time = Data[planet]["TIME"]
-
-			continue
-		if data["valid"]:
-			pos = vector([data["X"], data["Y"], data["Z"]]) * 1000
-			vel = vector([data["VX"], data["VY"], data["VZ"]]) * 1000
-			mass = data["MASS"]
-			density = data["DENSITY"]
-			new = particle(mass, pos, vel, density=density, autoColour=False,
-						colour=(colours[planet] if planet in colours else [0.5, 0.5, 0.5]),
-						limitRadius=False, name=planet)
-			planetList.append(new)
-			planets[planet] = new
-			bigVec += new.pos
-	camera.pos = bigVec
-	MainLoop.target = planets["Earth"]
-	# camera.goTo(planets["Earth"])
-	# camera.trackDistance = 10 * planets["Earth"].radius
-
-	if makeAsteroids:
-		beltRadius = (AsteroidsEnd - AsteroidsStart) / 2
-		beltCentre = (AsteroidsEnd + AsteroidsStart) / 2
-		for i in range(makeAsteroids):
-			pos = randomVector(3, beltCentre, fixComponents=[1, 1, 0])
-			offset = randomVector(3, 0, beltRadius)
-			offset *= (abs(offset) / beltRadius) ** 2
-			offset.elements[2] *= 1/5
-			density = AsteroidsDensity
-			mass = random.random() * (AsteroidsMaxMass - AsteroidsMinMass) + AsteroidsMinMass
-			new = particle(mass, planets["Sun"].pos + pos + offset, autoColour=False, colour = "grey", limitRadius=False)
-			new.circularise(planets["Sun"], axis = vector([0, 0, -1]))
-
-	earthVec = planets["Earth"].pos
-	radius   = planets["Earth"].radius + 150000
-	if makeSatellites:
-		for i in range(makeSatellites):
-			offset = randomVector(3, radius)
-			particle(1000, earthVec + offset, autoColour = False, colour = "grey").circularise(planets["Earth"])
-
-	# sat1 = earthVec + vector([1, 0.8, 0]).setMag(radius)
-	# sat2 = earthVec + vector([0.8, 1, 0]).setMag(radius)
-	# particle(1000, sat1).circularise(planets["Earth"], axis=vector([0, 0, -1]))
-	# particle(1000, sat2).circularise(planets["Earth"], axis=vector([0, 0, 1]))
-	if getStars:
-		print("Loading stars...")
-		STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, spread=True)
-		for STAR_key in STARS_DATA:
-			if STAR_key == "$VAR" or STAR_key[0] in ["~", "!"]: continue
-			STAR = STARS_DATA[STAR_key]
-			# A = STAR["RA"] #* (pi / 12)
-			# B = STAR["Dec"] * (pi / 180)
-			# D = STAR["Distance"] * PARSEC
-
-			X = STAR["x"]
-			Y = STAR["y"]
-			Z = STAR["z"]
-
-			new = particle(1000000, vector([X, Y, Z]) * PARSEC, static=True, name=STAR["proper"])
-			if new.name:
-				planetList.append(new)
-elif preset == 4:
-	# defaultDensity = 10
-	Sun = particle(300000, vector([0, 0, 0]), density=10, name="Sun")
-	for i in range(PARTICLE_COUNT):
-		radius = i / (PARTICLE_COUNT - 1) * (PRESET_4_MAX_RADIUS - PRESET_4_MIN_RADIUS) + PRESET_4_MIN_RADIUS
-		particle(variableMass, vector([radius, 0, 0]), density=10)
-		particleList[-1].circularise(Sun, axis = vector([0, -1, 0]))
-	camera.pos = vector([0, 0, radius])
-	camera.rotTrackSet(Sun)
+	turtle.onkey(search, "/")
 
 if TestMode:
 	try:
