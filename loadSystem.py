@@ -1,3 +1,33 @@
+import sys
+
+# Substitutes words starting with $ for their corresponding value in 'values'
+def subs(values, string):
+	# Get a string with just letters and spaces
+	# text = "".join([(x if (x.isalpha() or x.isdigit() else " ") for x in string])
+	newString = ""
+	start, end = 0, 0
+	i = 0
+	validSubs = True # Valid substitution if all variables are found and substituted
+	while (i < len(string)):
+		char = string[i]
+		if (char == "$"):
+			start = i + 1
+			end = start + 1
+			while string[end].isalpha():
+				end += 1
+			if string[start:end] in values:
+				newString += str(values[string[start:end]])
+			else:
+				print("Unable to find '%s' in values." % (string[start:end]))
+				validSubs = False
+			i = end
+		else:
+			newString += char
+			i += 1
+	return [newString, validSubs]
+
+
+
 # removes lines commented out with #'s
 def stripComments(text):
 	lines = text.split("\n")
@@ -8,7 +38,12 @@ def stripComments(text):
 # Loads a file from 'path' and returns a dictionary with the first column
 # as the key, which holds another dictionary with each table header as a key,
 # and the corresponding row entry as a value
-def loadFile(path, length=0, spread=False):
+# spread: True or False, if True then takes a set of 'length' items evenly spread through
+#     throughout the database, to cover the whole list.
+# key: A list of strings, eg. ["$distance > 1"] to determine if a record is included.
+#     Use $ to signify variable names, and they will be replaced with the relevant values
+#     when being evaluated.
+def loadFile(path, length=0, spread=False, key=None):
 	f = open(path, "r")
 	FILE = f.read()
 	f.close()
@@ -20,7 +55,8 @@ def loadFile(path, length=0, spread=False):
 
 	Vars = {
 		"DELIM"	  : ['\t'],
-		"REQUIRED": ["ALL"]
+		"REQUIRED": ["ALL"],
+		"KEY_COL" : [0]
 	}
 
 	for line in lines:
@@ -37,6 +73,8 @@ def loadFile(path, length=0, spread=False):
 	# print("Column names:", columnNames)
 	DELIM = Vars["DELIM"][0]
 	requiredValues = (columnNames if Vars["REQUIRED"][0] == "ALL" else Vars["REQUIRED"][0].strip(",")) # Currently all fields must contain values
+	KEY_COL = Vars["KEY_COL"][0]
+
 	if requiredValues[0] == '.':
 		requiredValues = None
 	table = []
@@ -48,6 +86,8 @@ def loadFile(path, length=0, spread=False):
 		if line[0] == "$":
 			words = line[1:].split("=")
 			data["$VAR"][words[0].strip()] = float(words[1])
+			continue
+		elif line[0] in ["!", "~"]:
 			continue
 		if (DELIM == ","):
 			row = [x for x in line.split(DELIM)]
@@ -65,25 +105,53 @@ def loadFile(path, length=0, spread=False):
 	else:
 		iterTable = table[1:]
 	for row in iterTable:
-		data[row[0]] = {}
-		data[row[0]]["valid"] = True
+		# print(row)
+		# data[row[KEY_COL] = {}
+		# data[row[KEY_COL]["valid"] = True
+		newRow = {}
+		newRow["$valid"] = True
+		ignoreRow = False
 		for i, col in enumerate(row[1:]):
 			# table[0] is the row containing the header names
-			name = columnNames[i + 1]
+			name = columnNames[i + 1].strip()
 			try:
 				value = float(col)
 			except ValueError:
-				value = None
-				if (requiredValues and name in requiredValues):
+				value = col
+				if not value: value = None
+				if (value == None and requiredValues and name in requiredValues):
 					# enoughData = False
-					data[row[0]]["valid"] = False
-
-			data[row[0]][name] = value
-		if not data[row[0]]["valid"]:
-			print("Not enough data for '%s'." % (row[0]))
-		rowCounter += 1
-		if (length and rowCounter >= length):
-			break
+					data[row[KEY_COL]]["$valid"] = False
+			# except NameError:
+			# 	print("Name error with row %d" % (i))
+			newRow[name] = value
+		if key:
+			nextKey = False
+			if type(key) != list:
+				key = [key]
+			for k in key:
+				testString, validSubs = subs(newRow, k)
+				if not validSubs:
+				# 	nextKey = True
+				# if nextKey:
+				# 	nextKey = False
+					continue
+				# print("testString:", testString)
+				if (not eval(testString)):
+					ignoreRow = True
+		if ignoreRow:
+			ignoreRow = False
+			continue
+		else:
+			rowCounter += 1
+			print("\rItem count: %d " % (rowCounter), end = "id: {}                    ".format(row[0]))
+			sys.stdout.flush()
+			data[row[KEY_COL]] = newRow
+			if (length and rowCounter >= length):
+				break
+		if not data[row[KEY_COL]]["$valid"]:
+			print("Not enough data for '%s'." % (row[KEY_COL]))
+	print()
 	return data
 
 # Testing:
