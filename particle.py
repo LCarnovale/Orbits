@@ -62,7 +62,7 @@ class particle:
 	# colour parameter only used if autoColour is off
 	def setColour(self, colour=None):
 		if self.autoColour:
-			self.colour = [min(self.radius/radiusLimit, 1), 0, max(1, (radiusLimit - self.radius)/radiusLimit)]
+			self.colour = [min(self.radius/radiusLimit, 1), 0, min(1, (0 if (radiusLimit < self.radius) else (radiusLimit - self.radius)/radiusLimit))]
 		elif colour:
 			self.colour = colour
 		else:

@@ -2,10 +2,10 @@ from math import *
 import random
 
 class vector:
-	def __init__(self, elements):
-		self.elements = elements
-		self.dim = len(elements)
-		# self.type = "c" #,'c' --> cartesian, 'p' --> polar
+	def __init__(self, elements, unit=False):
+		self.elements 	= elements
+		self.dim 		= len(elements)
+		self.unit 		= unit
 
 	def __len__(self):
 		return len(self.elements)
@@ -24,10 +24,14 @@ class vector:
 
 	def __iadd__(self, other):
 		self = self + other
+		if self.unit:
+			self = self.mag(1)
 		return self
 
 	def __isub__(self, other):
 		self = self - other
+		if self.unit:
+			self = self.mag(1)
 		return self
 
 	def __neg__(self):
@@ -36,15 +40,15 @@ class vector:
 	def __str__(self):
 		return ("<" + ", ".join([str(x) for x in self.elements]) + ">")
 
+	# A better way of getting the string format of a vector, allows rounding of each element
 	def string(self, rounding=None):
 		if rounding:
 			return ("<" + ", ".join([str(round(x, rounding)) for x in self]) + ">")
 		else:
 			return ("<" + ", ".join([str(x) for x in self.elements]) + ">")
 
-
 	def __repr__(self):
-		return self.elements
+		return str(self)
 
 	def __getitem__(self, value):
 		return self.elements[value]
@@ -52,8 +56,10 @@ class vector:
 	def __mul__(self, value):
 		if (type(value) in [int, float]):
 			return self.multiply(value)
+		elif (type(value) == vector):
+			return self.cross(value)
 		else:
-			raise Exception("Invalid types for multiplying vector, must be <vector> and a scalar")
+			raise Exception("Invalid types for multiplying vector, must be vector and a scalar or vector")
 			return 0
 
 	def __rmul__(self, value):
@@ -61,22 +67,34 @@ class vector:
 
 	def __imul__(self, value):
 		self = self * value
+		# print("Warning, attempting to modify magnitude of a unit vector. (Changes won't be made to the vector)")
+		if self.unit:
+			self = self.mag(1)
 		return self
 
 	def __iter__(self):
 		return self.elements.__iter__()
 
 	def define(self, other):
-		self.elements = other.elements
-		self.dim = len(other.elements)
+		self.elements	= other.elements
+		self.dim 		= len(other.elements)
+		self.unit 		= other.unit
 		return True
 
 	def elementWiseMultiply(self, other):
 		return vector([self[i] * other[i] for i, x in enumerate(self)])
 
+	# The only function that actually calculates the magnitude. Won't be called usually
+	# but it can't be deprecated, abs() calls this!
 	def getMag(self):
 		mag = sum([x ** 2 for x in self.elements]) ** (1/2)
 		return mag
+
+	def mag(self, newMag=None):
+		if (newMag == None):
+			return abs(self)
+		else:
+			return (self / abs(self)) * newMag
 
 	def getHeading(self, axis=0, aCos=True, trueBearing=None, lock=None):
 		# true bearing: an angle will be given in the direction of the axis trueBearing
@@ -118,30 +136,27 @@ class vector:
 
 
 
+	# This is only useful if a completely new vector is needed with the same
+	# dimensions as the old one. Most of the functions return new vectors anyway,
+	# so this isn't a really necessary function. Maybe just for peace of mind
+	# to avoid annoying pointer related behaviour
 	def getClone(self):
-		# This is pretty useless
 		return vector(self.elements)
 
+	# This has been more or less deprecated, to the function '.mag()'
+	# which can both retrieve the magnitude or return a *new* vector
+	# with a different magnitude
+	# This will make a non-unit vector even if the original is a unit vector
 	def setMag(self, mag):
 		self.define(self / abs(self) * mag)
 		return self
-
-	# For most of the following functions (add, subtract etc.) there is a respective 'functionToMe',
-	# The only difference is that the original function returns a new vector without changing any other vector.
-	# functionToMe will change the original vector.
-	# eg. a.add(b) --> c = (a + b), a.addToMe(b) --> a = (a + b)
-	# There might be a better way to do this than have seperate functions?
 
 	def reverseToMe(self):
 		self.define(self.reverse())
 		return True
 
 	def reverse(self):
-		return vector([-x for x in self.elements])
-
-	# def addToMe(self, other, element=None):
-	# 	self.define(self.add(other, element))
-	# 	return True
+		return self * (-1)
 
 	def add(self, other, element=None):
 		if (not element and (self.dim != other.dim)): return False
@@ -153,17 +168,9 @@ class vector:
 				tempVec[i] = tempVec[i] + other.elements[i]
 		return vector(tempVec)
 
-	# def subtractToMe(self, other):
-	# 	self.define(self.subtract(other))
-	# 	return True
-
 	def subtract(self, other, element=None):
 		# tempV = other.reverse()
 		return self.add(other.reverse())
-
-	# def multiplyToMe(self, scalar):
-	# 	self.define(self.multiply(scalar))
-	# 	return True
 
 	def multiply(self, scalar):
 		return vector([x * scalar for x in self.elements])
@@ -185,29 +192,33 @@ class vector:
 			product += self.elements[i] * other.elements[i]
 		return product
 
+	# Rotates the vector about another vector, maintaining magnitude
 	def rotateAbout(self, other, angle):
 		selfParaOther = self.project(other)
 		selfPerpOther = self - selfParaOther
 		crossProd = self.cross(other)
+		# crossProd = other.cross(self)
 		X = cos(angle) / abs(selfPerpOther)
 		Y = sin(angle) / abs(crossProd)
 		result = (selfPerpOther * X + crossProd * Y) * abs(selfPerpOther) + selfParaOther
 		return result
 
 
+	# Projects self onto other
 	def project(self, other):
-		# Projects self onto other
 		return other * (self.dot(other) / (abs(other) ** 2))
 
+	# Projects self onto other, returns the magnitude of the projection
 	def projectMag(self, other):
-		# Projects self onto other
 		return (self.dot(other) / abs(other))
 
 	def relAngle(self, other, plane=None):
 		# plane = None or the plane [axis1, axis2]
 		if type(other) == int:
+			# Gets the angle between the vector and an axis
 			return acos(self[other] / abs(self))
 		if not plane:
+			# Gets the absolute angle between the two vectors
 			cosTheta = self.dot(other) / (abs(self) * abs(other))
 			if cosTheta > 1:
 				cosTheta = 1
@@ -215,11 +226,13 @@ class vector:
 				cosTheta = -1
 			return acos(cosTheta)
 		else:
+			# Gets the relative angle in a particular plane
 			angleSelf 	= self.lock(plane).getHeading(plane[0], trueBearing = plane[1])
 			angleOther 	= other.lock(plane).getHeading(plane[0], trueBearing = plane[1])
 			angle 		= angleSelf - angleOther
 			return angle
-
+	
+	# Returns a vector with only the desired elements, the rest become 0
 	def lock(self, elements, inverse=False):
 		if elements == None:
 			return self
@@ -229,6 +242,7 @@ class vector:
 				tempVec.elements[x[0]] = x[1]
 		return tempVec
 
+	# Makes the vector orthogonal to other. (?)
 	def makeOrthogonal(self, other, element=2):
 		"""element --> index of the array of elements, default 2
 		Maintains magnitude"""
@@ -237,7 +251,7 @@ class vector:
 		result = 0
 		if other.elements[element] == 0:
 			while other.elements[element] == 0:
-				element = (element + 1) % self.dim
+				element = (element + 1) % self.dim # Loops through only the elements in the vector
 		for i in range(self.dim):
 			if i != element:
 				result += self.elements[i] * other.elements[i]
@@ -247,10 +261,11 @@ class vector:
 		return True
 
 def randomVector(dim, mag, maxMag=0, fixComponents=[1,1,1]):
-	"""dimensions, magnitude, maximum magnitude (defaults to magnitude),
-	fixComponents: default [1,1,1], multiplies each randomly generated component
+	"""(dimensions, magnitude, maximum magnitude (defaults to magnitude),
+	fixComponents: default [1,1,1]), multiplies each randomly generated component
 	by the respective component in fixComponents, eg. [1,0,0] will limit the
-	generated vector to the X-axis."""
+	generated vector to the X-axis, where as [2, 1, 1] will give the vector
+	more range along the X-axis than the other axes."""
 	if dim != len(fixComponents) and fixComponents != [1,1,1]: return False
 	tempVec = []
 	X = (random.random() - 1/2) * 2 * fixComponents[0]
