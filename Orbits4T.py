@@ -204,6 +204,8 @@ HOUR 	= 60 *	MINUTE
 DAY  	= 24 *	HOUR
 YEAR 	= 365 * DAY
 
+MAX_VISIBILE_MAG = 7
+
 LIGHT_SPEED = 299792458
 LIGHT_YEAR  = LIGHT_SPEED * YEAR
 AU		= 149597870700
@@ -304,7 +306,7 @@ def screenHeight():
 	return turtle.window_height()
 
 
-def drawOval(x, y, major, minor, angle, fill = "black", box = False):
+def drawOval(x, y, major, minor, angle, fill = "black", box = False, mag = None):
 	global ellipsePoints
 	global drawStars
 	if SMART_DRAW:
@@ -342,11 +344,28 @@ def drawOval(x, y, major, minor, angle, fill = "black", box = False):
 			screenY = localY * cos(angle) + localX * sin(angle)
 			turtle.goto(x + screenX, y + screenY)
 		turtle.end_fill()
-	elif (drawStars):
+	if (drawStars):
 		turtle.up()
-		turtle.pencolor([1, 1, 1])
 		turtle.goto(x, y)
-		turtle.dot(2)
+		if (points < 2):
+			if (mag != None):
+				# print("Drawing flare")
+				flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
+				for r in range(int(flareWidth), 0, -1):
+					rMag = 1 - (r / flareWidth)
+					turtle.pencolor([rMag, rMag, rMag])
+					turtle.dot(r)
+			else:
+				turtle.dot(2)
+		else:
+			if (mag != None):
+				flareWidth = max(MAX_VISIBILE_MAG - mag, 0) * 1.5
+				for r in range(int(flareWidth), 0, -1):
+					rMag = (1 - (r / flareWidth))
+					turtle.pencolor([x * rMag for x in fill])
+					turtle.dot(r + major)
+
+
 	else:
 		return False
 	return True
@@ -631,20 +650,18 @@ Distance to closest particle: %s
 			elif (clickTarget[2] == 1):
 				camera.rotTrackSet()
 		if camera.panTrack:
-			if doStep: camera.panTrack.step(delta, camera)
+			# if doStep: camera.panTrack.step(delta, camera)
 			camera.panFollow()
-		if camera.rotTrack and (camera.rotTrack != camera.panTrack):
-			if doStep: camera.rotTrack.step(delta, camera)
-			camera.rotFollow()
-		elif camera.rotTrack:
+		# if camera.rotTrack and (camera.rotTrack != camera.panTrack):
+			# if doStep: camera.rotTrack.step(delta, camera)
+			# camera.rotFollow()
+		if camera.rotTrack:
 			camera.rotFollow()
 
-		camera.pos += self.commonShiftPos
+		# camera.pos += self.commonShiftPos
 		for I, p  in enumerate(particleList):
-			# print("I: %d" % (I))
-			# p = particleList[I]
-			if self.commonShiftPos:
-				p.pos += self.commonShiftPos
+			# if self.commonShiftPos:
+			# 	p.pos += self.commonShiftPos
 
 			if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
 				# Swap the previous one with the current one
@@ -654,22 +671,17 @@ Distance to closest particle: %s
 				self.closestParticle = p#abs(p.pos - camera.pos) - p.radius
 			elif ((abs(p.pos - camera.pos) - p.radius) < (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius)):
 				self.closestParticle = p
-			if (doStep and (p not in [camera.rotTrack, camera.panTrack])):
+			# if (doStep and (p not in [camera.rotTrack, camera.panTrack])):
+			if (doStep):
 				p.step(delta, camera)
 
 			buff = Buffer.processPosition(p) # Returns something if it wants anything other than the actual particle to be drawn
 			if not buff:
-				if self.target == p:
-					drawResult = camera.drawParticle(p, box = True)
-				else:
-					drawResult = camera.drawParticle(p)
+				drawResult = camera.drawParticle(p, box = (self.target == p))
 			else:
 				# Buff returned something, which means it wants the camera
 				# to draw something other than the particle's actual position
-				if self.target == p:
-					drawResult = camera.drawAt(buff[0], buff[1], buff[2], box = True)
-				else:
-					drawResult = camera.drawAt(buff[0], buff[1], buff[2])
+				drawResult = camera.drawAt(buff[0], buff[1], buff[2], box = (self.target == p))
 
 			if DRAW_VEL_VECS and drawResult:
 				vecResult = camera.drawParticle([buff[0] + buff[3] * DRAW_VEL_VECS, 1, [0, 1, 0]], drawAt=True, point=True)
@@ -798,12 +810,15 @@ class camera:
 		self.rot.setMag(1)
 
 	def step(self, delta, pan=[0, 0, 0], panRate=1):
-		if self.panTrack: self.vel = self.panTrack.vel
-		self.pos += (pan[0] * self.screenXaxis +
+		panShift = (pan[0] * self.screenXaxis +
 					 pan[1] * self.screenYaxis +
 					 pan[2] * self.rot) * panRate
 
-		self.pos += (self.vel * delta)
+		if self.panTrack:
+			self.vel = self.panTrack.vel.getClone()
+			self.trackSeparate += panShift
+		else:
+			self.pos += (self.vel * delta) + panShift
 		# print(self.panStart)
 
 	def panTrackSet(self, target = None):
@@ -889,9 +904,11 @@ class camera:
 			angle = 0
 		else:
 			angle = pi/2
-		drawOval(X, Y, majorAxis, minorAxis, angle, colour, box)
-		# prin = prin + ("X: " + str(round(X, 5)) + ", Y: " + str(round(Y, 5)))
-		# if PRINT_DATA: print(prin)
+		appMag = None
+		if (not drawAt and "absmag" in particle.info):
+			appMag = particle.info["absmag"] + 5 * log(abs(particle.pos - self.pos) / (10 * PARSEC), 10)
+			particle.info["appmag"] = appMag
+		drawOval(X, Y, majorAxis, minorAxis, angle, colour, box, mag=appMag)
 		return [X, Y, majorAxis, minorAxis]
 
 	def drawAt(self, posVector, radius, colour = None, box=False):
@@ -906,14 +923,11 @@ class camera:
 			self.pos = self.panTrack.pos + self.trackSeparate
 			return True
 		if self.moving:
-			# followRate = (self.rot.dot(self.panTrack.pos - self.pos) / abs(self.panTrack.pos - self.pos))**10 * followRate
 			distProgress = abs(self.pos - self.panStart)
 			totalDist = abs((self.panTrack.pos + self.trackSeparate) - self.panStart)
 			followRate *= max(1, distProgress * (totalDist - distProgress) / totalDist**2)
-			print("Rate first %.5lf" % (followRate), end = "")
 			relPos = self.panTrack.pos - self.pos
 			followRate *= max(0, cos(self.rot.relAngle(relPos)))
-			print(" and second: %.5lf" % (followRate))
 
 		panShift = ((self.panTrack.pos - self.pos) + self.trackSeparate) * followRate
 		self.pos += panShift
@@ -1156,15 +1170,15 @@ Running = True
 
 
 if preset == 1:
-	for i in range(10):
-		particle(50 + i*20, vector([50, 100 - 10*i, 0]))
-	# # Cloud of particles orbiting a big thing
-	# MainLoop.addData("Pan speed", "round(panRate, 2)", True)
-	# MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
-	# MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
-	# particle(25000, vector([DEFAULT_SCREEN_DEPTH, 0, 0]))
-	# for i in range(PARTICLE_COUNT):
-	# 	particle(variableMass, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
+	# for i in range(10):
+	# 	particle(50 + i*20, vector([50, 100 - 10*i, 0]))
+	# Cloud of particles orbiting a big thing
+	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
+	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
+	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
+	particle(25000, vector([DEFAULT_SCREEN_DEPTH, 0, 0]))
+	for i in range(PARTICLE_COUNT):
+		particle(variableMass, vector([150 + DEFAULT_SCREEN_DEPTH, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
 elif preset == 2:
 	# Galaxy kinda thing
 	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
@@ -1193,7 +1207,7 @@ elif preset == 2:
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
 elif preset == 3:
-	if (not args["-G"][-1]): particle.G = 6.67408e-11
+	if (not args["-G"][-1]): Pmodule.G = 6.67408e-11
 
 	if (not args["-ps"][-1]): maxPan = 10e6
 
@@ -1237,8 +1251,8 @@ elif preset == 3:
 		data = Data[planet]
 		if (planet == "$VAR"):
 			if ("TIME" in Data[planet]): MainLoop.Time = Data[planet]["TIME"]
-
 			continue
+
 		if data["$valid"]:
 			pos = vector([data["X"], data["Y"], data["Z"]]) * 1000
 			vel = vector([data["VX"], data["VY"], data["VZ"]]) * 1000
@@ -1247,6 +1261,8 @@ elif preset == 3:
 			new = particle(mass, pos, vel, density=density, autoColour=False,
 						colour=(colours[planet] if planet in colours else [0.5, 0.5, 0.5]),
 						limitRadius=False, name=planet)
+			new.info["appmag"] = 0
+			if data["ABSMAG"]: new.info["absmag"] = data["ABSMAG"]
 			planetList.append(new)
 			planets[planet] = new
 			bigVec += new.pos
@@ -1256,7 +1272,8 @@ elif preset == 3:
 		planets["Phobos"].immune = False # Screw you phobos
 	# camera.goTo(planets["Earth"])
 	# camera.trackDistance = 10 * planets["Earth"].radius
-
+	MainLoop.addData("Absolute Magnitude", "MainLoop.target.info['absmag']", True, "---")
+	MainLoop.addData("Apparent Magnitude", "MainLoop.target.info['appmag']", True, "---")
 	if makeAsteroids:
 		beltRadius = (AsteroidsEnd - AsteroidsStart) / 2
 		beltCentre = (AsteroidsEnd + AsteroidsStart) / 2
@@ -1297,14 +1314,10 @@ elif preset == 3:
 				vector([vX, vY, vZ]) * PARSEC / YEAR, static=True,
 				name=STAR["proper"], density=1e3)
 			planetList.append(new)
+			new.info["appmag"] = 0
+			new.info["absmag"] = STAR["absmag"]
 			new.info["mag"] = STAR["mag"]
 			new.info["HIP id"] = "None" if not STAR["hip"] else int(STAR["hip"])
-			# if new.name:
-			# 	new.static = False
-				# print("Including star, name:", new.name, end = "")
-
-			# print()
-			# if new.name:
 elif preset == 4:
 	# defaultDensity = 10
 	Sun = particle(300000, vector([0, 0, 0]), density=10, name="Sun")

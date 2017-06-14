@@ -12,6 +12,7 @@ ALL_IMMUNE	   = False
 voidRadius 	   = 5000
 CAMERA_UNTRACK_IF_DIE = True
 
+# G = 6.67408e-11
 G = 1
 
 TestMode = False
@@ -91,6 +92,7 @@ class particle:
 			if p != self and type(p) != marker and not p.static:
 				if not self.checkCollision(p):
 					self.calcAcc(p)
+		# print("Acc: %s, %.2f" % (self.acc.string(2), abs(self.acc)))
 
 
 	def checkOutOfBounds(self, camera): #bounds=[turtle.window_width()/2, turtle.window_height()/2]):
@@ -156,18 +158,18 @@ class particle:
 		if self.static:
 			self.pos += self.vel * delta# + self.acc * (delta**2 / 2)
 			return False
-		oldAcc = self.acc
-		self.acc *= 0
+		oldAcc = self.acc.getClone()
+		self.acc = vector([0, 0, 0])
 		self.runLoop()
 		if self.radius > radiusLimit and self.limitRadius:
 			self.die()
 			return False
 
 		self.vel += (oldAcc + self.acc) * (delta / 2)
+		self.pos += self.vel * delta
 		# self.vel += self.acc * delta
-		# self.pos += self.vel * delta
+		# self.vel += self.acc * delta
 		self.checkOutOfBounds(camera)
-		# if self.acc.getMag(): #print(self.acc.elements)
 
 		return True
 
