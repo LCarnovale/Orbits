@@ -1,4 +1,21 @@
+# LoadFile - loads data from a .txt file that is laid out as a table
+# In the text file:
+#  - Lines beginning with '#' will be ignored
+#  - Lines beginning with '$' will be parsed in as variables to the data dictionary.
+#    The variables will be stored as strings in a dictionary within the main data dictionary
+#    under the key '$VAR'.
+#  - Lines beginning with '~' are used to tell the program how to read the file.
+#    - ~DELIM = ',' , this will tell the program that each term in the rows and header
+#      are separated by commas. For tabs, use '\t', or leave the command out, as tab is the default.
+#    - ~REQUIRED = '.' / 'X,Y' , this parameter tells the program which of the names is
+#      is required for an entry to be valid. Each row has an additional value under '$valid',
+#      if a row is missing values from the designated columns then that value will be False, otherwise True.
+#      '.' indicates there are no required values. The default is to require all values.
+#    - ~KEY_COL = '2' , Designates which column will be used as the key in the final data dictionary.
+#  - There must always be 1 line beginning with '!' that contains the header names.
+
 import sys
+COUNT = True
 
 # Substitutes words starting with $ for their corresponding value in 'values'
 def subs(values, string):
@@ -44,114 +61,120 @@ def stripComments(text):
 #     Use $ to signify variable names, and they will be replaced with the relevant values
 #     when being evaluated.
 def loadFile(path, length=0, spread=False, key=None):
-	f = open(path, "r")
-	FILE = f.read()
-	f.close()
+	try:
+		global COUNT
+		f = open(path, "r")
+		FILE = f.read()
+		f.close()
 
-	# The first line must contain the column titles matching the following names
-	# columnNames = ["X", "Y", "Z", "VX", "VY", "VZ", "MASS", "DENSITY"]
-	columnNames = None
-	lines = stripComments(FILE)
+		# columnNames = ["X", "Y", "Z", "VX", "VY", "VZ", "MASS", "DENSITY"]
+		columnNames = None
+		lines = stripComments(FILE)
 
-	Vars = {
-		"DELIM"	  : ['\t'],
-		"REQUIRED": ["ALL"],
-		"KEY_COL" : [0]
-	}
+		Vars = {
+			"DELIM"	  : ['\t'],
+			"REQUIRED": ["ALL"],
+			"KEY_COL" : [0]
+		}
 
-	for line in lines:
-		if (line[0] == "~"):
-			if ("=" in line and ((line[1:].split("=")[0]).strip() in Vars)):
-				value = (line[1:].split("=")[1]).strip()
-				if (value[0] == value[-1] and value[0] == "'"):
-					Vars[(line[1:].split("=")[0]).strip()] = value[1:-1]
-				else:
-					print("Poor formatting of data file, line: %s" % (line))
-		if (line[0] == "!" and not columnNames):
-			columnNames = [x for x in line[1:].split(Vars["DELIM"][0]) if x]
+		for line in lines:
+			if (line[0] == "~"):
+				if ("=" in line and ((line[1:].split("=")[0]).strip() in Vars)):
+					value = (line[1:].split("=")[1]).strip()
+					if (value[0] == value[-1] and value[0] == "'"):
+						Vars[(line[1:].split("=")[0]).strip()] = value[1:-1]
+					else:
+						print("Poor formatting of data file, line: %s" % (line))
+			if (line[0] == "!" and not columnNames):
+				columnNames = [x for x in line[1:].split(Vars["DELIM"][0]) if x]
+			elif (line[0] == "!" and columnNames):
+				print("Warning: Multiple header rows defined in file. (File: %s, line: '%s')" % (path, line))
 
-	# print("Column names:", columnNames)
-	DELIM = Vars["DELIM"][0]
-	requiredValues = (columnNames if Vars["REQUIRED"][0] == "ALL" else Vars["REQUIRED"][0].strip(",")) # Currently all fields must contain values
-	KEY_COL = Vars["KEY_COL"][0]
-
-	if requiredValues[0] == '.':
-		requiredValues = None
-	table = []
-	data = {}
-	data["$VAR"] = {}
-	# gotHeadings = False
-	for line in lines:
-		if not line: continue
-		if line[0] == "$":
-			words = line[1:].split("=")
-			data["$VAR"][words[0].strip()] = float(words[1])
-			continue
-		elif line[0] in ["!", "~"]:
-			continue
-		if (DELIM == ","):
-			row = [x for x in line.split(DELIM)]
+		DELIM = Vars["DELIM"][0]
+		requiredValues = (columnNames if Vars["REQUIRED"][0] == "ALL" else Vars["REQUIRED"][0].strip(","))
+		if (Vars["KEY_COL"][0] == 0):
+			KEY_COL = 0
+		elif (Vars["KEY_COL"][0] in columnNames):
+			KEY_COL = columnNames.index(Vars["KEY_COL"])
 		else:
-			row = [x for x in line.split(DELIM) if x]
-		table.append(row)
+			print("Warning: Unknown header name given for KEY_COL. Must be a column name given in the header row. (File: %s, given value: %s)" % (path, Vars["KEY_COL"][0]))
+			KEY_COL = 0
+		# except ValueError:
+		# 	KEY_COL = 0
+		if requiredValues[0] == '.':
+			requiredValues = None
+		table = []
+		data = {}
+		data["$VAR"] = {}
+		# gotHeadings = False
+		for line in lines:
+			if not line: continue
+			if line[0] == "$":
+				words = line[1:].split("=")
+				data["$VAR"][words[0].strip()] = float(words[1])
+				continue
+			elif line[0] in ["!", "~"]:
+				continue
+			if (DELIM == ","):
+				row = [x for x in line.split(DELIM)]
+			else:
+				row = [x for x in line.split(DELIM) if x]
+			table.append(row)
 
-	# The table is now stored as a 2D list
-	rowCounter = 0
-	if length:
-		if spread:
-			iterTable = table[1::int(len(table)/length)]
+		# The table is now stored as a 2D list
+		rowCounter = 0
+		if length:
+			if spread:
+				iterTable = table[::int(len(table)/length)]
+			else:
+				iterTable = table[:length + 1]
 		else:
-			iterTable = table[1:length + 1]
-	else:
-		iterTable = table[1:]
-	for row in iterTable:
-		# print(row)
-		# data[row[KEY_COL] = {}
-		# data[row[KEY_COL]["valid"] = True
-		newRow = {}
-		newRow["$valid"] = True
-		ignoreRow = False
-		for i, col in enumerate(row[1:]):
-			# table[0] is the row containing the header names
-			name = columnNames[i + 1].strip()
-			try:
-				value = float(col)
-			except ValueError:
-				value = col
-				if not value: value = None
-				if (value == None and requiredValues and name in requiredValues):
-					# enoughData = False
-					data[row[KEY_COL]]["$valid"] = False
-			# except NameError:
-			# 	print("Name error with row %d" % (i))
-			newRow[name] = value
-		if key:
-			nextKey = False
-			if type(key) != list:
-				key = [key]
-			for k in key:
-				testString, validSubs = subs(newRow, k)
-				if not validSubs:
-				# 	nextKey = True
-				# if nextKey:
-				# 	nextKey = False
-					continue
-				# print("testString:", testString)
-				if (not eval(testString)):
-					ignoreRow = True
-		if ignoreRow:
+			iterTable = table
+		for row in iterTable:
+			# Iterates through the rows
+			newRow = {}
+			newRow["$valid"] = True
 			ignoreRow = False
-			continue
-		else:
-			rowCounter += 1
-			print("\rItem count: %d " % (rowCounter), end = "id: {}                    ".format(row[0]))
-			sys.stdout.flush()
-			data[row[KEY_COL]] = newRow
-			if (length and rowCounter >= length):
-				break
-		if not data[row[KEY_COL]]["$valid"]:
-			print("Not enough data for '%s'." % (row[KEY_COL]))
-	print()
+			for name in columnNames:
+				newRow[name] = None
+			for i, col in enumerate(row[1:]):
+				# iterates through the columns or words in a row
+				name = columnNames[i + 1].strip()
+				try:
+					value = float(col)
+				except ValueError:
+					value = col
+					if not value: value = None
+					if (value == None and requiredValues and name in requiredValues):
+						data[row[KEY_COL]]["$valid"] = False
+				newRow[name] = value
+			if key:
+				nextKey = False
+				if type(key) != list:
+					key = [key]
+				for k in key:
+					testString, validSubs = subs(newRow, k)
+					if not validSubs:
+						continue
+					if (not eval(testString)):
+						ignoreRow = True
+			if ignoreRow:
+				ignoreRow = False
+				continue
+			else:
+				rowCounter += 1
+				if COUNT:
+					print("\rItem count: %d " % (rowCounter), end = "id: {}                    ".format(row[0]))
+					sys.stdout.flush()
+				data[row[KEY_COL]] = newRow
+				if (length and rowCounter >= length):
+					break
+			if not data[row[KEY_COL]]["$valid"]:
+				print("Not enough data for '%s'." % (row[KEY_COL]))
+		print()
+	except KeyboardInterrupt:
+		print("Stopping loadFile")
+		exit()
 	return data
 
 # Testing:
