@@ -45,7 +45,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-G"  :  	[float, 20,		True], # Gravitational constant
 "-pd" :  	[str,   False,	False,  True], # Print data
 "-sd" :  	[float, 2000,	True], # Default screen depth
-"-ps" :  	[float, 5.0,	True], # Maximum pan speed
+"-ps" :  	[float, 0.01,	True], # Maximum pan speed
 "-rs" :  	[float, 0.01,	True], # Rotational speed
 "-mk" :  	[str,   False,	False,  True], # Show marker points
 "-ep" :  	[int,   360,	True], # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
@@ -349,10 +349,10 @@ def drawOval(x, y, major, minor, angle, fill = "black", box = False, mag = None)
 		turtle.goto(x, y)
 		if (points < 2):
 			if (mag != None):
-				# print("Drawing flare")
 				flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
+				# print(flareWidth)
 				for r in range(int(flareWidth), 0, -1):
-					rMag = 1 - (r / flareWidth)
+					rMag = (1 - (r / flareWidth)) ** 2
 					turtle.pencolor([rMag, rMag, rMag])
 					turtle.dot(r)
 			else:
@@ -360,6 +360,7 @@ def drawOval(x, y, major, minor, angle, fill = "black", box = False, mag = None)
 		else:
 			if (mag != None):
 				flareWidth = max(MAX_VISIBILE_MAG - mag, 0) * 1.5
+				print(flareWidth, major)
 				for r in range(int(flareWidth), 0, -1):
 					rMag = (1 - (r / flareWidth))
 					turtle.pencolor([x * rMag for x in fill])
@@ -618,7 +619,7 @@ Distance to closest particle: %s
 		global panRate
 		if (self.closestParticle != None):
 			# panAmount = self.closestParticle * maxPan/(self.closestParticle + AUTO_RATE_CONSTANT)
-			panAmount = (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius) * 0.01#maxPan/(AUTO_RATE_CONSTANT)
+			panAmount = (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius) * maxPan#maxPan/(AUTO_RATE_CONSTANT)
 			if (pan[-1]):
 				panAmount = max(panAmount, maxPan)
 
@@ -858,6 +859,12 @@ class camera:
 			radius = particle[1]
 			colour = particle[2]
 		else:
+			appMag = None
+			if ("absmag" in particle.info):
+				appMag = particle.info["absmag"] + 5 * log(abs(particle.pos - self.pos) / (10 * PARSEC), 10)
+				particle.info["appmag"] = appMag
+				if (appMag > MAX_VISIBILE_MAG):
+					return False
 			pos = particle.pos
 			radius = particle.radius
 			colour = particle.colour
@@ -904,10 +911,6 @@ class camera:
 			angle = 0
 		else:
 			angle = pi/2
-		appMag = None
-		if (not drawAt and "absmag" in particle.info):
-			appMag = particle.info["absmag"] + 5 * log(abs(particle.pos - self.pos) / (10 * PARSEC), 10)
-			particle.info["appmag"] = appMag
 		drawOval(X, Y, majorAxis, minorAxis, angle, colour, box, mag=appMag)
 		return [X, Y, majorAxis, minorAxis]
 
@@ -942,7 +945,8 @@ class camera:
 		relPos   = (self.rotTrack.pos - self.pos).mag(1)
 		# print(abs(self.rot), abs(relPos))
 		relAngle = relPos.relAngle(self.rot)
-		shift    = followRate * relAngle if (relAngle > 0.001) else relAngle
+		shift    = followRate * (relAngle + 0.01) if (relAngle > 0.01 and followRate != 1) else relAngle
+		# shift    = followRate * relAngle if (relAngle > 0.001) else relAngle
 		shiftMag = sin(shift) / (cos(relAngle/2 - shift))
 		rotShift = (relPos - self.rot).mag(shiftMag)
 
@@ -1060,6 +1064,14 @@ def upScreenDepth():
 def downScreenDepth():
 	camera.setScreenDepth(-10, True)
 
+def upMaxMag():
+	global MAX_VISIBILE_MAG
+	MAX_VISIBILE_MAG += 0.1
+
+def downMaxMag():
+	global MAX_VISIBILE_MAG
+	MAX_VISIBILE_MAG -= 0.1
+
 def upDelta():
 	global Delta
 	Delta *= 1.2
@@ -1077,8 +1089,6 @@ def toggleRealTime():
 	REAL_TIME = False if REAL_TIME else True
 
 def bufferRecord():
-	# if MainLoop.pause == 1:
-	#     pause()
 	Buffer.bufferMode = 1
 
 def bufferPlay():
@@ -1209,7 +1219,7 @@ elif preset == 2:
 elif preset == 3:
 	if (not args["-G"][-1]): Pmodule.G = 6.67408e-11
 
-	if (not args["-ps"][-1]): maxPan = 10e6
+	# if (not args["-ps"][-1]): maxPan = 10e6
 
 	if (not args["-sf"][-1]): SMOOTH_FOLLOW = 0.04
 
@@ -1270,8 +1280,6 @@ elif preset == 3:
 	MainLoop.target = planets["Earth"]
 	if "Phobos" in planets:
 		planets["Phobos"].immune = False # Screw you phobos
-	# camera.goTo(planets["Earth"])
-	# camera.trackDistance = 10 * planets["Earth"].radius
 	MainLoop.addData("Absolute Magnitude", "MainLoop.target.info['absmag']", True, "---")
 	MainLoop.addData("Apparent Magnitude", "MainLoop.target.info['appmag']", True, "---")
 	if makeAsteroids:
@@ -1296,6 +1304,7 @@ elif preset == 3:
 
 	if getStars:
 		print("Loading stars...")
+		MainLoop.addData("Maximum visible magnitude", "round(MAX_VISIBILE_MAG,2)", True)
 		MainLoop.addData("Earth magnitude", "MainLoop.target.info['mag']", True, "---")
 		MainLoop.addData("Hipparcos catalog id", "MainLoop.target.info['HIP id']", True, "---")
 		STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)])
@@ -1388,8 +1397,11 @@ if not TestMode:
 	turtle.onkey(goToTarget,	 "g")
 	turtle.onkey(toggleRealTime, "i")
 
-	turtle.onkeypress(upScreenDepth, ".")
-	turtle.onkeypress(downScreenDepth, ",")
+	turtle.onkeypress(upScreenDepth, "'")
+	turtle.onkeypress(downScreenDepth, ";")
+
+	turtle.onkeypress(upMaxMag, ".")
+	turtle.onkeypress(downMaxMag, ",")
 
 	turtle.onkey(upDelta, "]")
 	turtle.onkey(downDelta, "[")
