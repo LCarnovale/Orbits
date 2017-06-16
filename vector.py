@@ -94,7 +94,10 @@ class vector:
 		if (newMag == None):
 			return abs(self)
 		else:
-			return (self / abs(self)) * newMag
+			if (abs(self) == 0):
+				return self
+			else:
+				return (self / abs(self)) * newMag
 
 	def getHeading(self, axis=0, aCos=True, trueBearing=None, lock=None):
 		# true bearing: an angle will be given in the direction of the axis trueBearing
@@ -231,7 +234,7 @@ class vector:
 			angleOther 	= other.lock(plane).getHeading(plane[0], trueBearing = plane[1])
 			angle 		= angleSelf - angleOther
 			return angle
-	
+
 	# Returns a vector with only the desired elements, the rest become 0
 	def lock(self, elements, inverse=False):
 		if elements == None:
