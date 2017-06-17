@@ -529,6 +529,7 @@ class MainLoop:
 		self.target = None
 		self.FPS = 1
 		self.frameWarning = False
+		self.displayData = True
 		self.DataDisplay = {
 		#  	Title		 [<is a function>, object]
 		}
@@ -549,6 +550,7 @@ class MainLoop:
 		self.DataDisplay["\n"] = None
 
 	def showData(self, delta):
+		if not self.displayData: return False
 		global planets
 		pauseString = "True"
 		if self.Time != 0:
@@ -1113,6 +1115,10 @@ def goToTarget():
 	if MainLoop.target:
 		camera.goTo(MainLoop.target)
 
+def toggleScreenData():
+	MainLoop.target = None
+	MainLoop.displayData = False if MainLoop.displayData else True
+
 def cycleTargets():
 	global planetList
 	global shiftL
@@ -1135,12 +1141,11 @@ def clearTarget():
 
 
 
-def search():
-	term = turtle.textinput("Search for a body", "Enter a search term:")
+def search(term=None):
+	if term == None: term = turtle.textinput("Search for a body", "Enter a search term:")
 	if not term:
 		turtle.listen()
 		return
-	# bestMatch = 0
 	bestBody = None
 	for body in Pmodule.particleList:
 		if not body.name: continue
@@ -1219,8 +1224,6 @@ elif preset == 2:
 elif preset == 3:
 	if (not args["-G"][-1]): Pmodule.G = 6.67408e-11
 
-	# if (not args["-ps"][-1]): maxPan = 10e6
-
 	if (not args["-sf"][-1]): SMOOTH_FOLLOW = 0.04
 
 	MainLoop.addData("Pan speed", "numPrefix(panRate, 'm/step', 2)", True)
@@ -1282,6 +1285,7 @@ elif preset == 3:
 		planets["Phobos"].immune = False # Screw you phobos
 	MainLoop.addData("Absolute Magnitude", "MainLoop.target.info['absmag']", True, "---")
 	MainLoop.addData("Apparent Magnitude", "MainLoop.target.info['appmag']", True, "---")
+
 	if makeAsteroids:
 		beltRadius = (AsteroidsEnd - AsteroidsStart) / 2
 		beltCentre = (AsteroidsEnd + AsteroidsStart) / 2
@@ -1297,6 +1301,7 @@ elif preset == 3:
 
 	earthVec = planets["Earth"].pos
 	radius   = planets["Earth"].radius + 150000
+
 	if makeSatellites:
 		for i in range(makeSatellites):
 			offset = randomVector(3, radius)
@@ -1322,11 +1327,18 @@ elif preset == 3:
 			new = particle(10**(massIndex), vector([X, Y, Z]) * PARSEC,
 				vector([vX, vY, vZ]) * PARSEC / YEAR, static=True,
 				name=STAR["proper"], density=1e3)
+
 			planetList.append(new)
 			new.info["appmag"] = 0
 			new.info["absmag"] = STAR["absmag"]
 			new.info["mag"] = STAR["mag"]
 			new.info["HIP id"] = "None" if not STAR["hip"] else int(STAR["hip"])
+	search("Acrux")
+	toggleRotTrack()
+	search("Pluto")
+	togglePanTrack()
+	clearTarget()
+
 elif preset == 4:
 	# defaultDensity = 10
 	Sun = particle(300000, vector([0, 0, 0]), density=10, name="Sun")
@@ -1396,6 +1408,8 @@ if not TestMode:
 	turtle.onkey(clearTarget,    "c")
 	turtle.onkey(goToTarget,	 "g")
 	turtle.onkey(toggleRealTime, "i")
+
+	turtle.onkey(toggleScreenData, "h")
 
 	turtle.onkeypress(upScreenDepth, "'")
 	turtle.onkeypress(downScreenDepth, ";")
