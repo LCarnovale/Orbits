@@ -83,32 +83,33 @@ The third one is way better, don't even bother with the other two. They were jus
 Arguments:
 Key|Parameter type|Description
    | (if needed)  |
--d :    float,      Delta time per step.
--n :    int,        Particle count, where applicable.
--p :    int,        Preset.
+-d :    float       Delta time per step.
+-n :    int         Particle count, where applicable.
+-p :    int         Preset.
 -sp:                Start paused.
 -ss:                Staggered simulation (Hit enter in the terminal to trigger each step)
--G :    float,	    Gravitational constant.
+-G :    float       Gravitational constant.
 -pd:                Print debugging data.
--sd:    float,      Default screen depth.
--ps:    float,      Maximum pan speed.
--rs:    float,      Rotational speed.
+-sd:    float       Default screen depth.
+-ps:    float       Maximum pan speed.
+-rs:    float       Rotational speed.
 -mk:                Show marker points (static X, Y, Z and Origin coloured particles)
--ep:    int,        Number of points on each ellipse (Irrelevant if SMART_DRAW is on (which it is))
--sf:    float,      Rate at which the camera follows its target.
+-ep:    int         Number of points on each ellipse (Irrelevant if SMART_DRAW is on (which it is))
+-sf:    float       Rate at which the camera follows its target.
 -ad:                Always draw. Attempts to draw particles even if they are thought not to be on screen
--vm:    float,      Variable mass. To be used in relevant places for some presets.
+-vm:    float       Variable mass. To be used in relevant places for some presets.
 -vv:                Draw velocity and acceleration vectors. Note that while velocity vectors are to scale,
                         acceleration vectors are multiplied by 5 when being drawn. (Otherwise they are too short)
                         Give a number parameter to scale each vector.
 -ds  :              Draw stars, ie, make the minimum size 1 pixel, regardless of distance.
--sdp :  int,        Smart draw parameter, equivalent to the number of pixels per edge on a shape.
--me  :  int,        Maximum edges, max number of edges drawn on each shape.
--ab  :  int,        Make asteroid belt (Wouldn't recommend on presets other than 3..)
--es  :  int,        Make earth satellites.
+-sdp :  int         Smart draw parameter, equivalent to the number of pixels per edge on a shape.
+-me  :  int         Maximum edges, max number of edges drawn on each shape.
+-ab  :  int         Make asteroid belt (Wouldn't recommend on presets other than 3..)
+-es  :  int         Make earth satellites.
 -WB  :              Write buffer to file.
--flim:  float,      Frame limit.
--df  :  str,        Path of the data file.
+-flim:  float       Frame limit.
+-df  :  str         Path of the data file.
+-test:              Enter test mode.*
 -AA_OFF:            Turn off AutoAbort. (AutoAbort will kill the simulation if two consecutive frames
                         last longer than a second, it's only trying to help you not bring your
                         computer to a standstill, be careful if you choose to abandon it)
@@ -133,7 +134,14 @@ Using the program:
   - To stop tracking, click (and/or right click) on empty space or another particle.
   - To clear the target selection, press C
   - End the simulation with Esc.
-""")
+
+*Test mode: There are some hard coded time, position and velocity snapshots for various
+bodies in the simulation, with data taken from the same source as the start positions, but
+anywhere between 92 minutes and a month later, and so show the correct positions and velocities
+that those bodies should have. Test mode will use the delta time step given by the command line
+argument (or the default) and nothing else. No graphics will be drawn, instead the program will
+simply step its way through to each relevant time until each of the bodies with test data can
+have their correct position and velocity compared with the correct values.""")
 		exit()
 	argv = sys.argv
 	for arg in args:
@@ -306,7 +314,7 @@ def screenHeight():
 	return turtle.window_height()
 
 
-def drawOval(x, y, major, minor, angle, fill = "black", box = False, mag = None):
+def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = None):
 	global ellipsePoints
 	global drawStars
 	if SMART_DRAW:
@@ -322,7 +330,7 @@ def drawOval(x, y, major, minor, angle, fill = "black", box = False, mag = None)
 	if box:
 		boxRadius = max(MIN_BOX_WIDTH, major * 1.4) / 2
 		turtle.up()
-		turtle.pencolor("white")
+		turtle.pencolor([1, 1, 1])
 		turtle.goto(x - boxRadius, y - boxRadius)
 		turtle.down()
 		turtle.goto(x - boxRadius, y + boxRadius)
@@ -347,28 +355,26 @@ def drawOval(x, y, major, minor, angle, fill = "black", box = False, mag = None)
 	if (drawStars):
 		turtle.up()
 		turtle.goto(x, y)
-		if (points < 2):
-			if (mag != None):
-				flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
-				# print(flareWidth)
-				for r in range(int(flareWidth), 0, -1):
-					rMag = (1 - (r / flareWidth)) ** 2
-					turtle.pencolor([rMag, rMag, rMag])
-					turtle.dot(r)
-			else:
+		flareWidth = 0
+		if (mag == None):
+			if (points < 2):
 				turtle.dot(2)
+			return True
+		if (points < 2):
+			fill = [1, 1, 1]
+			flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
 		else:
-			if (mag != None):
-				flareWidth = max(MAX_VISIBILE_MAG - mag, 0) * 1.5
-				print(flareWidth, major)
-				for r in range(int(flareWidth), 0, -1):
-					rMag = (1 - (r / flareWidth))
-					turtle.pencolor([x * rMag for x in fill])
-					turtle.dot(r + major)
+			flareWidth = max(MAX_VISIBILE_MAG - mag, 0) * 1.5
+
+		# if (flareWidth > 1000): print(flareWidth)
+		for r in range(int(flareWidth), 0, -1):
+			rMag = (1 - (r / flareWidth))
+			turtle.pencolor([x * rMag for x in fill])
+			turtle.dot(r + major)
 
 
-	else:
-		return False
+	# else:
+	# 	return False
 	return True
 
 def drawLine(pointA, pointB = None, fill = "black", width = 1):
@@ -514,6 +520,9 @@ class buffer:
 		else:
 			return False
 
+def warpedDistance(particle):
+	dist = (abs(particle.pos - camera.pos) - particle.radius)*tan(camera.rot.relAngle(particle.pos - camera.pos))
+	return abs(dist)
 
 class MainLoop:
 	def __init__(self):
@@ -614,13 +623,11 @@ Distance to closest particle: %s
 		# I think it would be slightly more effecient to only do an if comparison once,
 		# even if means a few lines are duplicated.
 
-		# drawLine((-500, 0), (500, 0), fill = [1, 1, 1])
 		global FRAME_LIMIT
 		global particleList
 		global DRAW_VEL_VECS
 		global panRate
 		if (self.closestParticle != None):
-			# panAmount = self.closestParticle * maxPan/(self.closestParticle + AUTO_RATE_CONSTANT)
 			panAmount = (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius) * maxPan#maxPan/(AUTO_RATE_CONSTANT)
 			if (pan[-1]):
 				panAmount = max(panAmount, maxPan)
@@ -629,15 +636,11 @@ Distance to closest particle: %s
 			panAmount = maxPan
 		panRate = panAmount
 
-
-		# camera.panMotion = vector(pan[0:3]) * panAmount / delta
-		# if ([0, 0, 0] not in pan):
-			# camera.pan(pan, panAmount)
 		if (rotate != [0, 0, 0]):
 			camera.rotate(rotate, rotSpeed)
 		frameStart = time.time()
 		if self.pause == -1 and Buffer.bufferMode != 2: self.Time += delta
-		# if draw:
+
 		doStep = (self.pause == -1 and Buffer.bufferMode != 2)
 		camera.step((delta if doStep else 0), pan, panAmount)
 		if (abs(camera.pos) > 1e5):
@@ -672,9 +675,8 @@ Distance to closest particle: %s
 
 			if (self.closestParticle == None):
 				self.closestParticle = p#abs(p.pos - camera.pos) - p.radius
-			elif ((abs(p.pos - camera.pos) - p.radius) < (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius)):
+			elif (warpedDistance(p) < warpedDistance(self.closestParticle)):
 				self.closestParticle = p
-			# if (doStep and (p not in [camera.rotTrack, camera.panTrack])):
 			if (doStep):
 				p.step(delta, camera)
 
@@ -765,6 +767,7 @@ class camera:
 			 -self.rot[2]    * self.rot[1]
 		], unit=True)
 		self.panStart = self.pos # When flying to a position, the speed is based on the progress from start to finish.
+		self.screenRadius = (screenWidth()**2 + screenHeight()**2)**(1/2)
 
 						# it will go slow at the start and end and fastest in the middle
 	panTrack = None
@@ -813,6 +816,7 @@ class camera:
 		self.rot.setMag(1)
 
 	def step(self, delta, pan=[0, 0, 0], panRate=1):
+		self.screenRadius = (screenWidth()**2 + screenHeight()**2)**(1/2)
 		panShift = (pan[0] * self.screenXaxis +
 					 pan[1] * self.screenYaxis +
 					 pan[2] * self.rot) * panRate
@@ -822,7 +826,6 @@ class camera:
 			self.trackSeparate += panShift
 		else:
 			self.pos += (self.vel * delta) + panShift
-		# print(self.panStart)
 
 	def panTrackSet(self, target = None):
 		# print("Setting pan")
@@ -850,12 +853,34 @@ class camera:
 		MainLoop.commonShiftPos = self.pos.negate()
 		# MainLoop.commonShiftVel = self.vel.negate()
 
+	# Returns values for use in drawParticle or False if particle not on screen
+	def onScreen(self, particle):
+		relPosition = particle.pos - self.pos
+		if (relPosition.dot(self.rot) <= 0):
+			return False
+		if (particle.radius >= abs(relPosition)):
+			return False
+		if ("absmag" in particle.info):
+			appMag = particle.info["absmag"] + 5 * log(abs(particle.pos - self.pos) / (10 * PARSEC), 10)
+			if (appMag > MAX_VISIBILE_MAG):
+				return False
+
+		offset = atan(particle.radius/abs(relPosition))
+
+		# if (abs(X) - majorAxis > screenWidth()/2 or abs(Y) - majorAxis > screenHeight()/2):
+		# 	return False
+		return True
+
+
+
+
 	def drawParticle(self, particle, drawAt = False, point=False, box=False):
 		# drawAt: if the desired particle isn't actually where we want to draw it, parse [pos, radius [, colour]] and set drawAt = True
+		# if not self.onScreen(particle): return False
 		self.rot.setMag(1)
-		# prin = "-\n"
-		screenAngleX = atan(( turtle.window_width() / 2 ) / self.screenDepth)
-		screenAngleY = atan(( turtle.window_height() / 2 ) / self.screenDepth)
+
+		# screenAngleX = atan(( turtle.window_width() / 2 ) / self.screenDepth)
+		# screenAngleY = atan(( turtle.window_height() / 2 ) / self.screenDepth)
 		if drawAt:
 			pos = particle[0]
 			radius = particle[1]
@@ -872,19 +897,19 @@ class camera:
 			colour = particle.colour
 
 		# Get relative position to camera's position.
-		sd = self.screenDepth
-		scrCent =  self.rot.getClone().setMag(self.screenDepth)
+
+
 		relPosition = pos - self.pos
 		if (relPosition.dot(self.rot) <= 0):
 			# Only condition to exit draw if ALWAYS_DRAW is True
 			return False
-		ScreenParticleDistance = sd * abs(relPosition) * abs(self.rot) / (relPosition.dot(self.rot)) #self.screenDepth * relPosition.getMag() / self.rot.dot(relPosition) # A factor to multiply the relPosition vector by to get a vector on a plane on the screen.
+		ScreenParticleDistance = self.screenDepth * abs(relPosition) * abs(self.rot) / (relPosition.dot(self.rot)) #self.screenDepth * relPosition.getMag() / self.rot.dot(relPosition) # A factor to multiply the relPosition vector by to get a vector on a plane on the screen.
 		relPosOnScreen = relPosition.multiply(ScreenParticleDistance/abs(relPosition))
 		relPosUnit = relPosition * (1 / abs(relPosition))
 		relRotation = relPosUnit - self.rot
 		x_r, y_r, z_r = self.rot.elements
 		x_CSP, y_CSP, z_CSP = relPosOnScreen.elements
-		x_CSC, y_CSC, z_CSC = scrCent.elements
+		x_CSC, y_CSC, z_CSC = self.rot.getClone().setMag(self.screenDepth).elements
 
 		X = relPosOnScreen.dot(self.screenXaxis) / abs(self.screenXaxis)
 		Y = relPosOnScreen.dot(self.screenYaxis) / abs(self.screenYaxis)
@@ -898,7 +923,7 @@ class camera:
 			# prin += ("Inside particle, not drawing")
 			# if PRINT_DATA: print(prin)
 			return False
-		offset = asin(radius/distance)
+		offset = atan(radius/distance)
 		if point:
 			majorAxis, minorAxis = 1, 1
 		else:
@@ -1142,6 +1167,8 @@ def clearTarget():
 
 
 def search(term=None):
+	global TestMode
+	if TestMode: return False
 	if term == None: term = turtle.textinput("Search for a body", "Enter a search term:")
 	if not term:
 		turtle.listen()
@@ -1354,7 +1381,7 @@ elif preset == 4:
 if not TestMode:
 	window = turtle.Screen()
 	window.setup(width = 1.0, height = 1.0)
-	turtle.bgcolor("black")
+	turtle.bgcolor([0, 0, 0])
 
 	turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
 	turtle.hideturtle()
@@ -1431,7 +1458,7 @@ if not TestMode:
 
 if TestMode:
 	try:
-		print("Running simulation...")
+		print("Running simulation with delta time step of %s/step" % (timeString(Delta)))
 	# 	print("""	Note that with leapfrog arithmetic,
 	# velocity and position are technically never both known at the same time,
 	# but that shouldn't affect results significantly.""")
@@ -1464,10 +1491,10 @@ if TestMode:
 						targetTime = targetData[0]
 						targetPos  = targetData[1]
 						targetVel  = targetData[2]
-						print("\nAt time: %lf, for %s:" %(Time, p.name))
+						print("\nAt time: %s, for %s:" %(timeString(Time), p.name))
 						print("\tShould be at:    %s\twith vel: %s (mag: %s)" % (targetPos.string(2), targetVel.string(2), numPrefix(abs(targetVel), "m/s")))
 						print("\tWas actually at: %s\twith vel: %s (mag: %s)" % (p.pos.string(2), p.vel.string(2), numPrefix(abs(p.vel), "m/s")))
-						print("\tOffset by %s (mag: %s) over %d steps of %lfs, average %s/step or %s" % (
+						print("\tOffset by        %s (mag: %s) over %d steps of %lfs, average %s/step or %s" % (
 							(p.pos - targetPos).string(2),
 							numPrefix(abs(p.pos - targetPos), "m", 3),
 							stepCounter, (Delta if not tempDelta else tempDelta),

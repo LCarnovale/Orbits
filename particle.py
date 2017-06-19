@@ -96,10 +96,6 @@ class particle:
 
 
 	def checkOutOfBounds(self, camera): #bounds=[turtle.window_width()/2, turtle.window_height()/2]):
-		# self.vel.multiplyToMe(0)
-		# return
-		# global TestMode
-		# print(ALL_IMMUNE)
 		if self.immune or ALL_IMMUNE or TestMode: return False
 		out = False
 		if abs(self.pos.subtract(camera.pos)) > voidRadius:
@@ -154,7 +150,7 @@ class particle:
 			other.setRadius()
 			self.die(other)
 
-	def step(self, delta, camera, draw=True, drawVel=False, onlyDraw = False, bufferMode = 0):
+	def step(self, delta, camera=None, draw=True, drawVel=False, onlyDraw = False, bufferMode = 0):
 		if self.static:
 			self.pos += self.vel * delta# + self.acc * (delta**2 / 2)
 			return False
