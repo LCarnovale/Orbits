@@ -10,6 +10,20 @@ class vector:
 	def __len__(self):
 		return len(self.elements)
 
+	def __eq__(self, other):
+		if (type(other) == vector):
+			if (other.dim == self.dim):
+				return (self.elements == other.elements)
+			else:
+				raise Exception("Error: Inconsistent dimensions in '==' comparison between vectors.")
+		elif (other == 0):
+			return (abs(self) == other)
+		else:
+			raise Exception("Error: Unable to check equality between vector and non-vector.")
+
+	def __bool__(self):
+		return (abs(self) != 0)
+
 	def __abs__(self):
 		return self.getMag()
 
@@ -20,7 +34,11 @@ class vector:
 		return self.subtract(other)
 
 	def __truediv__(self, other):
-		return self.multiply(1 / other)
+		if (type(other) == vector):
+			x = self.isParallel(other)
+			return (x if x else False)
+		else:
+			return self.multiply(1 / other)
 
 	def __iadd__(self, other):
 		self = self + other
@@ -75,20 +93,40 @@ class vector:
 	def __iter__(self):
 		return self.elements.__iter__()
 
+
+
+	def zero(self):
+		self *= 0
+		return self
+
 	def define(self, other):
 		self.elements	= other.elements
 		self.dim 		= len(other.elements)
 		self.unit 		= other.unit
 		return True
 
+	# Both pretty useless functions
 	def elementWiseMultiply(self, other):
-		return vector([self[i] * other[i] for i, x in enumerate(self)])
+		return vector([self[i] * other[i] for i in range(self.dim)])
+
+	def elementWiseDivide(self, other):
+		return vector([self[i] / other[i] for i in range(self.dim)])
 
 	# The only function that actually calculates the magnitude. Won't be called usually
 	# but it can't be deprecated, abs() calls this!
 	def getMag(self):
 		mag = sum([x ** 2 for x in self.elements]) ** (1/2)
 		return mag
+
+	def isParallel(self, other):
+		tempQuot = self.elementWiseDivide(other)
+		factor = tempQuot[0]
+		tempQuot = tempQuot / factor
+		parallel = True
+		if [x for x in tempQuot if x != 1]:
+			return False
+		else:
+			return factor
 
 	def mag(self, newMag=None):
 		if (newMag == None):
