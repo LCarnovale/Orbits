@@ -521,7 +521,9 @@ class buffer:
 			return False
 
 def warpedDistance(particle):
-	dist = (abs(particle.pos - camera.pos) - particle.radius)*tan(camera.rot.relAngle(particle.pos - camera.pos))
+	if particle == None:
+		return None
+	dist = (abs(particle.pos - camera.pos) - particle.radius)*(1 + tan(1/2 * camera.rot.relAngle(particle.pos - camera.pos)))
 	return abs(dist)
 
 class MainLoop:
@@ -645,7 +647,6 @@ Distance to closest particle: %s
 		camera.step((delta if doStep else 0), pan, panAmount)
 		if (abs(camera.pos) > 1e5):
 			self.commonShiftPos = -camera.pos
-		self.closestParticle = None
 		for m in sorted(markerList, key = lambda x: abs(x.pos - camera.pos), reverse = True):
 			camera.drawParticle(m)
 		clickTarget = None
@@ -657,12 +658,13 @@ Distance to closest particle: %s
 				camera.rotTrackSet()
 		if camera.panTrack:
 			# if doStep: camera.panTrack.step(delta, camera)
-			camera.panFollow()
+			camera.panFollow(closestDist=warpedDistance(self.closestParticle))
 		# if camera.rotTrack and (camera.rotTrack != camera.panTrack):
 			# if doStep: camera.rotTrack.step(delta, camera)
 			# camera.rotFollow()
 		if camera.rotTrack:
 			camera.rotFollow()
+		self.closestParticle = None
 
 		# camera.pos += self.commonShiftPos
 		for I, p  in enumerate(particleList):
@@ -673,9 +675,10 @@ Distance to closest particle: %s
 				# Swap the previous one with the current one
 				particleList = particleList[:I - 1] + [particleList[I], particleList[I-1]] + particleList[I + 1:]
 
+			pWarp = warpedDistance(p)
 			if (self.closestParticle == None):
 				self.closestParticle = p#abs(p.pos - camera.pos) - p.radius
-			elif (warpedDistance(p) < warpedDistance(self.closestParticle)):
+			elif (pWarp and pWarp < warpedDistance(self.closestParticle)):
 				self.closestParticle = p
 			if (doStep):
 				p.step(delta, camera)
@@ -767,15 +770,17 @@ class camera:
 			 -self.rot[2]    * self.rot[1]
 		], unit=True)
 		self.panStart = self.pos # When flying to a position, the speed is based on the progress from start to finish.
-		self.screenRadius = (screenWidth()**2 + screenHeight()**2)**(1/2)
+		self.rotStart = self.rot # Similar to above but for rotation
 
-						# it will go slow at the start and end and fastest in the middle
+	panInfo = [0, 0, vector([0, 0, 0])] # total distance, maxSpeed, destination. Stored so they aren't calculated each step.
+	screenRadius = 0 #(screenWidth()**2 + screenHeight()**2)**(1/2)
 	panTrack = None
 	rotTrack = None
 	panTrackLock = False # Once the pan or rotation tracking has sufficiently closed in on the target,
 	rotTrackLock = False # don't allow any 'slippage', ie lock on firmly to the target
 	moving = False # To go to a particle, just activate pan and rotational
 				   # tracking on the target until they both have locked on
+	absolutePan = vector([0, 0, 0])
 
 	def setScreenDepth(self, value, increment=False):
 		if increment:
@@ -794,17 +799,8 @@ class camera:
 
 	def goTo(self, particle):
 		self.moving = True
-		self.panTrackSet(particle)
 		self.rotTrackSet(particle)
-
-	def pan(self, direction, rate):
-		# Direction as a vector
-		# if PRINT_DATA: print("direction[0] = {}, rate = {}, self.rot[0] = {}".format(direction[0], rate, self.rot[0]))
-		screenZaxis = self.rot.setMag(1)
-		if self.panTrack == None:
-			self.pos += ((self.screenXaxis * direction[2]) + (self.screenYaxis * -direction[1]) + (screenZaxis * direction[0])) * -rate
-		else:
-			self.trackSeparate += ((self.screenXaxis * direction[2]) + (self.screenYaxis * -direction[1]) + (screenZaxis * direction[0])) * -rate
+		# self.panTrackSet(particle)
 
 	def rotate(self, direction, rate):
 		# direction as a 2 element list [x, y]
@@ -818,30 +814,44 @@ class camera:
 	def step(self, delta, pan=[0, 0, 0], panRate=1):
 		self.screenRadius = (screenWidth()**2 + screenHeight()**2)**(1/2)
 		panShift = (pan[0] * self.screenXaxis +
-					 pan[1] * self.screenYaxis +
-					 pan[2] * self.rot) * panRate
+					pan[1] * self.screenYaxis +
+					pan[2] * self.rot) * panRate
 
+		if (panShift and self.panTrack and not self.panTrackLock):
+			self.panTrackSet()
+
+		self.vel = panShift
 		if self.panTrack:
-			self.vel = self.panTrack.vel.getClone()
 			self.trackSeparate += panShift
-		else:
-			self.pos += (self.vel * delta) + panShift
+			self.vel += self.panTrack.vel * delta
+		self.vel += self.absolutePan
+		self.pos += (self.vel)
+		self.absolutePan *= 0
 
 	def panTrackSet(self, target = None):
 		# print("Setting pan")
 		self.panTrack = target
 		self.panTrackLock = False
 		if target:
-			mag = min((20 * target.radius), abs(self.pos - target.pos))
-			self.trackSeparate = (self.pos - target.pos).setMag(mag)
-			if (abs(self.trackSeparate) > 20 * target.radius):
-				self.panStart = self.pos
+			self.panStart = self.pos.getClone()
+			if ((20 * target.radius) < abs(self.pos - target.pos)):
+				self.trackSeparate = self.rot.mag(-20 * target.radius)
+			else:
+				self.trackSeparate = self.pos - target.pos
+			# if (abs(self.trackSeparate) > 20 * target.radius):
+			self.panInfo[0] = abs(target.pos + self.trackSeparate - self.pos)
+			travelSteps = max(5 * MainLoop.FPS, 100) # No less than 100 steps
+			self.panInfo[1] = self.panInfo[0] / travelSteps
+			self.panInfo[2] = target.pos + self.trackSeparate
+		print("Setting panTrack to %s from %s, mag %s" % (self.trackSeparate.string(2), "none" if not target else target.name, numPrefix(abs(self.trackSeparate), "m", 2)))
 		return target
 
 	def rotTrackSet(self, target = None):
 		# print("Setting rot")
 		self.rotTrack = target
-		self.rotTrackLock = False
+		if target:
+			self.rotTrackLock = False
+			self.rotStart = self.rot.getClone()
 		return target
 
 	# Not used, this can be removed
@@ -866,7 +876,7 @@ class camera:
 				return False
 
 		offset = atan(particle.radius/abs(relPosition))
-
+		# centreAngle = atan()
 		# if (abs(X) - majorAxis > screenWidth()/2 or abs(Y) - majorAxis > screenHeight()/2):
 		# 	return False
 		return True
@@ -900,12 +910,16 @@ class camera:
 
 
 		relPosition = pos - self.pos
+		distance = abs(relPosition)
 		if (relPosition.dot(self.rot) <= 0):
 			# Only condition to exit draw if ALWAYS_DRAW is True
 			return False
-		ScreenParticleDistance = self.screenDepth * abs(relPosition) * abs(self.rot) / (relPosition.dot(self.rot)) #self.screenDepth * relPosition.getMag() / self.rot.dot(relPosition) # A factor to multiply the relPosition vector by to get a vector on a plane on the screen.
-		relPosOnScreen = relPosition.multiply(ScreenParticleDistance/abs(relPosition))
-		relPosUnit = relPosition * (1 / abs(relPosition))
+		if (distance < radius):
+			# and this one
+			return False
+		ScreenParticleDistance = self.screenDepth * abs(relPosition) * abs(self.rot) / (relPosition.dot(self.rot))
+		relPosOnScreen = relPosition * ScreenParticleDistance / abs(relPosition)
+		relPosUnit = relPosition / abs(relPosition)
 		relRotation = relPosUnit - self.rot
 		x_r, y_r, z_r = self.rot.elements
 		x_CSP, y_CSP, z_CSP = relPosOnScreen.elements
@@ -914,16 +928,19 @@ class camera:
 		X = relPosOnScreen.dot(self.screenXaxis) / abs(self.screenXaxis)
 		Y = relPosOnScreen.dot(self.screenYaxis) / abs(self.screenYaxis)
 
-		centreAngleX = acos((2 - abs(relRotation.lock([0, 2])) ** 2) / 2)
-		centreAngleY = acos((2 - abs(relRotation.lock([0, 1])) ** 2) / 2)
-		# prin += "centreAngleX: " + str(round(centreAngleX, 5)) + ", centreAngleY: " + str(round(centreAngleY, 5)) + "\n"
+		# centreAngleX = acos((2 - abs(relRotation.lock([0, 2])) ** 2) / 2)
+		# centreAngleY = acos((2 - abs(relRotation.lock([0, 1])) ** 2) / 2)
 		# offset: angle either side of centre angle which is slightly distorted due to the 3d bulge of the sphere.
-		distance = relPosition.getMag()
+		offset = asin(radius/distance)
+		centreAngle = acos(min(1, self.screenDepth / ScreenParticleDistance))
+		minAngle = centreAngle - offset
+		screenAngle = atan(self.screenRadius / self.screenDepth)
+		if (minAngle > screenAngle):
+			return False
 		if (radius >= distance and not point):
 			# prin += ("Inside particle, not drawing")
 			# if PRINT_DATA: print(prin)
 			return False
-		offset = atan(radius/distance)
 		if point:
 			majorAxis, minorAxis = 1, 1
 		else:
@@ -944,43 +961,62 @@ class camera:
 	def drawAt(self, posVector, radius, colour = None, box=False):
 		return self.drawParticle([posVector, radius, colour], True, box=box)
 
-	def panFollow(self, followRate=None):
+	def panFollow(self, followRate=None, closestDist=None):
 		global SMOOTH_FOLLOW
+		if self.panTrack == None: return False
 		if (not followRate):
 			followRate = SMOOTH_FOLLOW
-		if self.panTrack == None: return False
-		if self.panTrackLock:
-			self.pos = self.panTrack.pos + self.trackSeparate
-			return True
-		if self.moving:
-			distProgress = abs(self.pos - self.panStart)
-			totalDist = abs((self.panTrack.pos + self.trackSeparate) - self.panStart)
-			followRate *= max(1, distProgress * (totalDist - distProgress) / totalDist**2)
-			relPos = self.panTrack.pos - self.pos
-			followRate *= max(0, cos(self.rot.relAngle(relPos)))
 
-		panShift = ((self.panTrack.pos - self.pos) + self.trackSeparate) * followRate
-		self.pos += panShift
-		if abs(panShift) / abs(self.trackSeparate) < 0.01:
+		# Choose the follow rate so that the approach takes approx
+		# 5 seconds whilst at max speed, dont worry about time accelerating
+		maxSpeed = self.panInfo[1]
+		# if (self.vel - self.panTrack.vel)
+		# pan destination
+		panDest = self.panInfo[2]
+		if self.panTrackLock:
+			self.pos = panDest
+			return True
+		relPos = (panDest - self.pos)
+		totalDist = self.panInfo[0]
+		remDist = totalDist - abs(self.pos - self.panStart) + 1
+		# print("totalDist: %.5f, remDist: %.5f" % (totalDist, remDist), end = " ")
+		if remDist <= 1:
+			# print("Locking", end = " ")
 			self.lockPan()
+			followRate = 0
+		else:
+				# followRate is multiplied by a factor based on the progress of travel from start to finish,
+				# so that the panning is fastest in the middle and slowest at the start and finish.
+			followRate *= ((remDist * (totalDist - remDist) / totalDist**2))
+
+			# add a bit to the speed so that the shift is never 0, which would normally be the case at endpoints
+		speed = max(followRate * totalDist, 0.000001 * remDist)
+		panShift = relPos.mag(speed)
+		self.absolutePan = panShift
+		# print("speed: %.2f" %(speed))
+		# self.pos += panShift
 		return True
 
 	def rotFollow(self, followRate=DEFAULT_ROTATE_FOLLOW_RATE):
 		if self.rotTrack == None: return False
 		if self.rotTrackLock:
 			followRate = 1
+
 		relPos   = (self.rotTrack.pos - self.pos).mag(1)
-		# print(abs(self.rot), abs(relPos))
+
 		relAngle = relPos.relAngle(self.rot)
+			# shift is equivalent to a portion of the arc from the current rotation to the end rotation.
 		shift    = followRate * (relAngle + 0.01) if (relAngle > 0.01 and followRate != 1) else relAngle
-		# shift    = followRate * relAngle if (relAngle > 0.001) else relAngle
+			# shiftMag is shift modified so that adding it to rot results in a rotation of 'shift' through that arc
 		shiftMag = sin(shift) / (cos(relAngle/2 - shift))
+			# rotShift is simply a vector from the current rotation to the desired rotation of magnitude shiftMag
 		rotShift = (relPos - self.rot).mag(shiftMag)
 
 		self.rot += rotShift
 
-		if not self.rotTrackLock and relAngle < 0.001:
+		if not self.rotTrackLock and relAngle:
 			self.lockRot()
+
 		self.screenXaxis = self.rot.cross(self.screenYaxis)
 		self.screenYaxis = self.screenXaxis.cross(self.rot)
 
@@ -1129,12 +1165,17 @@ def togglePanTrack():
 			camera.panTrackSet()
 		else:
 			camera.panTrackSet(MainLoop.target)
+	else:
+		camera.panTrackSet()
+
 def toggleRotTrack():
 	if MainLoop.target:
 		if camera.rotTrack:
 			camera.rotTrackSet()
 		else:
 			camera.rotTrackSet(MainLoop.target)
+	else:
+		camera.rotTrackSet()
 
 def goToTarget():
 	if MainLoop.target:
@@ -1172,7 +1213,7 @@ def search(term=None):
 	if term == None: term = turtle.textinput("Search for a body", "Enter a search term:")
 	if not term:
 		turtle.listen()
-		return
+		return False
 	bestBody = None
 	for body in Pmodule.particleList:
 		if not body.name: continue
@@ -1194,7 +1235,11 @@ def search(term=None):
 	# 	MainLoop.target = bestBody
 	if bestBody:
 		MainLoop.target = bestBody
-	turtle.listen()
+		turtle.listen()
+		return True
+	else:
+		turtle.listen()
+		return False
 
 
 
@@ -1283,7 +1328,7 @@ elif preset == 3:
 	MainLoop.addData("Distance to Target", "")
 	MainLoop.addData("Centre", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ), 2 ), 'm' )", True, "---")
 	MainLoop.addData("Surface", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ) - MainLoop.target.radius, 2 ), 'm' )", True, "---")
-	MainLoop.addData("Relative speed of camera", "numPrefix(abs((camera.vel + camera.panMotion) - MainLoop.target.vel), 'm/s', 2)", True, "---")
+	MainLoop.addData("Speed of camera", "numPrefix(abs(camera.vel), 'm/step', 2)", True, "---")
 	MainLoop.addDataLine()
 
 	bigVec = vector([0, 0, 0])
@@ -1360,8 +1405,7 @@ elif preset == 3:
 			new.info["absmag"] = STAR["absmag"]
 			new.info["mag"] = STAR["mag"]
 			new.info["HIP id"] = "None" if not STAR["hip"] else int(STAR["hip"])
-	search("Acrux")
-	toggleRotTrack()
+	if search("Acrux"): toggleRotTrack()
 	search("Pluto")
 	togglePanTrack()
 	clearTarget()
