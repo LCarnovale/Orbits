@@ -161,10 +161,9 @@ class particle:
 			self.die()
 			return False
 
-		self.vel += (oldAcc + self.acc) * (delta / 2)
+		self.vel += self.acc * delta
 		self.pos += self.vel * delta
-		# self.vel += self.acc * delta
-		# self.vel += self.acc * delta
+
 		self.checkOutOfBounds(camera)
 
 		return True
