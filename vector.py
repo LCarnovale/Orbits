@@ -11,7 +11,9 @@ class vector:
 		return len(self.elements)
 
 	def __eq__(self, other):
-		if (type(other) == vector):
+		if (other == None):
+			return False
+		elif (type(other) == vector):
 			if (other.dim == self.dim):
 				return (self.elements == other.elements)
 			else:
