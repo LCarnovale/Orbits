@@ -2,7 +2,10 @@ from vector import vector, randomVector
 from math import *
 import random
 
-particleList = []
+particleList  = []
+staticList    = []
+nonStaticList = []
+
 markerList   = []
 
 defaultDensity = 1
@@ -45,6 +48,10 @@ class particle:
 		if not autoColour:
 			self.setColour(colour)
 		particleList.append(self)
+		if static:
+			staticList.append(self)
+		else:
+			nonStaticList.append(self)
 		if self.pos.dim != self.vel.dim:
 			print("This class is badly made! (non consistant dimensions):", self)
 		# self.setColour()
@@ -76,9 +83,7 @@ class particle:
 	def calcAcc(self, other):
 		force = (G * self.mass * other.mass) / (abs(self.pos - other.pos) ** 2)
 		forceVector = other.pos.subtract(self.pos)
-		# drawVector(forceVector.setMag(force/self.mass), self.pos)
 		self.acc += (forceVector.setMag(force/self.mass))
-		# print("calcAcc:", self.acc.elements)
 
 	def checkCollision(self, other):
 		if other.alive and (abs(self.pos.subtract(other.pos)) < self.radius + other.radius):
@@ -88,11 +93,10 @@ class particle:
 			return False
 
 	def runLoop(self):
-		for p in particleList:
-			if p != self and type(p) != marker and not p.static:
+		for p in nonStaticList:
+			if p != self:
 				if not self.checkCollision(p):
 					self.calcAcc(p)
-		# print("Acc: %s, %.2f" % (self.acc.string(2), abs(self.acc)))
 
 
 	def checkOutOfBounds(self, camera): #bounds=[turtle.window_width()/2, turtle.window_height()/2]):
@@ -154,6 +158,7 @@ class particle:
 		if self.static:
 			self.pos += self.vel * delta# + self.acc * (delta**2 / 2)
 			return False
+
 		oldAcc = self.acc.getClone()
 		self.acc = vector([0, 0, 0])
 		self.runLoop()
@@ -208,6 +213,8 @@ class marker(particle):
 		self.pos = position
 		self.colour = colour
 		self.radius = radius
+		self.static = True
+		staticList.append(self)
 		markerList.append(self)
 	def set_colour(self, colour):
 		self.colour = colour
