@@ -60,7 +60,20 @@ def stripComments(text):
 # key: A list of strings, eg. ["$distance > 1"] to determine if a record is included.
 #     Use $ to signify variable names, and they will be replaced with the relevant values
 #     when being evaluated.
-def loadFile(path, length=0, spread=False, key=None):
+def loadFile(path, length=0, spread=False, key=None, quiet=True):
+	"""Loads a database from a text file.
+    Designed to read settings for the load from the text file,
+    Look at source code for more info.
+    path: path of the text file
+    lenth: Max number of entries to read
+    spread: True or False, if True then takes length number of items
+        spread evenly through the whole file.
+    key: A string or list of strings to filter the entries, formatted using
+        elements from the table, ie ['$distance > 1'], use $ to represent variables
+        and they will be substituted correctly
+    quiet: True or False, if False then info about item counts etc. will be shown.
+"""
+
 	try:
 		global COUNT
 		f = open(path, "r")
@@ -111,7 +124,10 @@ def loadFile(path, length=0, spread=False, key=None):
 			if not line: continue
 			if line[0] == "$":
 				words = line[1:].split("=")
-				data["$VAR"][words[0].strip()] = float(words[1])
+				if (words[1].strip()[0] == "'" and words[1].strip()[-1] == "'"):
+					data["$VAR"][words[0].strip()] = (words[1][1:-1])
+				else:
+					data["$VAR"][words[0].strip()] = float(words[1])
 				continue
 			elif line[0] in ["!", "~"]:
 				continue
@@ -136,7 +152,7 @@ def loadFile(path, length=0, spread=False, key=None):
 			newRow["$valid"] = True
 			ignoreRow = False
 			for name in columnNames:
-				newRow[name] = None
+				newRow[name.strip()] = None
 			for i, col in enumerate(row[1:]):
 				# iterates through the columns or words in a row
 				name = columnNames[i + 1].strip()
@@ -163,13 +179,13 @@ def loadFile(path, length=0, spread=False, key=None):
 				continue
 			else:
 				rowCounter += 1
-				if COUNT:
+				if COUNT and not quiet:
 					print("\rItem count: %d " % (rowCounter), end = "id: {}                    ".format(row[0]))
 					sys.stdout.flush()
 				data[row[KEY_COL]] = newRow
 				if (length and rowCounter >= length):
 					break
-			if not data[row[KEY_COL]]["$valid"]:
+			if not data[row[KEY_COL]]["$valid"] and not quiet:
 				print("Not enough data for '%s'." % (row[KEY_COL]))
 		print()
 	except KeyboardInterrupt:
