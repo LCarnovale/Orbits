@@ -15,7 +15,10 @@ import particle as Pmodule
 randomVector = vector.randomVector
 vector = vector.vector
 
-particleList = Pmodule.particleList
+particleList  = Pmodule.particleList
+staticList    = Pmodule.staticList
+nonStaticList = Pmodule.nonStaticList
+
 markerList   = Pmodule.markerList
 
 marker   = Pmodule.marker
@@ -39,7 +42,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-?"  :  [None],
 "-d"  :  	[float,	0.025,	True], # Delta time per step
 "-n"  :  	[int,   20,		True], # Particle count
-"-p"  :  	[int,   1,		True], # preset
+"-p"  :  	[str,   "1",	True], # preset
 "-sp" :  	[str,   False,	False,  True], # start paused
 "-ss" :  	[str,   False,	False,  True], # staggered simulation
 "-G"  :  	[float, 20,		True], # Gravitational constant
@@ -63,6 +66,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-df" :  	[str, "SolSystem.txt", True], # Path of the data file
 "-test": 	[str,	 False, False, True], # Test mode
 "-getStars": [float,  False,	False, 4], # Get stars from the datafile.
+"-PM":      [str,   False,  False, True],  # Enter the preset maker
 "-AA_OFF": [str, True, 	False, 	False]   # Turn off AutoAbort.
 }
 
@@ -78,6 +82,7 @@ This version contains 3 presets:
 1)  Centre body with -n number of planets orbiting in random places. (Default 10)
 2)  'Galaxy' kinda thing (Miserable failure, don't waste your time with this one)
 3)  Our very own Solar System!
+4)  Another small test. Large body with a line of small bodies orbiting in a circle.
 The third one is way better, don't even bother with the other two. They were just practice.
 
 Arguments:
@@ -85,7 +90,7 @@ Key|Parameter type|Description
    | (if needed)  |
 -d :    float       Delta time per step.
 -n :    int         Particle count, where applicable.
--p :    int         Preset.
+-p :    string      Preset.
 -sp:                Start paused.
 -ss:                Staggered simulation (Hit enter in the terminal to trigger each step)
 -G :    float       Gravitational constant.
@@ -108,8 +113,13 @@ Key|Parameter type|Description
 -es  :  int         Make earth satellites.
 -WB  :              Write buffer to file.
 -flim:  float       Frame limit.
--df  :  str         Path of the data file.
+-df  :  string      Path of the data file.
 -test:              Enter test mode.*
+-getStars: float	Loads stars from a database of almost 120,000 stars in the night sky. The value
+                        given with this parameter will be used as the maximum apparent magnitude from
+                        Earth of the stars loaded. The default is 4.5, which loads about 510 stars.
+-PM  :              Enters the preset maker, allowing you to design a preset.
+-P?  :				Shows the available presets then exits.
 -AA_OFF:            Turn off AutoAbort. (AutoAbort will kill the simulation if two consecutive frames
                         last longer than a second, it's only trying to help you not bring your
                         computer to a standstill, be careful if you choose to abandon it)
@@ -269,7 +279,7 @@ if not AUTO_ABORT:
 
 
 if TestMode:
-	if preset == 3:
+	if preset == "3":
 		# Test data:
 		testData = {# [[<Name>, <Time>, <Pos>, <vel>], ...]
 			"ISS":
@@ -300,7 +310,7 @@ if TestMode:
 			print("Testing positions and velocities for:", ", ".join([x for x in testData]))
 
 	else:
-		print("Testing not available for this preset (%d)." %(preset))
+		print("Testing not available for this preset (%s)." %(preset))
 
 def setup():
 	# a = particle(1, vector([25, 1, 0]))
@@ -314,7 +324,39 @@ def setup():
 def roundList(list, places):
 	return [round(x, places) for x in list]
 
-
+# Credit to 'Spektre' and 'paddyg' on StackOverflow for this function,
+# Source: 'https://stackoverflow.com/questions/21977786/star-b-v-color-index-to-apparent-rgb-color'
+# Author: 'https://stackoverflow.com/users/2521214/spektre' (paddyg converted it to python)
+def bv2rgb(bv):
+  if bv < -0.4: bv = -0.4
+  if bv > 2.0: bv = 2.0
+  if bv >= -0.40 and bv < 0.00:
+    t = (bv + 0.40) / (0.00 + 0.40)
+    r = 0.61 + 0.11 * t + 0.1 * t * t
+    g = 0.70 + 0.07 * t + 0.1 * t * t
+    b = 1.0
+  elif bv >= 0.00 and bv < 0.40:
+    t = (bv - 0.00) / (0.40 - 0.00)
+    r = 0.83 + (0.17 * t)
+    g = 0.87 + (0.11 * t)
+    b = 1.0
+  elif bv >= 0.40 and bv < 1.60:
+    t = (bv - 0.40) / (1.60 - 0.40)
+    r = 1.0
+    g = 0.98 - 0.16 * t
+  else:
+    t = (bv - 1.60) / (2.00 - 1.60)
+    r = 1.0
+    g = 0.82 - 0.5 * t * t
+  if bv >= 0.40 and bv < 1.50:
+    t = (bv - 0.40) / (1.50 - 0.40)
+    b = 1.00 - 0.47 * t + 0.1 * t * t
+  elif bv >= 1.50 and bv < 1.951:
+    t = (bv - 1.50) / (1.94 - 1.50)
+    b = 0.63 - 0.6 * t * t
+  else:
+    b = 0.0
+  return (r, g, b)
 
 
 def screenWidth():
@@ -337,8 +379,16 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	localY = 0
 	screenX = localX * cos(angle) - localY * sin(angle)
 	screenY = localY * cos(angle) + localX * sin(angle)
+
+	flareWidth = 0
+	if (mag and points <= 2):
+		fill = [1, 1, 1]
+		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
+	elif (mag):
+		flareWidth = max(MAX_VISIBILE_MAG - mag, 0) * 1.5
+
 	if box:
-		boxRadius = max(MIN_BOX_WIDTH, major * 1.4) / 2
+		boxRadius = max(MIN_BOX_WIDTH, major * 1.4 + flareWidth) / 2
 		turtle.up()
 		turtle.pencolor([1, 1, 1])
 		turtle.goto(x - boxRadius, y - boxRadius)
@@ -348,39 +398,45 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 		turtle.goto(x + boxRadius, y - boxRadius)
 		turtle.goto(x - boxRadius, y - boxRadius)
 		turtle.up()
-	if (points > 3):
+	if (points > 2):
 		turtle.up()
 		turtle.goto(x + screenX, y + screenY)
 		turtle.begin_fill()
 		turtle.fillcolor(fill)
 		onScreen = True
 		Drawn = False
-		for i in range(points):
+		# Check if the oval is overly big, only draw the points visible
+		screenRadius = camera.screenRadius
+		centreRadius = (x**2 + y**2)**(1/2)
+		start = 0
+		end = points
+		# if (centreRadius >= screenRadius):
+		# 	start = int( points * (-acos((centreRadius - screenRadius)/major))/(2*pi) )
+		# 	end = -start
+		#
+		# 	print("OFfset angle: %f" % (-start))
+		# 	# start, end = 0, points
+
+		for i in range(start, end):
 			localX = major/2 * cos(2 * pi * i / points)
 			localY = minor/2 * sin(2 * pi * i / points)
 			screenX = localX * cos(angle) - localY * sin(angle)
 			screenY = localY * cos(angle) + localX * sin(angle)
 			turtle.goto(x + screenX, y + screenY)
 		turtle.end_fill()
+
 	if (drawStars):
 		turtle.up()
 		turtle.goto(x, y)
-		flareWidth = 0
 		if (mag == None):
 			if (points < 2):
 				turtle.dot(2)
 			return True
-		if (points <= 3):
-			fill = [1, 1, 1]
-			flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
-		else:
-			flareWidth = max(MAX_VISIBILE_MAG - mag, 0) * 1.5
 
-		# if (flareWidth > 1000): print(flareWidth)
-		for r in range(int(flareWidth), 0, -1):
-			rMag = (1 - (r / flareWidth))
+		for r in range(0, int(flareWidth), 1):
+			rMag = (r / flareWidth)
 			turtle.pencolor([x * rMag for x in fill])
-			turtle.dot(r + minor)
+			turtle.dot((flareWidth - r) + minor)
 
 
 	# else:
@@ -402,7 +458,9 @@ def drawLine(pointA, pointB = None, fill = "black", width = 1):
 	turtle.goto(x2, y2)
 	turtle.up()
 
-# These must be in descending order:
+# These must be in descending order
+# A '!' indicates that the unit symbol is not shown, if the unit symbol
+# matches one of the symbols in the respective list
 prefixes = {
 	"! Parsecs":PARSEC,
 	"! light years":LIGHT_YEAR,
@@ -416,12 +474,15 @@ prefixes = {
 	u"\u03BC":1e-6
 }
 # Returns a string of num reduced with the appropriate prefix
-def numPrefix(num, unit, rounding=3):
+def numPrefix(num, unit, rounding=3, standardOnly=False):
 	# unit is a string, ie 'm', 'g'
+	# is standardOnly is False, then
+	# the function will replace m with parsec/lightyear etc. in units like m/s or m.
+	# That won't happpen if standardOnly is True
 	global prefixes
 	for p in prefixes:
 		if (num > prefixes[p]):
-			if (p and p[0] == "!"):
+			if (p and p[0] == "!" and not standardOnly):
 				result = str(round(num / prefixes[p], rounding)) + p[1:] + unit[1:]
 			else:
 				result = str(round(num / prefixes[p], rounding)) + p + unit
@@ -450,8 +511,6 @@ def timeString(seconds, rounding=3):
 
 class buffer:
 	def __init__(self):
-		# self.allshift = DEFAULT_ZERO_VEC
-		# self.allrotate = DEFAULT_ZERO_VEC
 		self.buffer = {}
 		self.bufferMode = 0 # 0: Normal. 1: Recording, sim paused. 2: Playing.
 		self.bufferLength = 0
@@ -672,8 +731,6 @@ Distance to closest particle: %s
 
 		# camera.pos += self.commonShiftPos
 		for I, p  in enumerate(particleList):
-			# if self.commonShiftPos:
-			# 	p.pos += self.commonShiftPos
 			if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
 				# Swap the previous one with the current one
 				particleList = particleList[:I - 1] + [particleList[I], particleList[I-1]] + particleList[I + 1:]
@@ -1269,7 +1326,7 @@ setup()
 Running = True
 
 
-if preset == 1:
+if preset == "1":
 	# for i in range(10):
 	# 	particle(50 + i*20, vector([50, 100 - 10*i, 0]))
 	# Cloud of particles orbiting a big thing
@@ -1279,7 +1336,7 @@ if preset == 1:
 	particle(25000, vector([defaultScreenDepth, 0, 0]))
 	for i in range(PARTICLE_COUNT):
 		particle(variableMass, vector([150 + defaultScreenDepth, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
-elif preset == 2:
+elif preset == "2":
 	# Galaxy kinda thing
 	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
 	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
@@ -1306,7 +1363,7 @@ elif preset == 2:
 		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)))
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
-elif preset == 3:
+elif preset == "3":
 	if (not args["-G"][-1]): Pmodule.G = 6.67408e-11
 
 	if (not args["-sf"][-1]): smoothFollow = 0.04
@@ -1397,8 +1454,12 @@ elif preset == 3:
 		print("Loading stars...")
 		MainLoop.addData("Maximum visible magnitude", "round(MAX_VISIBILE_MAG,2)", True)
 		MainLoop.addData("Earth magnitude", "MainLoop.target.info['mag']", True, "---")
-		MainLoop.addData("Hipparcos catalog id", "MainLoop.target.info['HIP id']", True, "---")
-		STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)])
+		# MainLoop.addData("Hipparcos catalog id", "MainLoop.target.info['HIP id']", True, "---")
+		MainLoop.addData("Surface temperature", "MainLoop.target.info['temp']", True, "---")
+		MainLoop.addData("Colour index", "MainLoop.target.info['ci']", True, "---")
+
+		# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)], quiet=False)
+		STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
 		for STAR_key in STARS_DATA:
 			if STAR_key == "$VAR" or STAR_key[0] in ["~", "!"]: continue
 			STAR = STARS_DATA[STAR_key]
@@ -1419,12 +1480,20 @@ elif preset == 3:
 			new.info["absmag"] = STAR["absmag"]
 			new.info["mag"] = STAR["mag"]
 			new.info["HIP id"] = "None" if not STAR["hip"] else int(STAR["hip"])
+			new.info["ci"] = (None if not STAR["ci"] else STAR["ci"])
+			if (new.info["ci"] != None):
+				new.info["temp"] = 4600 * ((1 / ((0.92 * new.info["ci"]) + 1.7)) + (1 / ((0.92 * new.info["ci"]) + 0.62)) )
+				new.autoColour = False
+				new.colour = bv2rgb(new.info["ci"])
+			else:
+				new.info["temp"] = None
+
 	if search("Acrux"): toggleRotTrack()
 	search("Pluto")
 	togglePanTrack()
 	clearTarget()
 
-elif preset == 4:
+elif preset == "4":
 	# defaultDensity = 10
 	Sun = particle(300000, vector([0, 0, 0]), density=10, name="Sun")
 	for i in range(PARTICLE_COUNT):
