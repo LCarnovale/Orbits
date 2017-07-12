@@ -24,7 +24,8 @@ class particle:
 	def __init__(
 				self, mass, position, velocity=0, acceleration=0,
 				density=defaultDensity, autoColour=True, colour=[0, 0, 1],
-				limitRadius=True, name=None, static=False):
+				limitRadius=True, name=None, static=False, immune=False,
+				radius=None):
 		self.mass = mass
 		self.pos = position
 		self.dim = len(position.elements)
@@ -44,7 +45,8 @@ class particle:
 		else:
 			self.acc = acceleration
 		self.autoColour = autoColour
-		self.setRadius()
+		self.setRadius(radius) # Providing a radius will override the mass
+		self.immune = immune
 		if not autoColour:
 			self.setColour(colour)
 		particleList.append(self)
@@ -64,7 +66,6 @@ class particle:
 	colour = [0, 0, 0]
 
 	inbound = False
-	immune = False
 
 	newMass = False # the mass of the particle after it respawns
 	# colour parameter only used if autoColour is off
@@ -76,9 +77,14 @@ class particle:
 		else:
 			return False
 
-	def setRadius(self):
-		self.radius = (0.75 * (self.mass/self.density) / pi) ** (1/3)
+	def setRadius(self, newRadius=None):
+		if (newRadius == None):
+			self.radius = (0.75 * (abs(self.mass)/self.density) / pi) ** (1/3)
+		else:
+			self.radius = newRadius
+			self.mass = (4 * newRadius**3 * self.density * pi) / 3
 		self.setColour()
+
 
 	def calcAcc(self, other):
 		force = (G * self.mass * other.mass) / (abs(self.pos - other.pos) ** 2)
@@ -86,7 +92,7 @@ class particle:
 		self.acc += (forceVector.setMag(force/self.mass))
 
 	def checkCollision(self, other):
-		if other.alive and (abs(self.pos.subtract(other.pos)) < self.radius + other.radius):
+		if other.alive and (self.mass > 0) and (abs(self.pos.subtract(other.pos)) < self.radius + other.radius):
 			self.contest(other)
 			return True
 		else:
@@ -94,7 +100,7 @@ class particle:
 
 	def runLoop(self):
 		for p in nonStaticList:
-			if p != self:
+			if p != self and abs(p.pos - self.pos) < 10e12:
 				if not self.checkCollision(p):
 					self.calcAcc(p)
 
@@ -201,8 +207,7 @@ class particle:
 			if plane: vel = vel.lock(plane)#[vel.elements[i] * plane[i] for i in range(len(vel.elements))]
 		else:
 			vel = axis.cross(position - self.pos)
-		vel.setMag(speed)
-		self.vel = vel + otherVel
+		self.vel = vel.mag(speed) + otherVel
 		return True
 
 		# if type(other) == particle:
