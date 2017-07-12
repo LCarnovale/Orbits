@@ -62,6 +62,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-ab" :  	[int,   False,	False,  20], # Make asteroid belt (Wouldn't recommend on presets other than 3..)
 "-es" :  	[int,	False,	False,  5], # Make earth satellites
 "-WB" :  	[str,   False,	False,	True], # Write buffer to file
+"-rp" :     [float, False,  False,  0.6], # Make random planets
 "-flim": 	[float, False,	True], # Frame limit
 "-df" :  	[str, "SolSystem.txt", True], # Path of the data file
 "-test": 	[str,	 False, False, True], # Test mode
@@ -230,6 +231,7 @@ AsteroidsEnd 	 = 740.52 * 10**9 # Couldn't find the actual boundaries (They're p
 AsteroidsMinMass = 0.0001 * 10**15
 AsteroidsMaxMass = 1	  * 10**23
 AsteroidsDensity = 1500
+randomPlanets = args["-rp"][1]
 
 # Preset 4
 PRESET_4_MIN_RADIUS = 40
@@ -256,11 +258,12 @@ voidRadius          = 5000      # Maximum distance of particle from camera
 CAMERA_UNTRACK_IF_DIE = True # If the tracked particle dies, the camera stops tracking it
 SMART_DRAW = True               # Changes the number of points on each ellipse
 FPS_AVG_COUNT = 15
+SCREEN_SETUP = False            # True when the screen is made, to avoid setting it up multiple times
 
 # Camera constants
 DEFAULT_ROTATE_FOLLOW_RATE = 0.04
 AUTO_RATE_CONSTANT  = 10    # A mysterious constant which determines the autoRate speed, 100 works well.
-FOLLOW_RATE_COEFF   = 0.1
+FOLLOW_RATE_COEFF   = 0.15
 FOLLOW_RATE_BASE    = 1
 TRAVEL_STEPS_MIN	= 100   # Number of steps to spend flying to a target (at full speed, doesn't include speeding up or slowing down)
 
@@ -328,35 +331,45 @@ def roundList(list, places):
 # Source: 'https://stackoverflow.com/questions/21977786/star-b-v-color-index-to-apparent-rgb-color'
 # Author: 'https://stackoverflow.com/users/2521214/spektre' (paddyg converted it to python)
 def bv2rgb(bv):
-  if bv < -0.4: bv = -0.4
-  if bv > 2.0: bv = 2.0
-  if bv >= -0.40 and bv < 0.00:
-    t = (bv + 0.40) / (0.00 + 0.40)
-    r = 0.61 + 0.11 * t + 0.1 * t * t
-    g = 0.70 + 0.07 * t + 0.1 * t * t
-    b = 1.0
-  elif bv >= 0.00 and bv < 0.40:
-    t = (bv - 0.00) / (0.40 - 0.00)
-    r = 0.83 + (0.17 * t)
-    g = 0.87 + (0.11 * t)
-    b = 1.0
-  elif bv >= 0.40 and bv < 1.60:
-    t = (bv - 0.40) / (1.60 - 0.40)
-    r = 1.0
-    g = 0.98 - 0.16 * t
-  else:
-    t = (bv - 1.60) / (2.00 - 1.60)
-    r = 1.0
-    g = 0.82 - 0.5 * t * t
-  if bv >= 0.40 and bv < 1.50:
-    t = (bv - 0.40) / (1.50 - 0.40)
-    b = 1.00 - 0.47 * t + 0.1 * t * t
-  elif bv >= 1.50 and bv < 1.951:
-    t = (bv - 1.50) / (1.94 - 1.50)
-    b = 0.63 - 0.6 * t * t
-  else:
+    if bv < -0.40: bv = -0.40
+    if bv > 2.00: bv = 2.00
+
+    r = 0.0
+    g = 0.0
     b = 0.0
-  return (r, g, b)
+
+    if  -0.40 <= bv<0.00:
+        t=(bv+0.40)/(0.00+0.40)
+        r=0.61+(0.11*t)+(0.1*t*t)
+    elif 0.00 <= bv<0.40:
+        t=(bv-0.00)/(0.40-0.00)
+        r=0.83+(0.17*t)
+    elif 0.40 <= bv<2.10:
+        t=(bv-0.40)/(2.10-0.40)
+        r=1.00
+    if  -0.40 <= bv<0.00:
+        t=(bv+0.40)/(0.00+0.40)
+        g=0.70+(0.07*t)+(0.1*t*t)
+    elif 0.00 <= bv<0.40:
+        t=(bv-0.00)/(0.40-0.00)
+        g=0.87+(0.11*t)
+    elif 0.40 <= bv<1.60:
+        t=(bv-0.40)/(1.60-0.40)
+        g=0.98-(0.16*t)
+    elif 1.60 <= bv<2.00:
+        t=(bv-1.60)/(2.00-1.60)
+        g=0.82-(0.5*t*t)
+    if  -0.40 <= bv<0.40:
+        t=(bv+0.40)/(0.40+0.40)
+        b=1.00
+    elif 0.40 <= bv<1.50:
+        t=(bv-0.40)/(1.50-0.40)
+        b=1.00-(0.47*t)+(0.1*t*t)
+    elif 1.50 <= bv<1.94:
+        t=(bv-1.50)/(1.94-1.50)
+        b=0.63-(0.6*t*t)
+
+    return (r, g, b)
 
 
 def screenWidth():
@@ -519,8 +532,8 @@ class buffer:
 		for p in particleList:
 			self.buffer[p] = []
 
-	def __sizeof__(self):
-		return (self.bufferLength * sys.getsizeof(self.buffer[particleList[0]]) * len(particleList))
+	# def __sizeof__(self):
+	# 	return (self.bufferLength * sys.getsizeof(self.buffer[particleList[0]]) * len(particleList))
 
 	def addParticle(self, particle):
 		self.buffer[p]    = [] * (bufferLength + 1)
@@ -645,7 +658,7 @@ class MainLoop:
 			time = "00:00"
 		if self.pause == -1: pauseString = "False"
 		text = """Frame Rate: %s
-Buffermode: %s (%d) --> (%.2lf Mb)
+Buffermode: %s (%d)
 Particle Count: %d Delta: %f
 Paused: %s         Time:  %s
 Distance to closest particle: %s
@@ -653,7 +666,6 @@ Distance to closest particle: %s
 			(("%.2f"%self.FPS) if self.FPS != 999 else "INFINITY!!"),
 			Buffer.bufferModeString(),
 			(0 if Buffer.bufferCount == 0 else Buffer.bufferLength / Buffer.bufferCount),
-			sys.getsizeof(Buffer) / 1000000,
 			len(particleList),
 			self.Delta,
 			pauseString,
@@ -700,7 +712,7 @@ Distance to closest particle: %s
 		if (self.closestParticle != None):
 			panAmount = (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius) * maxPan#maxPan/(AUTO_RATE_CONSTANT)
 			if (pan[-1]):
-				panAmount = max(panAmount, maxPan)
+				panAmount *= 15
 		else:
 			panAmount = maxPan
 		panRate = panAmount
@@ -730,6 +742,7 @@ Distance to closest particle: %s
 		self.closestParticle = None
 
 		# camera.pos += self.commonShiftPos
+		# print("Target pos: %s" % ("None" if not MainLoop.target else MainLoop.target.pos))
 		for I, p  in enumerate(particleList):
 			if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
 				# Swap the previous one with the current one
@@ -737,11 +750,14 @@ Distance to closest particle: %s
 
 			pWarp = warpedDistance(p)
 			if (self.closestParticle == None):
-				self.closestParticle = p#abs(p.pos - camera.pos) - p.radius
+				self.closestParticle = p
 			elif (pWarp and pWarp < warpedDistance(self.closestParticle)):
 				self.closestParticle = p
 			if (doStep):
 				p.step(delta, camera)
+				# This bit is for preset 5, should'nt be used otherwise
+				if p.mass < 0:
+					p.pos = p.pos.mag(100)
 
 			buff = Buffer.processPosition(p) # Returns something if it wants anything other than the actual particle to be drawn
 			if not buff:
@@ -751,7 +767,7 @@ Distance to closest particle: %s
 				# to draw something other than the particle's actual position
 				drawResult = camera.drawAt(buff[0], buff[1], buff[2], box = (self.target == p and self.displayData))
 
-			if DRAW_VEL_VECS and drawResult:
+			if DRAW_VEL_VECS and drawResult and buff:
 				vecResult = camera.drawParticle([buff[0] + buff[3] * DRAW_VEL_VECS, 1, [0, 1, 0]], drawAt=True, point=True)
 				accResult = camera.drawParticle([buff[0] + buff[4] * DRAW_VEL_VECS * 5, 1, [1, 0, 0]], drawAt=True, point=True)
 				if vecResult:
@@ -924,6 +940,7 @@ class camera:
 	def rotTrackSet(self, target = None):
 		# print("Setting rot")
 		self.rotTrack = target
+		self.moving = False
 		if target:
 			self.rotTrackLock = False
 			self.rotStart = self.rot.getClone()
@@ -1003,9 +1020,6 @@ class camera:
 		X = relPosOnScreen.dot(self.screenXaxis) / abs(self.screenXaxis)
 		Y = relPosOnScreen.dot(self.screenYaxis) / abs(self.screenYaxis)
 
-		# centreAngleX = acos((2 - abs(relRotation.lock([0, 2])) ** 2) / 2)
-		# centreAngleY = acos((2 - abs(relRotation.lock([0, 1])) ** 2) / 2)
-		# offset: angle either side of centre angle which is slightly distorted due to the 3d bulge of the sphere.
 		offset = asin(radius/distance)
 		centreAngle = acos(min(1, self.screenDepth / ScreenParticleDistance))
 		minAngle = centreAngle - offset
@@ -1076,7 +1090,7 @@ class camera:
 
 		relAngle = relPos.relAngle(self.rot)
 			# shift is equivalent to a portion of the arc from the current rotation to the end rotation.
-		shift    = followRate * (relAngle + 0.01) if (relAngle > 0.01 and followRate != 1) else relAngle
+		shift    = followRate * (relAngle + 0.01) if (relAngle > 0.001 and followRate != 1) else relAngle
 			# shiftMag is shift modified so that adding it to rot results in a rotation of 'shift' through that arc
 		shiftMag = sin(shift) / (cos(relAngle/2 - shift))
 			# rotShift is simply a vector from the current rotation to the desired rotation of magnitude shiftMag
@@ -1084,8 +1098,9 @@ class camera:
 
 		self.rot += rotShift
 
-		if not self.rotTrackLock and relAngle:
+		if (relAngle <= 0.001):
 			self.lockRot()
+
 
 		self.screenXaxis = self.rot.cross(self.screenYaxis)
 		self.screenYaxis = self.screenXaxis.cross(self.rot)
@@ -1097,17 +1112,13 @@ class camera:
 
 	def lockPan(self):
 		if (self.moving):
-			if self.rotTrack == None:
-				self.panTrackSet()
-				self.moving = False
-		else:
-			self.panTrackLock = True
+			self.moving = False
+		self.panTrackLock = True
 
 	def lockRot(self):
 		if (self.moving):
+			self.panTrackSet(self.rotTrack)
 			self.rotTrackSet()
-			if self.panTrack == None:
-				self.moving = False
 		else:
 			self.rotTrackLock = True
 
@@ -1325,6 +1336,7 @@ camera = camera(pos = vector([0, 0, 0]))
 setup()
 Running = True
 
+Buffer = buffer()
 
 if preset == "1":
 	# for i in range(10):
@@ -1441,6 +1453,7 @@ elif preset == "3":
 			mass = random.random() * (AsteroidsMaxMass - AsteroidsMinMass) + AsteroidsMinMass
 			new = particle(mass, planets["Sun"].pos + pos + offset, autoColour=False, colour = "grey", limitRadius=False)
 			new.circularise(planets["Sun"], axis = vector([0, 0, -1]))
+			planetList.append(new)
 
 	earthVec = planets["Earth"].pos
 	radius   = planets["Earth"].radius + 150000
@@ -1460,6 +1473,8 @@ elif preset == "3":
 
 		# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)], quiet=False)
 		STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
+		print("Loading named stars...")
+		# STARS_DATA.update(loadSystem.loadFile("StarsData.txt", key=["\"$proper\" != 'None'", "$dist != 100000"], quiet = False))
 		for STAR_key in STARS_DATA:
 			if STAR_key == "$VAR" or STAR_key[0] in ["~", "!"]: continue
 			STAR = STARS_DATA[STAR_key]
@@ -1473,7 +1488,7 @@ elif preset == "3":
 			massIndex = random.random() * 10 + 30
 			new = particle(10**(massIndex), vector([X, Y, Z]) * PARSEC,
 				vector([vX, vY, vZ]) * PARSEC / YEAR, static=True,
-				name=STAR["proper"], density=1e3)
+				name=STAR["proper"], density=1e3, immune=True, limitRadius=False)
 
 			planetList.append(new)
 			new.info["appmag"] = 0
@@ -1487,6 +1502,35 @@ elif preset == "3":
 				new.colour = bv2rgb(new.info["ci"])
 			else:
 				new.info["temp"] = None
+		if (randomPlanets):
+			# systemCount = randomPlanets * len(STARS_DATA)
+			print("Generating solar systems...")
+			systemChoice = planetList[-len(STARS_DATA)+1::int(1/randomPlanets)]
+			EarthMass = 5.97e24
+			density   = 5.51e+3 # Also Earth's density
+			for system in systemChoice:
+				systemAxis = randomVector(3, 10)
+				system.static = False
+				# if system in Pmodule.staticList: Pmodule.staticList.remove(system)
+				Pmodule.nonStaticList.append(system)
+				dbgCounter=0
+				for i in range(int(random.random()*9)+1):
+					dbgCounter+=1
+					newPos = randomVector(3,10).makeOrthogonal(systemAxis) + randomVector(3, 0, 5)
+					newPos = newPos.mag((i+1) * (random.random()+0.1)*2 * AU) #+ system.pos
+					# print("New pos: %s" % (newPos))
+					newPos += system.pos
+					new = particle(
+						(random.random()+0.2)*20 * EarthMass,
+						newPos,
+						system.vel,
+						immune = True, colour = [random.random() for i in range(3)], autoColour=False,
+						density = (random.random() + 0.5)*density, limitRadius = False,
+						name = "%s - %d"%(system.name, i))
+					new.circularise(system, axis = systemAxis + randomVector(3, 0, 2))
+					planetList.append(new)
+				print("Making system for %s. %d planets made." % (system.name, dbgCounter))
+					# MainLoop.target = new
 
 	if search("Acrux"): toggleRotTrack()
 	search("Pluto")
@@ -1495,7 +1539,8 @@ elif preset == "3":
 
 elif preset == "4":
 	# defaultDensity = 10
-	Sun = particle(300000, vector([0, 0, 0]), density=10, name="Sun")
+	Sun = particle(300000, vector([0, 0, 0]), density=10, name="Sun",
+			colour=[1,0,0], autoColour=False)
 	for i in range(PARTICLE_COUNT):
 		radius = i / (PARTICLE_COUNT - 1) * (PRESET_4_MAX_RADIUS - PRESET_4_MIN_RADIUS) + PRESET_4_MIN_RADIUS
 		particle(variableMass, vector([radius, 0, 0]), density=10)
@@ -1503,15 +1548,50 @@ elif preset == "4":
 	camera.pos = vector([0, 0, radius])
 	camera.rotTrackSet(Sun)
 
+elif preset == "5":
+	if PARTICLE_COUNT < 4:
+		print("Minimum particle count for this preset is 4")
+		PARTICLE_COUNT = 4
+	locked = False
+	def lockParticles():
+		global locked
+		locked = True
+	print("Press 'L' to lock the particles and start the simulation.")
+	time.sleep(1)
+	turtle.onkey(lockParticles, "l")
+	turtle.listen()
+	camera.pos = vector([-400, 0, 0])
+	if not SCREEN_SETUP:
+		window = turtle.Screen()
+		window.setup(width = 1.0, height = 1.0)
+		turtle.bgcolor([0, 0, 0])
+		turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
+		turtle.hideturtle()
+		SCREEN_SETUP = True
+
+	for i in range(PARTICLE_COUNT):
+		new = particle(-variableMass, randomVector(3, 100), autoColour=False, immune=True)
+	MainLoop.setDelta(Delta)
+	while (locked == False):
+		turtle.clear()
+		MainLoop.STEP(camera)
+		# for p in particleList:
+		# 	p.pos = p.pos.mag(100)
+		turtle.update()
+	new = particle(100, vector([0, 0, 0]), radius = 90, immune=True, limitRadius=False)
 # if not TestMode:
 
-if not TestMode:
-	window = turtle.Screen()
-	window.setup(width = 1.0, height = 1.0)
-	turtle.bgcolor([0, 0, 0])
 
-	turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
-	turtle.hideturtle()
+
+if not TestMode:
+	if not SCREEN_SETUP:
+		window = turtle.Screen()
+		window.setup(width = 1.0, height = 1.0)
+		turtle.bgcolor([0, 0, 0])
+
+		turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
+		turtle.hideturtle()
+		SCREEN_SETUP = True
 
 	turtle.onkeypress(panLeft, "a")
 	turtle.onkeyrelease(panRight , "a")
@@ -1663,7 +1743,6 @@ if TestMode:
 		exit()
 	exit()
 
-Buffer = buffer()
 turtle.listen()
 
 frameStart = time.time()
