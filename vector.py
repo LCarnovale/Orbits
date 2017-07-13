@@ -287,7 +287,7 @@ class vector:
 
 	# Makes the vector orthogonal to other. (?)
 	def makeOrthogonal(self, other):
-		return other.cross(self).cross(other)
+		return other.cross(self).cross(other).mag(abs(self))
 		# """element --> index of the array of elements, default 2
 		# Maintains magnitude"""
 		# initialMag = self.getMag()
