@@ -63,6 +63,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-es" :  	[int,	False,	False,  5], # Make earth satellites
 "-WB" :  	[str,   False,	False,	True], # Write buffer to file
 "-rp" :     [float, False,  False,  0.6], # Make random planets
+"-tn" :		[str,   False,  False,  True], # True n-body simulation. When off program makes some sacrifices for performance boost.
 "-flim": 	[float, False,	True], # Frame limit
 "-df" :  	[str, "SolSystem.txt", True], # Path of the data file
 "-test": 	[str,	 False, False, True], # Test mode
@@ -236,6 +237,8 @@ randomPlanets = args["-rp"][1]
 # Preset 4
 PRESET_4_MIN_RADIUS = 40
 PRESET_4_MAX_RADIUS = 400
+DEFAULT_SYSTEM_SIZE = 5 # Default number of bodies to add to a system
+TRUE_NBODY = args["-tn"][1]
 
 # Time lengths constants
 MINUTE 	= 60
@@ -257,7 +260,7 @@ particle.radiusLimit		= 1e+10       # Maximum size of particle
 voidRadius          = 5000      # Maximum distance of particle from camera
 CAMERA_UNTRACK_IF_DIE = True # If the tracked particle dies, the camera stops tracking it
 SMART_DRAW = True               # Changes the number of points on each ellipse
-FPS_AVG_COUNT = 15
+FPS_AVG_COUNT = 10
 SCREEN_SETUP = False            # True when the screen is made, to avoid setting it up multiple times
 
 # Camera constants
@@ -395,7 +398,7 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 
 	flareWidth = 0
 	if (mag and points <= 2):
-		fill = [1, 1, 1]
+		# fill = [1, 1, 1]
 		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
 	elif (mag):
 		flareWidth = max(MAX_VISIBILE_MAG - mag, 0) * 1.5
@@ -930,7 +933,7 @@ class camera:
 			self.panInfo[0] = abs(target.pos + destination - self.pos)
 			travelSteps = max(2 * MainLoop.FPS, TRAVEL_STEPS_MIN) # No less than 100 steps
 			self.panInfo[1] = self.panInfo[0] / travelSteps
-			self.panInfo[2] = target.pos + destination
+			self.panInfo[2] = destination
 			self.panInfo[3] = 0 # at speed: 0 for accelerating, 1 for at speed, 2 for slowing down.
 			self.panInfo[4] = (self.panInfo[1] / FOLLOW_RATE_COEFF)
 		# print("Setting panTrack to %s from %s, mag %s" % (self.trackSeparate.string(2), "none" if not target else target.name, numPrefix(abs(self.trackSeparate), "m", 2)))
@@ -940,7 +943,7 @@ class camera:
 	def rotTrackSet(self, target = None):
 		# print("Setting rot")
 		self.rotTrack = target
-		self.moving = False
+		# self.moving = False
 		if target:
 			self.rotTrackLock = False
 			self.rotStart = self.rot.getClone()
@@ -1056,7 +1059,7 @@ class camera:
 		# Choose the follow rate so that the approach takes approx
 		# 5 seconds whilst at max speed, dont worry about time accelerating
 		panDest = self.panInfo[2]
-		relPos = (panDest - self.pos)
+		relPos = (self.panTrack.pos + panDest - self.pos)
 		distTravelled = abs(self.pos - self.panStart)
 		remDist = abs(relPos)
 		if (self.panInfo[3]):
@@ -1111,9 +1114,8 @@ class camera:
 		return True
 
 	def lockPan(self):
-		if (self.moving):
-			self.moving = False
 		self.panTrackLock = True
+		self.moving = False
 
 	def lockRot(self):
 		if (self.moving):
@@ -1121,7 +1123,7 @@ class camera:
 			self.rotTrackSet()
 		else:
 			self.rotTrackLock = True
-
+		self.moving = False
 markerList = []
 
 autoRateValue = maxPan
@@ -1241,13 +1243,12 @@ def bufferPlay():
 	Buffer.bufferMode = 2
 
 def togglePanTrack():
-	if MainLoop.target:
-		if camera.panTrack:
-			camera.panTrackSet()
-		else:
-			camera.panTrackSet(MainLoop.target)
-	else:
+	global shiftL
+	if camera.panTrack or not MainLoop.target:
 		camera.panTrackSet()
+	else:
+		camera.panTrackSet(MainLoop.target)
+		if shiftL: camera.panTrackLock()
 
 def toggleRotTrack():
 	if MainLoop.target:
@@ -1381,8 +1382,8 @@ elif preset == "3":
 	if (not args["-sf"][-1]): smoothFollow = 0.04
 
 	MainLoop.addData("Pan speed", "numPrefix(panRate, 'm/step', 2)", True)
-	MainLoop.addData("Camera pan lock", "camera.panTrackLock and camera.panTrack.name", True)
-	MainLoop.addData("Camera rot lock", "camera.rotTrackLock and camera.rotTrack.name", True)
+	MainLoop.addData("Camera pan lock", "camera.panTrackLock and (camera.panTrack.name or 'True')", True)
+	MainLoop.addData("Camera rot lock", "camera.rotTrackLock and (camera.rotTrack.name or 'True')", True)
 
 	AUTO_RATE_CONSTANT = 1.0e9
 	Pmodule.ALL_IMMUNE = True
@@ -1471,10 +1472,23 @@ elif preset == "3":
 		MainLoop.addData("Surface temperature", "MainLoop.target.info['temp']", True, "---")
 		MainLoop.addData("Colour index", "MainLoop.target.info['ci']", True, "---")
 
-		# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)], quiet=False)
-		STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
-		print("Loading named stars...")
+		STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)], quiet=False)
+		# STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
+		# print("Loading named stars...")
 		# STARS_DATA.update(loadSystem.loadFile("StarsData.txt", key=["\"$proper\" != 'None'", "$dist != 100000"], quiet = False))
+
+		# Load names.txt to make random names for stars with no name.
+		nameFile = open("names.txt", "r")
+		names = nameFile.read()
+		nameFile.close()
+		things, adj = names.split("---")
+		things, adj = things.split("\n"), adj.split("\n")
+		def randomName():
+			global things
+			global adj
+			return random.sample(adj, 1)[0] + " " + random.sample(things, 1)[0]
+
+
 		for STAR_key in STARS_DATA:
 			if STAR_key == "$VAR" or STAR_key[0] in ["~", "!"]: continue
 			STAR = STARS_DATA[STAR_key]
@@ -1489,7 +1503,8 @@ elif preset == "3":
 			new = particle(10**(massIndex), vector([X, Y, Z]) * PARSEC,
 				vector([vX, vY, vZ]) * PARSEC / YEAR, static=True,
 				name=STAR["proper"], density=1e3, immune=True, limitRadius=False)
-
+			if (new.name == None):
+				new.name = randomName()
 			planetList.append(new)
 			new.info["appmag"] = 0
 			new.info["absmag"] = STAR["absmag"]
@@ -1516,12 +1531,12 @@ elif preset == "3":
 				dbgCounter=0
 				for i in range(int(random.random()*9)+1):
 					dbgCounter+=1
-					newPos = randomVector(3,10).makeOrthogonal(systemAxis) + randomVector(3, 0, 5)
-					newPos = newPos.mag((i+1) * (random.random()+0.1)*2 * AU) #+ system.pos
-					# print("New pos: %s" % (newPos))
+					newPos = randomVector(3,10).makeOrthogonal(systemAxis) + randomVector(3, 0, 3)
+					newPos = newPos.mag((i+1) * (random.random()+0.1)*4 * AU)
 					newPos += system.pos
+					newMass = EarthMass**(((random.random()-1/2)*2)**3 * 100)
 					new = particle(
-						(random.random()+0.2)*20 * EarthMass,
+						newMass,
 						newPos,
 						system.vel,
 						immune = True, colour = [random.random() for i in range(3)], autoColour=False,
@@ -1532,10 +1547,31 @@ elif preset == "3":
 				print("Making system for %s. %d planets made." % (system.name, dbgCounter))
 					# MainLoop.target = new
 
+	if not (TRUE_NBODY):
+		print("Auto-assigning systems...")
+
+		# forces = {}
+		for p1 in particleList:
+			forces = []
+			# Now go through the list a second time and find the accelerations due to each particle
+			for p2 in particleList:
+				if (p1 == p2): continue
+				forces.append([p2, abs(p1.calcAcc(p2, True))])
+			# Pick the top few particles attracting p1
+			forces.sort(key=lambda x:x[1], reverse = True)
+			bodies = [x[0] for x in forces[0:min(DEFAULT_SYSTEM_SIZE, len(forces))]]
+			p1.system = bodies
+
+		# print("Moon system:", ", ".join([x.name for x in planets["Moon"].system]))
+		# print("ISS system:", ", ".join([x.name for x in planets["ISS"].system]))
+		# print("Earth system:", ", ".join([x.name for x in planets["Earth"].system]))
+		# print("Voyager1 system:", ", ".join([x.name for x in planets["Voyager1"].system]))
 	if search("Acrux"): toggleRotTrack()
-	search("Pluto")
+	search("Earth")
 	togglePanTrack()
 	clearTarget()
+	print("Done! Starting simulation...")
+	time.sleep(1)
 
 elif preset == "4":
 	# defaultDensity = 10
@@ -1637,7 +1673,7 @@ if not TestMode:
 
 
 	turtle.onkey(cycleTargets, "Tab")
-	turtle.onkey(togglePanTrack, "t")
+	turtle.onkeypress(togglePanTrack, "t")
 	turtle.onkey(toggleRotTrack, "y")
 	turtle.onkey(clearTarget,    "c")
 	turtle.onkey(goToTarget,	 "g")
