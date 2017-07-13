@@ -33,7 +33,7 @@ class particle:
 		self.limitRadius = limitRadius
 		self.name = name
 		self.static = static
-
+		self.system = [] # If this is not empty, then the particle will only feel force from the bodies in this list
 		self.info = {}
 
 		if velocity == 0:
@@ -86,11 +86,13 @@ class particle:
 		self.setColour()
 
 
-	def calcAcc(self, other):
+	def calcAcc(self, other, returnResult=False):
 		force = (G * self.mass * other.mass) / (abs(self.pos - other.pos) ** 2)
 		forceVector = other.pos.subtract(self.pos)
-		self.acc += (forceVector.setMag(force/self.mass))
-
+		if (not returnResult):
+			self.acc += (forceVector.setMag(force/self.mass))
+		else:
+			return (forceVector.setMag(force/self.mass))
 	def checkCollision(self, other):
 		if other.alive and (self.mass > 0) and (abs(self.pos.subtract(other.pos)) < self.radius + other.radius):
 			self.contest(other)
@@ -99,8 +101,13 @@ class particle:
 			return False
 
 	def runLoop(self):
-		for p in nonStaticList:
-			if p != self and abs(p.pos - self.pos) < 10e12:
+		if not self.system:
+			for p in nonStaticList:
+				if p != self:
+					if not self.checkCollision(p):
+						self.calcAcc(p)
+		else:
+			for p in self.system:
 				if not self.checkCollision(p):
 					self.calcAcc(p)
 
