@@ -114,6 +114,8 @@ Key|Parameter type|Description
 -ab  :  int         Make asteroid belt (Wouldn't recommend on presets other than 3..)
 -es  :  int         Make earth satellites.
 -WB  :              Write buffer to file.
+-rp  :  float       Make random planets, give a percentage of stars to have systems.
+                        (only for preset 3, if stars are also made)
 -flim:  float       Frame limit.
 -df  :  string      Path of the data file.
 -test:              Enter test mode.*
@@ -233,12 +235,12 @@ AsteroidsMinMass = 0.0001 * 10**15
 AsteroidsMaxMass = 1	  * 10**23
 AsteroidsDensity = 1500
 randomPlanets = args["-rp"][1]
+DEFAULT_SYSTEM_SIZE = 3 # Default number of bodies to add to a system
+TRUE_NBODY = args["-tn"][1]
 
 # Preset 4
 PRESET_4_MIN_RADIUS = 40
 PRESET_4_MAX_RADIUS = 400
-DEFAULT_SYSTEM_SIZE = 5 # Default number of bodies to add to a system
-TRUE_NBODY = args["-tn"][1]
 
 # Time lengths constants
 MINUTE 	= 60
@@ -1534,7 +1536,7 @@ elif preset == "3":
 					newPos = randomVector(3,10).makeOrthogonal(systemAxis) + randomVector(3, 0, 3)
 					newPos = newPos.mag((i+1) * (random.random()+0.1)*4 * AU)
 					newPos += system.pos
-					newMass = EarthMass**(((random.random()-1/2)*2)**3 * 100)
+					newMass = EarthMass*10**(((random.random()-1/2)*2)**3 * 2)
 					new = particle(
 						newMass,
 						newPos,
@@ -1571,7 +1573,7 @@ elif preset == "3":
 	togglePanTrack()
 	clearTarget()
 	print("Done! Starting simulation...")
-	time.sleep(1)
+	# time.sleep(1)
 
 elif preset == "4":
 	# defaultDensity = 10
