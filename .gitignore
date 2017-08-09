@@ -64,3 +64,4 @@ __pycache__/vector.cpython-36.pyc
 *.tex~
 quicky.py
 *.pyc
+*.py~
