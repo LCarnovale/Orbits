@@ -3,6 +3,8 @@
 # Orbits 4T
 
 
+# This could help find radii for the stars: https://www.physicsforums.com/threads/star-radius-mass-from-spectral-class-b-v-luminosity.868047/
+
 from tkinter import *
 from math import *
 import turtle
@@ -36,6 +38,8 @@ LINUX = False # If true, then non alphanumeric key controls will be replaced wit
 # if false, the algorithm still looks for a value after the key but if no value is given the second default value is used.	#
 # The final value indicates if the argument has been supplied, to know if the user has specified a value					#
 # 	 (Useful if the default varies depending on other arguments)															#
+# NOTE: A key is defined as anything starting with a dash '-' then a letter. A dash followed by a number would be read as   #
+#    a (negative) number.                                                                                                   #
 #																															#
 ########### PUT DEFAULTS HERE ###############################################################################################
 args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
@@ -63,12 +67,14 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-es" :  	[int,	False,	False,  5], # Make earth satellites
 "-WB" :  	[str,   False,	False,	True], # Write buffer to file
 "-rp" :     [float, False,  False,  0.6], # Make random planets
+"-rg" :     [str,   False,  False,  True], # Record gif shots
 "-tn" :		[str,   False,  False,  True], # True n-body simulation. When off program makes some sacrifices for performance boost.
 "-flim": 	[float, False,	True], # Frame limit
 "-df" :  	[str, "SolSystem.txt", True], # Path of the data file
 "-test": 	[str,	 False, False, True], # Test mode
 "-getStars": [float,  False,	False, 4], # Get stars from the datafile.
 "-PM":      [str,   False,  False, True],  # Enter the preset maker
+"-P?":      [str,   False,  False, True],  # Show available presets and quit
 "-AA_OFF": [str, True, 	False, 	False]   # Turn off AutoAbort.
 }
 
@@ -181,7 +187,7 @@ have their correct position and velocity compared with the correct values.""")
 				print("Missing parameter for {}.".format(argv[i]))
 
 		else:
-			if (arg[0] == "-"):
+			if (arg[0] == "-" and arg[1].isalpha()):
 				print("Unrecognised argument: '%s'" % (arg))
 
 else:
@@ -216,6 +222,9 @@ writeBuffer		        = args["-WB"][1]
 FRAME_LIMIT 	        = args["-flim"][1]
 getStars 		        = args["-getStars"][1]
 
+presetMaker             = args["-PM"][1]
+presetShow              = args["-P?"][1]
+
 TestMode 				= args["-test"][1]
 AUTO_ABORT              = args["-AA_OFF"][1]      # I wouldn't change this unless you know the programs good to go
 
@@ -235,82 +244,91 @@ AsteroidsMinMass = 0.0001 * 10**15
 AsteroidsMaxMass = 1	  * 10**23
 AsteroidsDensity = 1500
 randomPlanets = args["-rp"][1]
-DEFAULT_SYSTEM_SIZE = 3 # Default number of bodies to add to a system
+DEFAULT_SYSTEM_SIZE = 6 # Default number of bodies to add to a system
 TRUE_NBODY = args["-tn"][1]
 
 # Preset 4
 PRESET_4_MIN_RADIUS = 40
 PRESET_4_MAX_RADIUS = 400
 
+# Physical constants
+EARTH_MASS   = 5.97e24
+EARTH_RADIUS = 6.371e6
+SUN_MASS     = 1.989e30
+SUN_RADIUS   = 695.7e6
+
 # Time lengths constants
-MINUTE 	= 60
-HOUR 	= 60 *	MINUTE
-DAY  	= 24 *	HOUR
-YEAR 	= 365 * DAY
+MINUTE  = 60
+HOUR    = 60 *	MINUTE
+DAY     = 24 *	HOUR
+YEAR    = 365 * DAY
 
 # Distance constants
 LIGHT_SPEED = 299792458
 LIGHT_YEAR  = LIGHT_SPEED * YEAR
-AU		= 149597870700
+AU      = 149597870700
 PARSEC  = 3.085677581e+16
 
 # Misc settings
 particle.ALL_IMMUNE = False
 REAL_TIME           = False
-particle.defaultDensity		= 1
-particle.radiusLimit		= 1e+10       # Maximum size of particle
-voidRadius          = 5000      # Maximum distance of particle from camera
+particle.defaultDensity  = 1
+particle.radiusLimit     = 1e+10       # Maximum size of particle
+voidRadius               = 5000      # Maximum distance of particle from camera
 CAMERA_UNTRACK_IF_DIE = True # If the tracked particle dies, the camera stops tracking it
 SMART_DRAW = True               # Changes the number of points on each ellipse
 FPS_AVG_COUNT = 10
 SCREEN_SETUP = False            # True when the screen is made, to avoid setting it up multiple times
+RECORD_SCREEN = args["-rg"][1]
 
 # Camera constants
 DEFAULT_ROTATE_FOLLOW_RATE = 0.04
 AUTO_RATE_CONSTANT  = 10    # A mysterious constant which determines the autoRate speed, 100 works well.
-FOLLOW_RATE_COEFF   = 0.15
-FOLLOW_RATE_BASE    = 1
+FOLLOW_RATE_COEFF   = 0.4
+FOLLOW_RATE_BASE    = 1.1
 TRAVEL_STEPS_MIN	= 100   # Number of steps to spend flying to a target (at full speed, doesn't include speeding up or slowing down)
 
 DEFAULT_ZERO_VEC = [0, 0, 0]
 DEFAULT_UNIT_VEC = [1, 0, 0]
 
-
+# Drawing/Visual constants
+FLARE_BASE = 1.2 # Must be greater than 1
+MIN_CLICK_RESPONSE_SIZE = 10 # Radius of area (in pixels) around centre of object that can be clicked
 								# depending on its size
 MIN_BOX_WIDTH = 50
 
-if not AUTO_ABORT:
-	print("Auto abort is off!")
-	print("This should only be done on large simulations where a low frame is expected.")
-	print("If you don't need it off, don't turn it off.")
-	time.sleep(3)
+## Load presets
+inBuiltPresets = ["1", "2", "3", "4", "5"]
+if (preset not in inBuiltPresets or presetShow):
+	pass
 
 
 if TestMode:
 	if preset == "3":
 		# Test data:
-		testData = {# [[<Name>, <Time>, <Pos>, <vel>], ...]
-			"ISS":
-			[(2017 * YEAR + 92 * MINUTE), # 2017 years, 1 hour 32 minutes, ie 1 hour 32 mins after start, should be one orbit.
+		testData = [# [[<Name>, <Time>, <Pos>, <vel>], ...]
+			["ISS",
+			(2017 * YEAR + 92 * MINUTE), # 2017 years, 1 hour 32 minutes, ie 1 hour 32 mins after start, should be one orbit.
 			vector([-2.652741416195131E+07,  1.451863591737731E+08, -2.246871177630126E+04]) * 1000, # Both given in km/s, convert to m/s
 			vector([-2.268856357268088E+01, -8.202616782054283E+00, -1.309397555344641E+00]) * 1000],
-			"Moon":
-			[(2017 * YEAR + 92 * MINUTE),
-			vector([-2.626413928789543E+07,  1.449000582187190E+08, -1.580188827935606E+04]) * 1000,
-			vector([-2.906316391048909E+01, -4.878152316231304E+00, -8.298362677803639E-02]) * 1000],
-			"Earth":
-			[(2017 * YEAR + 92 * MINUTE),
+			["Earth",
+			(2017 * YEAR + 92 * MINUTE),
 			vector([-2.652775232714054E+07,  1.451886523109221E+08, -2.883530398781598E+04]) * 1000,
 			vector([-2.977993074888063E+01, -5.581820507958473E+00,  1.472498187503835E-03]) * 1000],
-			"Mercury":
-			[(2017 * YEAR + 31 * DAY),
+			["Moon",
+			(2017 * YEAR + 29 * DAY),
+			vector([-9.398579017725559E+07,  1.132616201869949E+08, -2.745023191672564E+04]) * 1000,
+			vector([-2.288350662698629E+01, -1.833878035216436E+01, -9.208055408024851E-02]) * 1000],
+			["Mercury",
+			(2017 * YEAR + 31 * DAY),
 			vector([-3.491563712116394E+07, -5.847758798545337E+07, -1.603576528303239E+06]) * 1000,
 			vector([3.195297711109924E+01, -2.269718543834500E+01, -4.787363119651942E+00]) * 1000],
-			"Voyager2":
-			[(2017 * YEAR + 31 * DAY),
+			["Voyager2",
+			(2017 * YEAR + 31 * DAY),
 			vector([4.678084657944870E+09, -1.291984823213759E+10, -9.959551510991798E+09]) * 1000,
 			vector([4.245078194430032E+00, -9.418854886561272E+00, -1.138382248152680E+01]) * 1000]
-		}
+		]
+		testData = sorted(testData, key=lambda x:x[1])
 		if (not testData):
 			print("No test data given to test with. Aborting.")
 			exit()
@@ -318,7 +336,17 @@ if TestMode:
 			print("Testing positions and velocities for:", ", ".join([x for x in testData]))
 
 	else:
-		print("Testing not available for this preset (%s)." %(preset))
+		print("Testing not available for preset %s." %(preset))
+elif presetShow:
+	print("Function not available (since my lazy ass hasn't written it)")
+	pass
+
+if not AUTO_ABORT:
+	print("Auto abort is off!")
+	print("This should only be done on large simulations where a low frame is expected.")
+	print("If you don't need it off, don't turn it off.")
+	time.sleep(3)
+
 
 def setup():
 	# a = particle(1, vector([25, 1, 0]))
@@ -402,8 +430,10 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	if (mag and points <= 2):
 		# fill = [1, 1, 1]
 		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
+	elif (points <= 2 and not mag):
+		fill = [1, 1, 1]
 	elif (mag):
-		flareWidth = max(MAX_VISIBILE_MAG - mag, 0) * 1.5
+		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
 
 	if box:
 		boxRadius = max(MIN_BOX_WIDTH, major * 1.4 + flareWidth) / 2
@@ -434,7 +464,6 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 		#
 		# 	print("OFfset angle: %f" % (-start))
 		# 	# start, end = 0, points
-
 		for i in range(start, end):
 			localX = major/2 * cos(2 * pi * i / points)
 			localY = minor/2 * sin(2 * pi * i / points)
@@ -450,11 +479,29 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 			if (points < 2):
 				turtle.dot(2)
 			return True
+		else:
+			fillScale = 1 / max(fill)
+			fill = [fillScale * x for x in fill] # Makes the fill the brightest while maintaining the colour
+		# turtle.pencolor(fill)
+		# turtle.dot(int(flareWidth) + minor)
 
-		for r in range(0, int(flareWidth), 1):
-			rMag = (r / flareWidth)
+
+		# The function brightness = (a*b^r - a + 1) gives a good gradient for a flare
+		# b is FLARE_BASE, the higher it is the steeper the curve, and the faster it fades to black.
+		a = 1 + 1 / (FLARE_BASE**flareWidth - 1)
+
+		# print("flareWidth: %.2f" % (flareWidth))
+		for r in range(int(flareWidth), 0, -1):
+			rMag = a * FLARE_BASE**(-r) - a + 1
+			# rMag = 1 - r / flareWidth
+			# print("r: %d" % (r))
+			# print("a: %.2f, rMag: %.2f" % (a, rMag))
 			turtle.pencolor([x * rMag for x in fill])
-			turtle.dot((flareWidth - r) + minor)
+			turtle.dot((r) + minor)
+		# largeRadius = int(flareWidth) + 1
+		# fracRadius = flareWidth - int(flareWidth)
+		# turtle.pencolor([fracRadius * x for x in fill])
+		# turtle.dot(largeRadius + minor)
 
 
 	# else:
@@ -479,33 +526,49 @@ def drawLine(pointA, pointB = None, fill = "black", width = 1):
 # These must be in descending order
 # A '!' indicates that the unit symbol is not shown, if the unit symbol
 # matches one of the symbols in the respective list
-prefixes = {
-	"! Parsecs":PARSEC,
-	"! light years":LIGHT_YEAR,
-	"P":1e15,
-	"T":1e12,
-	"G":1e9,
-	"M":1e6,
-	"k":1e3,
-	"" :1e0,
-	"m":1e-3,
-	u"\u03BC":1e-6
-}
+prefixes = [
+	["! Parsecs",PARSEC],
+	["! light years",LIGHT_YEAR],
+	["P",1e15],
+	["T",1e12],
+	["G",1e9],
+	["M",1e6],
+	["k",1e3],
+	["" ,1e0],
+	["m",1e-3],
+	[u"\u03BC",1e-6]
+]
 # Returns a string of num reduced with the appropriate prefix
 def numPrefix(num, unit, rounding=3, standardOnly=False):
 	# unit is a string, ie 'm', 'g'
-	# is standardOnly is False, then
+	# if standardOnly is False, then
 	# the function will replace m with parsec/lightyear etc. in units like m/s or m.
 	# That won't happpen if standardOnly is True
 	global prefixes
 	for p in prefixes:
-		if (num > prefixes[p]):
-			if (p and p[0] == "!" and not standardOnly):
-				result = str(round(num / prefixes[p], rounding)) + p[1:] + unit[1:]
+		if (num > p[1]):
+			if (p[0] and p[0][0] == "!" and not standardOnly):
+				result = str(round(num / p[1], rounding)) + p[0][1:] + unit[1:]
 			else:
-				result = str(round(num / prefixes[p], rounding)) + p + unit
+				result = str(round(num / p[1], rounding)) + p[0] + unit
 			return result
 	return str(num) + unit
+
+def massTerm(mass):
+	global EARTH_MASS
+	global SUN_MASS
+	if (mass > 0.8 * SUN_MASS):
+		return ("%.2f Solar masses" % (mass / SUN_MASS))
+	else:
+		return ("%.2f Earth masses" % (mass / EARTH_MASS))
+
+def radiusTerm(radius):
+	global EARTH_RADIUS
+	global SUN_RADIUS
+	if (radius > 0.8 * SUN_RADIUS):
+		return ("%.2f Solar radii" % (radius / SUN_RADIUS))
+	else:
+		return ("%.2f Earth radii" % (radius / EARTH_RADIUS))
 
 def timeString(seconds, rounding=3):
 	if seconds < 60:
@@ -662,6 +725,10 @@ class MainLoop:
 		else:
 			time = "00:00"
 		if self.pause == -1: pauseString = "False"
+		if (not self.closestParticle):
+			distString = "---"
+		else:
+			distString = numPrefix(abs(camera.pos - self.closestParticle.pos), "m")
 		text = """Frame Rate: %s
 Buffermode: %s (%d)
 Particle Count: %d Delta: %f
@@ -675,8 +742,9 @@ Distance to closest particle: %s
 			self.Delta,
 			pauseString,
 			time,
-			("---" if not self.closestParticle else numPrefix(abs(camera.pos - self.closestParticle.pos), "m"))
-		)
+			distString)
+			#("---" if not self.closestParticle else numPrefix(abs(camera.pos - self.closestParticle.pos), "m"))
+
 
 		for data in self.DataDisplay:
 			text += "\n"
@@ -728,7 +796,7 @@ Distance to closest particle: %s
 		if self.pause == -1 and Buffer.bufferMode != 2: self.Time += delta
 
 		doStep = (self.pause == -1 and Buffer.bufferMode != 2)
-		camera.step((delta if doStep else 0), pan, panAmount)
+
 		if (abs(camera.pos) > 1e5):
 			self.commonShiftPos = -camera.pos
 		for m in sorted(markerList, key = lambda x: abs(x.pos - camera.pos), reverse = True):
@@ -740,14 +808,20 @@ Distance to closest particle: %s
 				camera.panTrackSet()
 			elif (clickTarget[2] == 1):
 				camera.rotTrackSet()
-		if camera.panTrack:
-			camera.panFollow()
-		if camera.rotTrack:
-			camera.rotFollow()
 		self.closestParticle = None
 
 		# camera.pos += self.commonShiftPos
 		# print("Target pos: %s" % ("None" if not MainLoop.target else MainLoop.target.pos))
+		camera.step((delta if doStep else 0), pan, panAmount)
+		if doStep:
+			if camera.panTrack:
+				camera.panTrack.step(delta, camera)
+			if camera.rotTrack and camera.rotTrack != camera.panTrack:
+				camera.rotTrack.step(delta, camera)
+		if camera.panTrack:
+			camera.panFollow()
+		if camera.rotTrack:
+			camera.rotFollow()
 		for I, p  in enumerate(particleList):
 			if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
 				# Swap the previous one with the current one
@@ -758,9 +832,10 @@ Distance to closest particle: %s
 				self.closestParticle = p
 			elif (pWarp and pWarp < warpedDistance(self.closestParticle)):
 				self.closestParticle = p
-			if (doStep):
+			# if (doStep):
+			if doStep and not (p == camera.panTrack or p == camera.rotTrack):
 				p.step(delta, camera)
-				# This bit is for preset 5, should'nt be used otherwise
+				# This bit is for preset 5, shouldn't be used otherwise
 				if p.mass < 0:
 					p.pos = p.pos.mag(100)
 
@@ -788,14 +863,15 @@ Distance to closest particle: %s
 					drawX   = drawResult[0]
 					drawY   = drawResult[1]
 					drawRad = drawResult[2]
-					# print("Distance from particle of mass %d: %.3lf" % (p.mass, abs(vector([clickX, clickY]) - vector([drawX, drawY]))))
-					if (abs(vector([clickX, clickY]) - vector([drawX, drawY])) < drawRad):
+					if (abs(vector([clickX, clickY]) - vector([drawX, drawY])) < max(drawRad, MIN_CLICK_RESPONSE_SIZE)):
 						if (clickBut == 0):
 							# Left click
-							camera.panTrackSet(p)
+							MainLoop.target = p
 						elif (clickBut == 1):
 							# Right click
 							camera.rotTrackSet(p)
+
+
 
 		frameEnd = time.time()
 		frameLength = frameEnd - frameStart
@@ -1088,30 +1164,28 @@ class camera:
 
 	def rotFollow(self, followRate=DEFAULT_ROTATE_FOLLOW_RATE):
 		if self.rotTrack == None: return False
-		if self.rotTrackLock:
-			followRate = 1
-
 		relPos   = (self.rotTrack.pos - self.pos).mag(1)
+		if self.rotTrackLock:
+			self.rot = relPos
+		else:
+			relAngle = relPos.relAngle(self.rot)
+				# 'shift' is equivalent to a portion of the arc from the current rotation to the end rotation.
+			shift    = followRate * ((relAngle + 0.01) if (relAngle > 0.001 and followRate != 1) else relAngle)
+				# shiftMag is a modified 'shift' so that adding it to rot results in a rotation of 'shift' through that arc
+			shiftMag = sin(shift) / (cos(relAngle/2 - shift))
+				# rotShift is simply a vector from the current rotation to the desired rotation of magnitude shiftMag
+			rotShift = (relPos - self.rot).mag(shiftMag)
 
-		relAngle = relPos.relAngle(self.rot)
-			# shift is equivalent to a portion of the arc from the current rotation to the end rotation.
-		shift    = followRate * (relAngle + 0.01) if (relAngle > 0.001 and followRate != 1) else relAngle
-			# shiftMag is shift modified so that adding it to rot results in a rotation of 'shift' through that arc
-		shiftMag = sin(shift) / (cos(relAngle/2 - shift))
-			# rotShift is simply a vector from the current rotation to the desired rotation of magnitude shiftMag
-		rotShift = (relPos - self.rot).mag(shiftMag)
+			self.rot += rotShift
 
-		self.rot += rotShift
-
-		if (relAngle <= 0.001):
-			self.lockRot()
+			if (relAngle <= 0.001):
+				self.lockRot()
 
 
-		self.screenXaxis = self.rot.cross(self.screenYaxis)
-		self.screenYaxis = self.screenXaxis.cross(self.rot)
-
-		self.screenXaxis.setMag(1)
-		self.screenYaxis.setMag(1)
+		self.screenXaxis = self.rot.cross(self.screenYaxis).mag(1)
+		self.screenYaxis = self.screenXaxis.cross(self.rot).mag(1)
+		# self.screenXaxis.setMag(1)
+		# self.screenYaxis.setMag(1)
 		self.rot.setMag(1)
 		return True
 
@@ -1406,13 +1480,15 @@ elif preset == "3":
 	print("Loading planets...")
 	Data = loadSystem.loadFile(DATA_FILE)
 	MainLoop.addDataLine()
-	MainLoop.addData("Track target", "MainLoop.target.name", True, "None")
-	MainLoop.addData("Mass", "str(MainLoop.target.mass) + 'kg'", True, "---")
-	MainLoop.addData("Radius", "numPrefix(round(MainLoop.target.radius, 2), 'm')", True, "---")
-	MainLoop.addData("XYZ Velocity", "(MainLoop.target.vel.string(2)) + ', mag: ' + numPrefix(round(abs(MainLoop.target.vel), 5), 'm/s')", True, "---")
+	MainLoop.addData("Selected target", "MainLoop.target.name", True, "None")
+	MainLoop.addData("Mass", "str(MainLoop.target.mass) + 'kg (' + massTerm(MainLoop.target.mass) + ')'", True, "---")
+	MainLoop.addData("Radius", "numPrefix(round(MainLoop.target.radius, 2), 'm') + ' (' + radiusTerm(MainLoop.target.radius) + ')'", True, "---")
+	MainLoop.addData("Velocity", "numPrefix(round(abs(MainLoop.target.vel), 5), 'm/s')", True, "---")
+	MainLoop.addDataLine()
 	MainLoop.addData("Distance to Target", "")
 	MainLoop.addData("Centre", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ), 2 ), 'm' )", True, "---")
 	MainLoop.addData("Surface", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ) - MainLoop.target.radius, 2 ), 'm' )", True, "---")
+	MainLoop.addDataLine()
 	MainLoop.addData("Speed of camera", "numPrefix(abs(camera.vel), 'm/step', 2)", True, "---")
 	MainLoop.addData("Target speed relative to camera", "(numPrefix(abs(camera.panTrack.vel - camera.vel / MainLoop.Delta), 'm/s') if abs(camera.panTrack.vel - camera.vel / MainLoop.Delta) > 0.0001 else 0)", True, "---")
 	MainLoop.addDataLine()
@@ -1470,14 +1546,16 @@ elif preset == "3":
 		print("Loading stars...")
 		MainLoop.addData("Maximum visible magnitude", "round(MAX_VISIBILE_MAG,2)", True)
 		MainLoop.addData("Earth magnitude", "MainLoop.target.info['mag']", True, "---")
-		# MainLoop.addData("Hipparcos catalog id", "MainLoop.target.info['HIP id']", True, "---")
 		MainLoop.addData("Surface temperature", "MainLoop.target.info['temp']", True, "---")
 		MainLoop.addData("Colour index", "MainLoop.target.info['ci']", True, "---")
-
-		STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)], quiet=False)
-		# STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
-		# print("Loading named stars...")
-		# STARS_DATA.update(loadSystem.loadFile("StarsData.txt", key=["\"$proper\" != 'None'", "$dist != 100000"], quiet = False))
+		MainLoop.addDataLine()
+		MainLoop.addData("Hipparcos catalog id", "MainLoop.target.info['HIP id']", True, "---")
+		if (getStars < 22):
+			STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)], quiet=False)
+		else:
+			STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
+			print("Loading named stars...")
+			STARS_DATA.update(loadSystem.loadFile("StarsData.txt", key=["\"$proper\" != 'None'", "$dist != 100000"], quiet = False))
 
 		# Load names.txt to make random names for stars with no name.
 		nameFile = open("names.txt", "r")
@@ -1533,8 +1611,7 @@ elif preset == "3":
 				dbgCounter=0
 				for i in range(int(random.random()*9)+1):
 					dbgCounter+=1
-					newPos = randomVector(3,10).makeOrthogonal(systemAxis) + randomVector(3, 0, 3)
-					newPos = newPos.mag((i+1) * (random.random()+0.1)*4 * AU)
+					newPos = randomVector(3, system.radius * 2, (i + 2) * 2 * system.radius).makeOrthogonal(systemAxis + randomVector(3, 0, 3))
 					newPos += system.pos
 					newMass = EarthMass*10**(((random.random()-1/2)*2)**3 * 2)
 					new = particle(
@@ -1619,6 +1696,15 @@ elif preset == "5":
 	new = particle(100, vector([0, 0, 0]), radius = 90, immune=True, limitRadius=False)
 # if not TestMode:
 
+def startRecord():
+	global RECORD_SCREEN
+	RECORD_SCREEN = True
+
+def stopRecord():
+	global RECORD_SCREEN
+	RECORD_SCREEN = False
+
+
 
 
 if not TestMode:
@@ -1673,7 +1759,6 @@ if not TestMode:
 	turtle.onkey(escape, "Escape")
 	turtle.onkey(pause,  "space")
 
-
 	turtle.onkey(cycleTargets, "Tab")
 	turtle.onkeypress(togglePanTrack, "t")
 	turtle.onkey(toggleRotTrack, "y")
@@ -1682,6 +1767,8 @@ if not TestMode:
 	turtle.onkey(toggleRealTime, "i")
 
 	turtle.onkey(toggleScreenData, "h")
+	turtle.onkey(startRecord, "j")
+	turtle.onkey(stopRecord, "k")
 
 	turtle.onkeypress(upScreenDepth, "'")
 	turtle.onkeypress(downScreenDepth, ";")
@@ -1708,8 +1795,8 @@ if TestMode:
 	# velocity and position are technically never both known at the same time,
 	# but that shouldn't affect results significantly.""")
 		Time = MainLoop.Time
-		checkTimes = sorted([testData[x][0] for x in testData])
-		# checkNames = [x for x in testData]
+		checkTimes = [x[1] for x in testData]
+		checkNames = [x[0] for x in testData]
 		flag = False
 		# We know there is test data because otherwise the program would have exited by now
 		startTime = Time
@@ -1730,12 +1817,15 @@ if TestMode:
 
 			if Time >= checkTimes[0]:
 				for p in particleList:
-					if ((p.name in testData) and (False if not checkTimes else checkTimes[0] == testData[p.name][0])):
+
+					if (p.name in checkNames):
+						checkData = [x for x in testData if x[0] == p.name]
+					# if ((p.name in checkNames) and checkTimes and checkTimes[0] == testData[1])):
 						# Check the data.
-						targetData = testData[p.name]
-						targetTime = targetData[0]
-						targetPos  = targetData[1]
-						targetVel  = targetData[2]
+						targetData = testData[0]
+						targetTime = targetData[1]
+						targetPos  = targetData[2]
+						targetVel  = targetData[3]
 						print("\nAt time: %s, for %s:" %(timeString(Time), p.name))
 						print("\tShould be at:    %s\twith vel: %s (mag: %s)" % (targetPos.string(2), targetVel.string(2), numPrefix(abs(targetVel), "m/s")))
 						print("\tWas actually at: %s\twith vel: %s (mag: %s)" % (p.pos.string(2), p.vel.string(2), numPrefix(abs(p.vel), "m/s")))
@@ -1789,6 +1879,13 @@ if REAL_TIME:
 	Delta = 0
 if START_PAUSED:
 	pause()
+frameCount = 0
+
+def save():
+	global frameCount
+	turtle.getcanvas().postscript(file = "frames/frame_{0:05d}.eps".format(frameCount))
+	frameCount += 1
+
 while Running:
 	turtle.clear()
 	if STAGGERED_SIM: input()
@@ -1797,3 +1894,5 @@ while Running:
 		Delta = time.time() - frameStart
 		frameStart = time.time()
 	turtle.update()
+	if (RECORD_SCREEN):
+		save()

@@ -113,7 +113,7 @@ class particle:
 
 
 	def checkOutOfBounds(self, camera): #bounds=[turtle.window_width()/2, turtle.window_height()/2]):
-		if self.immune or ALL_IMMUNE or TestMode: return False
+		if self.immune or ALL_IMMUNE or TestMode or camera == None: return False
 		out = False
 		if abs(self.pos.subtract(camera.pos)) > voidRadius:
 			out = True
@@ -141,7 +141,7 @@ class particle:
 		# print("Respawning to: {}".format([self.pos.elements[0], self.pos.elements[1], self.pos.elements[2]]))
 
 	def die(self, killer=None):
-		# print(self,"Dying!")
+		# print("%s dying to %s" % (self.name, killer.name))
 		if self.respawn:
 			# if CAMERA_UNTRACK_IF_DIE and camera.panTrack == self:
 			# 	camera.panTrackSet(killer)
@@ -167,7 +167,7 @@ class particle:
 			other.setRadius()
 			self.die(other)
 
-	def step(self, delta, camera=None, draw=True, drawVel=False, onlyDraw = False, bufferMode = 0):
+	def step(self, delta, camera=None):
 		if self.static:
 			self.pos += self.vel * delta# + self.acc * (delta**2 / 2)
 			return False
