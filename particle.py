@@ -22,10 +22,10 @@ TestMode = False
 
 class particle:
 	def __init__(
-				self, mass, position, velocity=0, acceleration=0,
-				density=defaultDensity, autoColour=True, colour=[0, 0, 1],
-				limitRadius=True, name=None, static=False, immune=False,
-				radius=None):
+			self, mass, position, velocity=0, acceleration=0,
+			density=defaultDensity, autoColour=True, colour=[0, 0, 1],
+			limitRadius=True, name=None, static=False, immune=False,
+		radius=None):
 		self.mass = mass
 		self.pos = position
 		self.dim = len(position.elements)
@@ -148,9 +148,12 @@ class particle:
 			self.respawn()
 		else:
 			if self in particleList:
-				if camera.panTrack: camera.panTrackSet()
-				if buffer != 0:
-					BUFFER[self].append(False)
+				try:
+					if camera.panTrack: camera.panTrackSet()
+					if buffer != 0:
+						BUFFER[self].append(False)
+				except NameError:
+					pass
 				particleList.remove(self)
 			self.alive = False
 
