@@ -31,51 +31,54 @@ print("Starting Orbits4T")
 LINUX = False # If true, then non alphanumeric key controls will be replaced with numbers
 
 #############################################################################################################################
-# args:																														#
-# <key> : [<type>, <default value>, <requires parameter>, [<second default value>], [changed]]								#
-# second default value is only necessary if <requires parameter> is true.													#
-# if true, then the algorithm looks for a value after the key.																#
-# if false, the algorithm still looks for a value after the key but if no value is given the second default value is used.	#
-# The final value indicates if the argument has been supplied, to know if the user has specified a value					#
-# 	 (Useful if the default varies depending on other arguments)															#
-# NOTE: A key is defined as anything starting with a dash '-' then a letter. A dash followed by a number would be read as   #
-#    a (negative) number.                                                                                                   #
-#																															#
+# args:                                                                                                                     #
+# <key> : [<type>, <default value>, <requires parameter>, [<second default value>], [changed]]                              #
+# second default value is only necessary if <requires parameter> is true.                                                   #
+# if true, then the algorithm looks for a value after the key.                                                              #
+# if false, the algorithm still looks for a value after the key but if no value is given the second default value is used.  #
+# The final value indicates if the argument has been supplied, to know if the user has specified a value                    #
+# 	 (Useful if the default varies depending on other arguments)                                                            #
+# NOTE: THIS LAST VALUE WILL BE ADDED AUTOMATICALLY, DO NOT INCLUDE IT IN THE CODE                                          #
+# ANOTHER NOTE: A key is defined as anything starting with a dash '-' then a letter. A dash followed by a number would be   #
+#    read as a negative number.                                                                                                     #
+#                                                                                                                           #
 ########### PUT DEFAULTS HERE ###############################################################################################
 args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
-"-?"  :  [None],
-"-d"  :  	[float,	0.025,	True], # Delta time per step
-"-n"  :  	[int,   20,		True], # Particle count
-"-p"  :  	[str,   "1",	True], # preset
-"-sp" :  	[str,   False,	False,  True], # start paused
-"-ss" :  	[str,   False,	False,  True], # staggered simulation
-"-G"  :  	[float, 20,		True], # Gravitational constant
-"-pd" :  	[str,   False,	False,  True], # Print data
-"-sd" :  	[float, 2000,	True], # Default screen depth
-"-ps" :  	[float, 0.01,	True], # Maximum pan speed
-"-rs" :  	[float, 0.01,	True], # Rotational speed
-"-mk" :  	[str,   False,	False,  True], # Show marker points
-"-ep" :  	[int,   360,	True], # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
-"-sf" :  	[float, 0.5,	True], # Rate at which the camera follows its target
-"-ad" :  	[str,   False,	False,  True], # Always draw. Attempts to draw particles even if they are thought not to be on screen
-"-vm" :  	[float, 150,	True], # Variable mass. Will be used in various places for each preset.
-"-vv" :  	[float, False,	False,  1], # Draw velocity vectors
-"-ds" :  	[str,	False,	False,  True], # Draw stars, ie, make the minimum size 1 pixel, regardless of distance.
-"-sdp":  	[int,   5,		True], # Smart draw parameter, equivalent to the number of pixels per edge on a shape
-"-me" :		[int,   400,	True], # Max number of edges drawn
-"-ab" :  	[int,   False,	False,  20], # Make asteroid belt (Wouldn't recommend on presets other than 3..)
-"-es" :  	[int,	False,	False,  5], # Make earth satellites
-"-WB" :  	[str,   False,	False,	True], # Write buffer to file
+"-?"  :  [None], # Help.
+"-d"  :     [float,	0.025,	True], # Delta time per step
+"-n"  :     [int,   20,		True], # Particle count
+"-p"  :     [str,   "1",	True], # preset
+"-rt" :     [str,   False,  False,  True], # Run in real time
+"-sp" :     [str,   False,	False,  True], # start paused
+"-ss" :     [str,   False,	False,  True], # staggered simulation
+"-G"  :     [float, 20,		True], # Gravitational constant
+"-pd" :     [str,   False,	False,  True], # Print data
+"-sd" :     [float, 2000,	True], # Default screen depth
+"-ps" :     [float, 0.01,	True], # Maximum pan speed
+"-rs" :     [float, 0.01,	True], # Rotational speed
+"-mk" :     [str,   False,	False,  True], # Show marker points
+"-ep" :     [int,   360,	True], # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
+"-sf" :     [float, 0.5,	True], # Rate at which the camera follows its target
+"-ad" :     [str,   False,	False,  True], # Always draw. Attempts to draw particles even if they are thought not to be on screen
+"-vm" :     [float, 150,	True], # Variable mass. Will be used in various places for each preset.
+"-vv" :     [float, False,	False,  1], # Draw velocity vectors
+"-ds" :     [str,	False,	False,  True], # Draw stars, ie, make the minimum size 1 pixel, regardless of distance.
+"-sdp":     [int,   5,		True], # Smart draw parameter, equivalent to the number of pixels per edge on a shape
+"-me" :     [int,   400,	True], # Max number of edges drawn
+"-ab" :     [int,   False,	False,  20], # Make asteroid belt (Wouldn't recommend on presets other than 3..)
+"-es" :     [int,	False,	False,  5], # Make earth satellites
+"-WB" :     [str,   False,	False,	True], # Write buffer to file
 "-rp" :     [float, False,  False,  0.6], # Make random planets
 "-rg" :     [str,   False,  False,  True], # Record gif shots
-"-tn" :		[str,   False,  False,  True], # True n-body simulation. When off program makes some sacrifices for performance boost.
-"-flim": 	[float, False,	True], # Frame limit
-"-df" :  	[str, "SolSystem.txt", True], # Path of the data file
-"-test": 	[str,	 False, False, True], # Test mode
-"-getStars": [float,  False,	False, 4], # Get stars from the datafile.
+"-tn" :     [str,   False,  False,  True], # True n-body simulation. When off program makes some sacrifices for performance boost.
+"-asb" :    [int,   4,      True], # Number of bodies in the auto-systems.
+"-flim":    [float, False,	True], # Frame limit
+"-df" :     [str, "SolSystem.txt", True], # Path of the data file
+"-test":    [str,	 False, False, True], # Test mode
+"-getStars":[float,  False,	False, 4], # Get stars from the datafile.
 "-PM":      [str,   False,  False, True],  # Enter the preset maker
 "-P?":      [str,   False,  False, True],  # Show available presets and quit
-"-AA_OFF": [str, True, 	False, 	False]   # Turn off AutoAbort.
+"-AA_OFF":  [str, True, 	False, 	False]   # Turn off AutoAbort.
 }
 
 originalG = args["-G"][1]
@@ -86,12 +89,13 @@ if len(sys.argv) > 1:
 		print("Welcome to Orbits4T!")
 
 		print("""
-This version contains 3 presets:
-1)  Centre body with -n number of planets orbiting in random places. (Default 10)
+This version contains the following presets:
+1)  Centre body with '-n' number of planets orbiting in random places. (Default 10)
 2)  'Galaxy' kinda thing (Miserable failure, don't waste your time with this one)
 3)  Our very own Solar System!
 4)  Another small test. Large body with a line of small bodies orbiting in a circle.
-The third one is way better, don't even bother with the other two. They were just practice.
+5)  Repulsive particles on the surface of a sphere, that eventually sort themselves into an even spread. Just cool to watch.
+The third one is way better, don't even bother with the others. They were just practice.
 
 Arguments:
 Key|Parameter type|Description
@@ -100,6 +104,7 @@ Key|Parameter type|Description
 -n :    int         Particle count, where applicable.
 -p :    string      Preset.
 -sp:                Start paused.
+-rt:                Start in real time. (Can be toggled during the simulation)
 -ss:                Staggered simulation (Hit enter in the terminal to trigger each step)
 -G :    float       Gravitational constant.
 -pd:                Print debugging data.
@@ -109,7 +114,7 @@ Key|Parameter type|Description
 -mk:                Show marker points (static X, Y, Z and Origin coloured particles)
 -ep:    int         Number of points on each ellipse (Irrelevant if SMART_DRAW is on (which it is))
 -sf:    float       Rate at which the camera follows its target.
--ad:                Always draw. Attempts to draw particles even if they are thought not to be on screen
+-ad:                (Debug tool) Always draw. Attempts to draw particles even if they are thought not to be on screen
 -vm:    float       Variable mass. To be used in relevant places for some presets.
 -vv:                Draw velocity and acceleration vectors. Note that while velocity vectors are to scale,
                         acceleration vectors are multiplied by 5 when being drawn. (Otherwise they are too short)
@@ -122,14 +127,21 @@ Key|Parameter type|Description
 -WB  :              Write buffer to file.
 -rp  :  float       Make random planets, give a percentage of stars to have systems.
                         (only for preset 3, if stars are also made)
+-tn  :              Runs the simulation in True N-body mode, making calculations of acceleration due the
+                        gravity of all bodies to all bodies. Much slower but usually much more accurate
+                        (Really not worth turning on for presets like the solar system)
+                      If left on, (ie the argument is not used) then the most influencial bodies at the
+                        start are the only ones that affect that body for the rest of the simulation.
+                      But, for some presets this is ON by default.
+-asb :  int         Number of bodies in auto generated systems.
 -flim:  float       Frame limit.
 -df  :  string      Path of the data file.
--test:              Enter test mode.*
+-test:              Enter test mode.* (See below)
 -getStars: float	Loads stars from a database of almost 120,000 stars in the night sky. The value
                         given with this parameter will be used as the maximum apparent magnitude from
                         Earth of the stars loaded. The default is 4.5, which loads about 510 stars.
 -PM  :              Enters the preset maker, allowing you to design a preset.
--P?  :				Shows the available presets then exits.
+-P?  :                  Shows the available presets then exits.
 -AA_OFF:            Turn off AutoAbort. (AutoAbort will kill the simulation if two consecutive frames
                         last longer than a second, it's only trying to help you not bring your
                         computer to a standstill, be careful if you choose to abandon it)
@@ -203,7 +215,7 @@ PARTICLE_COUNT	        = args["-n"][1]
 preset			        = args["-p"][1]
 STAGGERED_SIM	        = args["-ss"][1]
 START_PAUSED	        = args["-sp"][1]
-particle.G		        = args["-G"][1]
+Pmodule.G		        = args["-G"][1]
 PRINT_DATA		        = args["-pd"][1]
 defaultScreenDepth	    = args["-sd"][1]
 maxPan			        = args["-ps"][1]
@@ -237,6 +249,13 @@ particle.TestMode = TestMode
 
 MAX_VISIBILE_MAG = 7
 
+
+# Time lengths constants
+MINUTE  = 60
+HOUR    = 60 *	MINUTE
+DAY     = 24 *	HOUR
+YEAR    = 365 * DAY
+
 # Preset 3
 AsteroidsStart 	 = 249.23 * 10**9 # Places the belt roughly between Mars and Jupiter.
 AsteroidsEnd 	 = 740.52 * 10**9 # Couldn't find the actual boundaries (They're probably pretty fuzzy)
@@ -244,7 +263,7 @@ AsteroidsMinMass = 0.0001 * 10**15
 AsteroidsMaxMass = 1	  * 10**23
 AsteroidsDensity = 1500
 randomPlanets = args["-rp"][1]
-DEFAULT_SYSTEM_SIZE = 6 # Default number of bodies to add to a system
+DEFAULT_SYSTEM_SIZE = args["-asb"][1] # Default number of bodies to add to a system
 TRUE_NBODY = args["-tn"][1]
 
 # Preset 4
@@ -252,16 +271,17 @@ PRESET_4_MIN_RADIUS = 40
 PRESET_4_MAX_RADIUS = 400
 
 # Physical constants
+REAL_G       = 6.67408e-11
 EARTH_MASS   = 5.97e24
 EARTH_RADIUS = 6.371e6
 SUN_MASS     = 1.989e30
 SUN_RADIUS   = 695.7e6
 
-# Time lengths constants
-MINUTE  = 60
-HOUR    = 60 *	MINUTE
-DAY     = 24 *	HOUR
-YEAR    = 365 * DAY
+# Random Planet Settings
+MIN_PERIOD   = 30 * DAY
+MAX_PERIOD   = 250 * YEAR
+MAX_PLANET_COUNT = 12
+MIN_PLANET_COUNT = 1
 
 # Distance constants
 LIGHT_SPEED = 299792458
@@ -271,7 +291,7 @@ PARSEC  = 3.085677581e+16
 
 # Misc settings
 particle.ALL_IMMUNE = False
-REAL_TIME           = False
+REAL_TIME           = args["-rt"][1]
 particle.defaultDensity  = 1
 particle.radiusLimit     = 1e+10       # Maximum size of particle
 voidRadius               = 5000      # Maximum distance of particle from camera
@@ -287,14 +307,15 @@ AUTO_RATE_CONSTANT  = 10    # A mysterious constant which determines the autoRat
 FOLLOW_RATE_COEFF   = 0.4
 FOLLOW_RATE_BASE    = 1.1
 TRAVEL_STEPS_MIN	= 100   # Number of steps to spend flying to a target (at full speed, doesn't include speeding up or slowing down)
+MAX_DRAW_DIST       = 3 * LIGHT_YEAR  # Maximum distance to draw bodies that don't have a given magnitude (ie planets, stars are not affected)
 
 DEFAULT_ZERO_VEC = [0, 0, 0]
 DEFAULT_UNIT_VEC = [1, 0, 0]
 
 # Drawing/Visual constants
-FLARE_BASE = 1.2 # Must be greater than 1
+FLARE_BASE = 1.01 # Must be greater than 1
 MIN_CLICK_RESPONSE_SIZE = 10 # Radius of area (in pixels) around centre of object that can be clicked
-								# depending on its size
+                             # depending on its size
 MIN_BOX_WIDTH = 50
 
 ## Load presets
@@ -316,9 +337,9 @@ if TestMode:
 			vector([-2.652775232714054E+07,  1.451886523109221E+08, -2.883530398781598E+04]) * 1000,
 			vector([-2.977993074888063E+01, -5.581820507958473E+00,  1.472498187503835E-03]) * 1000],
 			["Moon",
-			(2017 * YEAR + 29 * DAY),
-			vector([-9.398579017725559E+07,  1.132616201869949E+08, -2.745023191672564E+04]) * 1000,
-			vector([-2.288350662698629E+01, -1.833878035216436E+01, -9.208055408024851E-02]) * 1000],
+			(2017 * YEAR + 31 * DAY),
+			vector([-9.791943397595288E+07,  1.100350864508356E+08, -4.271377345877886E+04]) * 1000,
+			vector([-2.265069523685520E+01, -1.903695183547426E+01, -8.119286303272855E-02]) * 1000],
 			["Mercury",
 			(2017 * YEAR + 31 * DAY),
 			vector([-3.491563712116394E+07, -5.847758798545337E+07, -1.603576528303239E+06]) * 1000,
@@ -333,7 +354,7 @@ if TestMode:
 			print("No test data given to test with. Aborting.")
 			exit()
 		else:
-			print("Testing positions and velocities for:", ", ".join([x for x in testData]))
+			print("Testing positions and velocities for:", ", ".join([x[0] for x in testData]))
 
 	else:
 		print("Testing not available for preset %s." %(preset))
@@ -427,10 +448,11 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	screenY = localY * cos(angle) + localX * sin(angle)
 
 	flareWidth = 0
-	if (mag and points <= 2):
+	# if (mag != None): mag -= 1
+	if (mag != None and points <= 2):
 		# fill = [1, 1, 1]
 		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
-	elif (points <= 2 and not mag):
+	elif (points <= 2 and mag == None):
 		fill = [1, 1, 1]
 	elif (mag):
 		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
@@ -479,29 +501,16 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 			if (points < 2):
 				turtle.dot(2)
 			return True
-		else:
-			fillScale = 1 / max(fill)
-			fill = [fillScale * x for x in fill] # Makes the fill the brightest while maintaining the colour
-		# turtle.pencolor(fill)
-		# turtle.dot(int(flareWidth) + minor)
 
 
 		# The function brightness = (a*b^r - a + 1) gives a good gradient for a flare
 		# b is FLARE_BASE, the higher it is the steeper the curve, and the faster it fades to black.
 		a = 1 + 1 / (FLARE_BASE**flareWidth - 1)
-
-		# print("flareWidth: %.2f" % (flareWidth))
 		for r in range(int(flareWidth), 0, -1):
 			rMag = a * FLARE_BASE**(-r) - a + 1
-			# rMag = 1 - r / flareWidth
-			# print("r: %d" % (r))
-			# print("a: %.2f, rMag: %.2f" % (a, rMag))
+			if (rMag < 0.005): continue
 			turtle.pencolor([x * rMag for x in fill])
 			turtle.dot((r) + minor)
-		# largeRadius = int(flareWidth) + 1
-		# fracRadius = flareWidth - int(flareWidth)
-		# turtle.pencolor([fracRadius * x for x in fill])
-		# turtle.dot(largeRadius + minor)
 
 
 	# else:
@@ -558,17 +567,17 @@ def massTerm(mass):
 	global EARTH_MASS
 	global SUN_MASS
 	if (mass > 0.8 * SUN_MASS):
-		return ("%.2f Solar masses" % (mass / SUN_MASS))
+		return ("%.5e Solar masses" % (mass / SUN_MASS))
 	else:
-		return ("%.2f Earth masses" % (mass / EARTH_MASS))
+		return ("%.5e Earth masses" % (mass / EARTH_MASS))
 
 def radiusTerm(radius):
 	global EARTH_RADIUS
 	global SUN_RADIUS
 	if (radius > 0.8 * SUN_RADIUS):
-		return ("%.2f Solar radii" % (radius / SUN_RADIUS))
+		return ("%.5e Solar radii" % (radius / SUN_RADIUS))
 	else:
-		return ("%.2f Earth radii" % (radius / EARTH_RADIUS))
+		return ("%.5e Earth radii" % (radius / EARTH_RADIUS))
 
 def timeString(seconds, rounding=3):
 	if seconds < 60:
@@ -1090,6 +1099,8 @@ class camera:
 		if (distance < radius):
 			# and this one
 			return False
+		elif (distance > MAX_DRAW_DIST and appMag == None):
+			return False
 		ScreenParticleDistance = self.screenDepth * abs(relPosition) * abs(self.rot) / (relPosition.dot(self.rot))
 		relPosOnScreen = relPosition * ScreenParticleDistance / abs(relPosition)
 		relPosUnit = relPosition / abs(relPosition)
@@ -1365,12 +1376,14 @@ def clearTarget():
 
 
 
-def search(term=None):
+# Searches the list of particles for a particle with a matching name
+# 'listen' determines if the function hands back focus to the turtle screen.
+def search(term=None, listen=True):
 	global TestMode
 	if TestMode: return False
 	if term == None: term = turtle.textinput("Search for a body", "Enter a search term:")
 	if not term:
-		turtle.listen()
+		if listen: turtle.listen()
 		return False
 	bestBody = None
 	for body in Pmodule.particleList:
@@ -1393,10 +1406,10 @@ def search(term=None):
 	# 	MainLoop.target = bestBody
 	if bestBody:
 		MainLoop.target = bestBody
-		turtle.listen()
+		if listen: turtle.listen()
 		return True
 	else:
-		turtle.listen()
+		if listen: turtle.listen()
 		return False
 
 
@@ -1416,6 +1429,9 @@ Running = True
 Buffer = buffer()
 
 if preset == "1":
+	if (not args["-tn"][-1]):
+		TRUE_NBODY = True
+
 	# for i in range(10):
 	# 	particle(50 + i*20, vector([50, 100 - 10*i, 0]))
 	# Cloud of particles orbiting a big thing
@@ -1424,7 +1440,8 @@ if preset == "1":
 	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
 	particle(25000, vector([defaultScreenDepth, 0, 0]))
 	for i in range(PARTICLE_COUNT):
-		particle(variableMass, vector([150 + defaultScreenDepth, 0, 0]) + randomVector(3, 50, 400)).circularise(particleList[0])
+		particle(variableMass, vector([150 + defaultScreenDepth, 0, 0]) + randomVector(3, 50, 400),
+                         colour = [random.random(), random.random(), random.random()], autoColour=False).circularise(particleList[0])
 elif preset == "2":
 	# Galaxy kinda thing
 	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
@@ -1453,7 +1470,7 @@ elif preset == "2":
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
 elif preset == "3":
-	if (not args["-G"][-1]): Pmodule.G = 6.67408e-11
+	if (not args["-G"][-1]): Pmodule.G = REAL_G
 
 	if (not args["-sf"][-1]): smoothFollow = 0.04
 
@@ -1481,8 +1498,8 @@ elif preset == "3":
 	Data = loadSystem.loadFile(DATA_FILE)
 	MainLoop.addDataLine()
 	MainLoop.addData("Selected target", "MainLoop.target.name", True, "None")
-	MainLoop.addData("Mass", "str(MainLoop.target.mass) + 'kg (' + massTerm(MainLoop.target.mass) + ')'", True, "---")
-	MainLoop.addData("Radius", "numPrefix(round(MainLoop.target.radius, 2), 'm') + ' (' + radiusTerm(MainLoop.target.radius) + ')'", True, "---")
+	MainLoop.addData("Mass", "'%.5e'%(MainLoop.target.mass) + 'kg \t(' + massTerm(MainLoop.target.mass) + ')'", True, "---")
+	MainLoop.addData("Radius", "numPrefix(round(MainLoop.target.radius, 2), 'm') + '   \t(' + radiusTerm(MainLoop.target.radius) + ')'", True, "---")
 	MainLoop.addData("Velocity", "numPrefix(round(abs(MainLoop.target.vel), 5), 'm/s')", True, "---")
 	MainLoop.addDataLine()
 	MainLoop.addData("Distance to Target", "")
@@ -1554,8 +1571,8 @@ elif preset == "3":
 			STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)], quiet=False)
 		else:
 			STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
-			print("Loading named stars...")
-			STARS_DATA.update(loadSystem.loadFile("StarsData.txt", key=["\"$proper\" != 'None'", "$dist != 100000"], quiet = False))
+#			print("Loading named stars...")
+#			STARS_DATA.update(loadSystem.loadFile("StarsData.txt", key=["\"$proper\" != 'None'", "$dist != 100000"], quiet = False))
 
 		# Load names.txt to make random names for stars with no name.
 		nameFile = open("names.txt", "r")
@@ -1604,14 +1621,17 @@ elif preset == "3":
 			EarthMass = 5.97e24
 			density   = 5.51e+3 # Also Earth's density
 			for system in systemChoice:
+				# system is a particle
 				systemAxis = randomVector(3, 10)
 				system.static = False
-				# if system in Pmodule.staticList: Pmodule.staticList.remove(system)
 				Pmodule.nonStaticList.append(system)
-				dbgCounter=0
-				for i in range(int(random.random()*9)+1):
-					dbgCounter+=1
-					newPos = randomVector(3, system.radius * 2, (i + 2) * 2 * system.radius).makeOrthogonal(systemAxis + randomVector(3, 0, 3))
+				dbgCounter = 0
+				maxRadius = (Pmodule.G * system.mass * MAX_PERIOD**2 / 4 * pi) ** (1/3)
+				minRadius = (Pmodule.G * system.mass * MIN_PERIOD**2 / 4 * pi) ** (1/3)
+				planetCount = ( int( random.random() * (MAX_PLANET_COUNT - MIN_PLANET_COUNT) ) + MIN_PLANET_COUNT)
+				for i in range(planetCount):
+					dbgCounter += 1
+					newPos = randomVector(3, minRadius, maxRadius).makeOrthogonal(systemAxis + randomVector(3, 0, 3))
 					newPos += system.pos
 					newMass = EarthMass*10**(((random.random()-1/2)*2)**3 * 2)
 					new = particle(
@@ -1626,30 +1646,10 @@ elif preset == "3":
 				print("Making system for %s. %d planets made." % (system.name, dbgCounter))
 					# MainLoop.target = new
 
-	if not (TRUE_NBODY):
-		print("Auto-assigning systems...")
-
-		# forces = {}
-		for p1 in particleList:
-			forces = []
-			# Now go through the list a second time and find the accelerations due to each particle
-			for p2 in particleList:
-				if (p1 == p2): continue
-				forces.append([p2, abs(p1.calcAcc(p2, True))])
-			# Pick the top few particles attracting p1
-			forces.sort(key=lambda x:x[1], reverse = True)
-			bodies = [x[0] for x in forces[0:min(DEFAULT_SYSTEM_SIZE, len(forces))]]
-			p1.system = bodies
-
-		# print("Moon system:", ", ".join([x.name for x in planets["Moon"].system]))
-		# print("ISS system:", ", ".join([x.name for x in planets["ISS"].system]))
-		# print("Earth system:", ", ".join([x.name for x in planets["Earth"].system]))
-		# print("Voyager1 system:", ", ".join([x.name for x in planets["Voyager1"].system]))
-	if search("Acrux"): toggleRotTrack()
-	search("Earth")
+	if search("Acrux", listen=False): toggleRotTrack()
+	search("Earth", listen=False)
 	togglePanTrack()
 	clearTarget()
-	print("Done! Starting simulation...")
 	# time.sleep(1)
 
 elif preset == "4":
@@ -1695,6 +1695,29 @@ elif preset == "5":
 		turtle.update()
 	new = particle(100, vector([0, 0, 0]), radius = 90, immune=True, limitRadius=False)
 # if not TestMode:
+
+
+if not (TRUE_NBODY):
+	print("Auto-assigning systems...")
+
+	# forces = {}
+	for p1 in particleList:
+		forces = []
+		# Now go through the list a second time and find the accelerations due to each particle
+		for p2 in particleList:
+			if (p1 == p2): continue
+			forces.append([p2, abs(p1.calcAcc(p2, True))])
+		# Pick the top few particles attracting p1
+		forces.sort(key=lambda x:x[1], reverse = True)
+		bodies = [x[0] for x in forces[0:min(DEFAULT_SYSTEM_SIZE, len(forces))]]
+		p1.system = bodies
+
+	# print("Moon system:", ", ".join([x.name for x in planets["Moon"].system]))
+	# print("ISS system:", ", ".join([x.name for x in planets["ISS"].system]))
+	# print("Earth system:", ", ".join([x.name for x in planets["Earth"].system]))
+	# print("Voyager1 system:", ", ".join([x.name for x in planets["Voyager1"].system]))
+
+print("Done! Starting simulation...")
 
 def startRecord():
 	global RECORD_SCREEN
@@ -1795,14 +1818,24 @@ if TestMode:
 	# velocity and position are technically never both known at the same time,
 	# but that shouldn't affect results significantly.""")
 		Time = MainLoop.Time
-		checkTimes = [x[1] for x in testData]
-		checkNames = [x[0] for x in testData]
+		checkTimes = sorted([x[1] for x in testData])
+		checkData = {}
+		# Format of testdata: [[<Name>, <Time>, <Pos>, <vel>], ...]
+		for t in testData:
+			if (t[1] in checkData): checkData[t[1]].append(t)
+			if (t[1] not in checkData): checkData[t[1]] = [t]
+		# Stop the tested particles from respawning.
+		names = [t[0] for t in testData]
+		testList = []
+		for p in particleList:
+			if (p.name in names):
+				p.respawn = False
+				testList.append(p)
 		flag = False
 		# We know there is test data because otherwise the program would have exited by now
 		startTime = Time
 		stepCounter = 1
 		startSim = time.time()
-		# [print(x.name) for x in particleList]
 		tempDelta = False
 		progressStep = 1
 		progressPoint = 0
@@ -1815,29 +1848,38 @@ if TestMode:
 			# print("\rProgress: %.2f%%" % (100 * (Time - startTime) / (checkTimes[-1] - startTime)), end = "")
 			sys.stdout.flush()
 
-			if Time >= checkTimes[0]:
-				for p in particleList:
+			if Time == checkTimes[0]:
+				if (tempDelta):
+					Delta = tempDelta
+				checkNames = [x[0] for x in checkData[checkTimes[0]]]
+				for p in testList:
 
+				#	if (p.name in checkNames):
+				#		checkData = [x for x in testData if x[0] == p.name]
+#					if ((p.name in checkNames) and checkTimes[0] == testData[1]):
+					# if (p.name == checkData[checkTimes[0]][0]):
 					if (p.name in checkNames):
-						checkData = [x for x in testData if x[0] == p.name]
-					# if ((p.name in checkNames) and checkTimes and checkTimes[0] == testData[1])):
 						# Check the data.
-						targetData = testData[0]
+						targetData = checkData[checkTimes[0]][checkNames.index(p.name)]
 						targetTime = targetData[1]
 						targetPos  = targetData[2]
 						targetVel  = targetData[3]
-						print("\nAt time: %s, for %s:" %(timeString(Time), p.name))
-						print("\tShould be at:    %s\twith vel: %s (mag: %s)" % (targetPos.string(2), targetVel.string(2), numPrefix(abs(targetVel), "m/s")))
-						print("\tWas actually at: %s\twith vel: %s (mag: %s)" % (p.pos.string(2), p.vel.string(2), numPrefix(abs(p.vel), "m/s")))
-						print("\tOffset by        %s (mag: %s) over %d steps of %lfs, average %s/step or %s" % (
-							(p.pos - targetPos).string(2),
-							numPrefix(abs(p.pos - targetPos), "m", 3),
-							stepCounter, (Delta if not tempDelta else tempDelta),
-							numPrefix(abs(p.pos - targetPos) / stepCounter, "m", 3),
-							numPrefix(abs(p.pos - targetPos) / (stepCounter * Delta), "m/s", 3))
-						)
+						if not (p.alive):
+							print("\n%s is dead." % (p.name))
+						else:
+							print("\nAt time: %s, for %s:" %(timeString(Time), p.name))
+							print("\tShould be at:    %s\twith vel: %s (mag: %s)" % (targetPos.string(2), targetVel.string(2), numPrefix(abs(targetVel), "m/s")))
+							print("\tWas actually at: %s\twith vel: %s (mag: %s)" % (p.pos.string(2), p.vel.string(2), numPrefix(abs(p.vel), "m/s")))
+							print("\tOffset by        %s (mag: %s) over %d steps of %lfs, average %s/step or %s" % (
+								(p.pos - targetPos).string(2),
+								numPrefix(abs(p.pos - targetPos), "m", 3),
+								stepCounter, (Delta if not tempDelta else tempDelta),
+								numPrefix(abs(p.pos - targetPos) / stepCounter, "m", 3),
+								numPrefix(abs(p.pos - targetPos) / (stepCounter * Delta), "m/s", 3))
+							)
 						print()
 						checkTimes.pop(0)
+						if (not checkTimes): break
 						progressPoint = 0
 						# flag = len(checkTimes)
 					p.step(Delta)
@@ -1845,12 +1887,14 @@ if TestMode:
 				if (tempDelta):
 					Delta = tempDelta
 					tempDelta = False
-				if (Time + Delta > checkTimes[0]):
+
+				if (Time + Delta >= checkTimes[0]):
 					tempDelta = Delta
-					# print("Time + Delta = %lf, greater than %f, setting Delta to %f" % (Time + Delta, checkTimes[0], checkTimes[0] - Time))
 					Delta = checkTimes[0] - Time
+
 				for p in particleList:
 					p.step(Delta)
+
 			Time += Delta
 			stepCounter += 1
 			if stepCounter == 100:
@@ -1858,7 +1902,7 @@ if TestMode:
 				# Covered 50 * Delta in interval seconds, ie (50*Delta simSeconds / interval realSeconds)
 				simSpeed = 100*Delta / interval
 				remainingTimeFirst = checkTimes[0] - Time
-				if len(checkTimes) > 1:
+				if (len(checkTimes) > 1 and checkTimes[0] != checkTimes[-1]):
 					remainingTimeLast = checkTimes[-1] - Time
 					remainingSimTimeFirst = remainingTimeFirst / simSpeed
 					remainingSimTimeLast  = remainingTimeLast  / simSpeed
@@ -1891,7 +1935,7 @@ while Running:
 	if STAGGERED_SIM: input()
 	MainLoop.STEP(camera)
 	if REAL_TIME:
-		Delta = time.time() - frameStart
+		MainLoop.setDelta(time.time() - frameStart)
 		frameStart = time.time()
 	turtle.update()
 	if (RECORD_SCREEN):
