@@ -2,7 +2,7 @@ from math import *
 import random
 
 class vector:
-	def __init__(self, elements, unit=False):
+	def __init__(self, elements, unit=False): #NOFP
 		self.elements 	= elements
 		self.dim 		= len(elements)
 		self.unit 		= unit
@@ -57,7 +57,7 @@ class vector:
 	def __neg__(self):
 		return self.reverse()
 
-	def __str__(self):
+	def __str__(self): #NOFP
 		return ("<" + ", ".join([str(x) for x in self.elements]) + ">")
 
 	# A better way of getting the string format of a vector, allows rounding of each element
@@ -67,7 +67,7 @@ class vector:
 		else:
 			return ("<" + ", ".join([str(x) for x in self.elements]) + ">")
 
-	def __repr__(self):
+	def __repr__(self): #NOFP
 		return str(self)
 
 	def __getitem__(self, value):
