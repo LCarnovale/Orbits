@@ -2,6 +2,8 @@
 # Date  : April to May ish?
 # Orbits 4T
 
+# On surface tablet, 71.1mm = 400 pixels.
+# --> 5.63 pixels / mm
 
 # This could help find radii for the stars: https://www.physicsforums.com/threads/star-radius-mass-from-spectral-class-b-v-luminosity.868047/
 
@@ -13,6 +15,7 @@ import time
 import vector
 import loadSystem
 import particle as Pmodule
+import copy
 
 randomVector = vector.randomVector
 vector = vector.vector
@@ -27,6 +30,7 @@ marker   = Pmodule.marker
 particle = Pmodule.particle
 
 print("Starting Orbits4T")
+PROGRAM_START = time.time()
 
 LINUX = False # If true, then non alphanumeric key controls will be replaced with numbers
 
@@ -69,6 +73,8 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-es" :     [int,	False,	False,  5], # Make earth satellites
 "-WB" :     [str,   False,	False,	True], # Write buffer to file
 "-rp" :     [float, False,  False,  0.6], # Make random planets
+"-cf" :     [str,	False,  False,  True], # Use complex flares
+"-sr" :     [int,   False,  True], # Make rings (really just a thin asteroid belt) around Saturn
 "-rg" :     [str,   False,  False,  True], # Record gif shots
 "-tn" :     [str,   False,  False,  True], # True n-body simulation. When off program makes some sacrifices for performance boost.
 "-asb" :    [int,   4,      True], # Number of bodies in the auto-systems.
@@ -130,9 +136,9 @@ Key|Parameter type|Description
 -tn  :              Runs the simulation in True N-body mode, making calculations of acceleration due the
                         gravity of all bodies to all bodies. Much slower but usually much more accurate
                         (Really not worth turning on for presets like the solar system)
-                      If left on, (ie the argument is not used) then the most influencial bodies at the
+                        If left on, (ie the argument is not used) then the most influencial bodies at the
                         start are the only ones that affect that body for the rest of the simulation.
-                      But, for some presets this is ON by default.
+                        But, for some presets this is ON by default.
 -asb :  int         Number of bodies in auto generated systems.
 -flim:  float       Frame limit.
 -df  :  string      Path of the data file.
@@ -141,7 +147,7 @@ Key|Parameter type|Description
                         given with this parameter will be used as the maximum apparent magnitude from
                         Earth of the stars loaded. The default is 4.5, which loads about 510 stars.
 -PM  :              Enters the preset maker, allowing you to design a preset.
--P?  :                  Shows the available presets then exits.
+-P?  :              Shows the available presets then exits.
 -AA_OFF:            Turn off AutoAbort. (AutoAbort will kill the simulation if two consecutive frames
                         last longer than a second, it's only trying to help you not bring your
                         computer to a standstill, be careful if you choose to abandon it)
@@ -256,15 +262,29 @@ HOUR    = 60 *	MINUTE
 DAY     = 24 *	HOUR
 YEAR    = 365 * DAY
 
+# Distance constants
+LIGHT_SPEED = 299792458
+LIGHT_YEAR  = LIGHT_SPEED * YEAR
+AU      = 149597870700
+PARSEC  = 3.085677581e+16
+
 # Preset 3
 AsteroidsStart 	 = 249.23 * 10**9 # Places the belt roughly between Mars and Jupiter.
 AsteroidsEnd 	 = 740.52 * 10**9 # Couldn't find the actual boundaries (They're probably pretty fuzzy)
 AsteroidsMinMass = 0.0001 * 10**15
 AsteroidsMaxMass = 1	  * 10**23
 AsteroidsDensity = 1500
-randomPlanets = args["-rp"][1]
-DEFAULT_SYSTEM_SIZE = args["-asb"][1] # Default number of bodies to add to a system
-TRUE_NBODY = args["-tn"][1]
+  # Saturn ring constants
+STRN_RING_MIN_MASS    = 10
+STRN_RING_MAX_MASS    = 1000
+STRN_RING_DENSITY     = 1000
+STRN_RING_MIN_RADIUS  = 7e6
+STRN_RING_MAX_RADIUS  = 50e6
+STRN_RING_THICKNESS   = 1e5
+  # Random planets settings
+randomPlanets         = args["-rp"][1]
+DEFAULT_SYSTEM_SIZE   = args["-asb"][1] # Default number of bodies to add to a system
+TRUE_NBODY            = args["-tn"][1]
 
 # Preset 4
 PRESET_4_MIN_RADIUS = 40
@@ -278,16 +298,11 @@ SUN_MASS     = 1.989e30
 SUN_RADIUS   = 695.7e6
 
 # Random Planet Settings
-MIN_PERIOD   = 30 * DAY
-MAX_PERIOD   = 250 * YEAR
+MIN_PERIOD   = 20 * DAY
+MAX_PERIOD   = 150 * YEAR
 MAX_PLANET_COUNT = 12
 MIN_PLANET_COUNT = 1
 
-# Distance constants
-LIGHT_SPEED = 299792458
-LIGHT_YEAR  = LIGHT_SPEED * YEAR
-AU      = 149597870700
-PARSEC  = 3.085677581e+16
 
 # Misc settings
 particle.ALL_IMMUNE = False
@@ -313,10 +328,13 @@ DEFAULT_ZERO_VEC = [0, 0, 0]
 DEFAULT_UNIT_VEC = [1, 0, 0]
 
 # Drawing/Visual constants
-FLARE_BASE = 1.01 # Must be greater than 1
+MAG_SHIFT  = 1               # All apparent magnitudes are shifted by this amount before being drawn
+FLARE_BASE = 1.06            # Must be greater than 1
 MIN_CLICK_RESPONSE_SIZE = 10 # Radius of area (in pixels) around centre of object that can be clicked
                              # depending on its size
 MIN_BOX_WIDTH = 50
+COMPLEX_FLARE = args["-cf"][1]
+SHOW_SCREENDEPTH = True
 
 ## Load presets
 inBuiltPresets = ["1", "2", "3", "4", "5"]
@@ -448,14 +466,14 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	screenY = localY * cos(angle) + localX * sin(angle)
 
 	flareWidth = 0
-	# if (mag != None): mag -= 1
+	if (mag != None): mag += MAG_SHIFT
 	if (mag != None and points <= 2):
 		# fill = [1, 1, 1]
-		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
+		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)**(1.4)
 	elif (points <= 2 and mag == None):
 		fill = [1, 1, 1]
 	elif (mag):
-		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)
+		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)**(1.4)
 
 	if box:
 		boxRadius = max(MIN_BOX_WIDTH, major * 1.4 + flareWidth) / 2
@@ -497,20 +515,28 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	if (drawStars):
 		turtle.up()
 		turtle.goto(x, y)
+		turtle.pencolor(fill)
 		if (mag == None):
 			if (points < 2):
 				turtle.dot(2)
 			return True
 
 
-		# The function brightness = (a*b^r - a + 1) gives a good gradient for a flare
+		# The function: brightness = (a*b^r - a + 1) gives a good gradient for a flare
 		# b is FLARE_BASE, the higher it is the steeper the curve, and the faster it fades to black.
-		a = 1 + 1 / (FLARE_BASE**flareWidth - 1)
-		for r in range(int(flareWidth), 0, -1):
-			rMag = a * FLARE_BASE**(-r) - a + 1
-			if (rMag < 0.005): continue
-			turtle.pencolor([x * rMag for x in fill])
-			turtle.dot((r) + minor)
+		if COMPLEX_FLARE and (FLARE_BASE**flareWidth != 1):
+			a = 1 + 1 / (FLARE_BASE**flareWidth - 1)
+			for r in range(int(flareWidth), 0, -1):
+				rMag = a * FLARE_BASE**(-r) - a + 1
+				if (rMag < 0.001): continue
+				turtle.pencolor([x * rMag for x in fill])
+				turtle.dot((r) + minor)
+		else:
+			for r in range(int(flareWidth), 0, -1):
+				rMag = ((flareWidth - r) / flareWidth) ** 2
+				if (rMag < 0.005): continue
+				turtle.pencolor([x * rMag for x in fill])
+				turtle.dot((r) + minor)
 
 
 	# else:
@@ -539,6 +565,7 @@ prefixes = [
 	["! Parsecs",PARSEC],
 	["! light years",LIGHT_YEAR],
 	["P",1e15],
+	["! AU", AU],
 	["T",1e12],
 	["G",1e9],
 	["M",1e6],
@@ -546,7 +573,7 @@ prefixes = [
 	["" ,1e0],
 	["m",1e-3],
 	[u"\u03BC",1e-6]
-]
+] # 149,597,870,700
 # Returns a string of num reduced with the appropriate prefix
 def numPrefix(num, unit, rounding=3, standardOnly=False):
 	# unit is a string, ie 'm', 'g'
@@ -555,7 +582,7 @@ def numPrefix(num, unit, rounding=3, standardOnly=False):
 	# That won't happpen if standardOnly is True
 	global prefixes
 	for p in prefixes:
-		if (num > p[1]):
+		if (num > p[1]*0.8):
 			if (p[0] and p[0][0] == "!" and not standardOnly):
 				result = str(round(num / p[1], rounding)) + p[0][1:] + unit[1:]
 			else:
@@ -579,6 +606,69 @@ def radiusTerm(radius):
 	else:
 		return ("%.5e Earth radii" % (radius / EARTH_RADIUS))
 
+# Fill's a nested dictionary. Really designed only for use with
+# the planet-child tree
+def fillDict(particle):
+	if (not particle.child): return None
+
+	result = {}
+	for c in particle.child:
+		result[c] = fillDict(c)
+	return result
+
+# Finds the next object after current in a planet tree
+def findNext(tree, current, avoidChild = False, previous=False):
+	global orderedParticleList
+	if (not tree):
+		return None
+	elif (current not in tree):
+		for p in tree:
+			temp = findNext(tree[p], current, avoidChild, previous)
+			if temp: return temp
+			if temp == False:
+				# False is only returned when there are no next particles in next tree level,
+				# but the particle has a parent. The parent will be in this level.
+				# If the previous isn't found then it will immediately return the parent,
+				# so if previous is true then this line won't ever be read.
+				return findNext(tree, current.parent, True)
+		return None
+	else:
+		if current.child and not (avoidChild or previous): return current.child[0]
+		globalIndex = orderedParticleList.index(current)
+		best = (len(orderedParticleList) if not previous else 0)
+		found = False
+
+		if previous:
+			for p in tree:
+				tempIndex = orderedParticleList.index(p)
+				if ((tempIndex < globalIndex) and (tempIndex > best)):
+					found = True
+					best = tempIndex
+		else:
+			for p in tree:
+				tempIndex = orderedParticleList.index(p)
+				if ((tempIndex > globalIndex) and (tempIndex < best)):
+					found = True
+					best = tempIndex
+		if found:
+			foundParticle = orderedParticleList[best]
+			return foundParticle
+		elif current.parent:
+			if previous: return current.parent
+			return False
+		else:
+			return None
+
+# Just for debugging.
+def printTree(tree, indent=0):
+	for t in tree:
+		if not tree[t]:
+			print("\t" * indent + t.name)
+		else:
+			print("\t" * indent + t.name + ":")
+			printTree(tree[t], indent+1)
+
+
 def timeString(seconds, rounding=3):
 	if seconds < 60:
 		return ("{}s".format(round(seconds, rounding)))
@@ -586,18 +676,18 @@ def timeString(seconds, rounding=3):
 	minutes = seconds / 60
 	minutes = int(minutes)
 	if minutes < 60:
-		return ("{}:{}s".format(int(minutes), round(seconds % 60, rounding)))
+		return ("{}:{}s".format(("%02d"%(int(minutes))), round(seconds % 60, rounding)))
 
 	hours = minutes / 60
 	if hours < 24:
-		return ("{}:{}:{}s".format(int(hours), int(minutes % 60), round(seconds % 60, rounding)))
+		return ("{}:{}:{}s".format(int(hours), ("%02d"%(int(minutes % 60))), round(seconds % 60, rounding)))
 
 	days = hours / 24
 	if days < 365:
-		return ("{} days, {}:{}:{}s".format(int(days), int(hours % 24), int(minutes % 60), round(seconds % 60, rounding)))
+		return ("{} days, {}:{}:{}s".format(int(days), int(hours % 24), ("%02d"%(int(minutes % 60))), round(seconds % 60, rounding)))
 
 	years = days / 365
-	return ("{} years, {} days, {}:{}:{}s".format(int(years), int(days % 365), int(hours % 24), int(minutes % 60), round(seconds % 60, rounding)))
+	return ("{} years, {} days, {}:{}:{}s".format(int(years), int(days % 365), int(hours % 24), ("%02d"%(int(minutes % 60))), round(seconds % 60, rounding)))
 
 class buffer:
 	def __init__(self):
@@ -606,16 +696,13 @@ class buffer:
 		self.bufferLength = 0
 		self.emptyBuffers = len(particleList)
 		self.bufferCount = self.emptyBuffers
+
+
+	def initialise(self):
+		self.buffer = {}
 		for p in particleList:
 			self.buffer[p] = []
 
-	# def __sizeof__(self):
-	# 	return (self.bufferLength * sys.getsizeof(self.buffer[particleList[0]]) * len(particleList))
-
-	def addParticle(self, particle):
-		self.buffer[p]    = [] * (bufferLength + 1)
-		self.emptyBuffers += 1
-		self.bufferCount  += 1
 
 	def bufferModeString(self):
 		if (self.bufferMode == 0):
@@ -625,56 +712,65 @@ class buffer:
 		elif (self.bufferMode == 2):
 			return "Playing"
 
-	# def getBuffer(self, particle, index = -1, remove = None):
-	#     if self.bufferLength > 0:
-	#         result = self.buffer[particle][index]
-	#         if remove != None: self.buffer[particle].pop(remove)
-	#         return result
-	#     else:
-	#         return False
+	# Takes a particle and if needed stores its position.
+	# Can be called on a particle regardless of whether or not
+	# the buffer is buffering.
+	def storeBuffer(self, particle):
+		if (self.bufferMode == 1):
+			# Store the position.
+			print("Storing", particle)
+			self.buffer[p].append(
+				[p.pos.getClone(), p.radius, p.colour]
+			)
+			print(self.buffer[p])
+			# else:
+				# self.buffer[p].append(None)
+		else:
+			# No use for the particle.
+			return
 
-	def addBuffer(self, particle):#, colour = None):
+
+	def buildBuffer(self, particle):
 		pos = particle.pos.getClone()
 		rad = particle.radius
 		colour = particle.colour
 		vel = particle.vel.getClone()
 		acc = particle.acc.getClone()
-		self.bufferLength += 1
-		if (not self.buffer[particle]):
-			self.emptyBuffers -= 1
 		if (DRAW_VEL_VECS):
 			self.buffer[particle].append([pos, rad, colour, vel, acc])
 		else:
 			self.buffer[particle].append([pos, rad, colour])
+		if len(self.buffer[particle]) == 1: self.emptyBuffers -= 1
 
 
-	def playBuffer(self, particle, index = 0, remove = True):
-		if (not self.buffer[particle]):
-			self.emptyBuffers += 1
-			# self.bufferMode = 0
-			return False
-		buff = self.buffer[particle][index]
-		if remove:
-			self.bufferLength -= 1
-			self.buffer[particle].pop(index)
-		return buff
 
-	def processPosition(self, particle, defaultIndex = 0, playIndex = 0, playRemove = True):
+	def playBuffer(self, particle, index = 0):
+		if (index > len(self.buffer[particle])):
+			print("Attempting to access non-existant buffer.")
+			exit()
+		elif not self.buffer[particle]: return False
+		if len(self.buffer[particle]) == 1: self.emptyBuffers += 1
+		return self.buffer[particle].pop(index)
+
+
+	def processPosition(self, particle, playIndex = 0, playRemove = True):
 		# A kind of autopilot, takes in a position and returns basically what the camera should see.
 		if self.bufferMode == 2:
 			if (self.emptyBuffers == self.bufferCount):
+				# All buffers are empty.
 				self.bufferMode = 0
 				return False
 			# playing
-			# print("Playing particle")
-			play = self.playBuffer(particle, playIndex, playRemove)
-			# if (play):
+			play = self.playBuffer(particle, playIndex)
 			return play
 
 		elif self.bufferMode == 1:
 			# recording. Don't let the particle move.
-			# print("Recording. Keeping particle frozen.")
-			self.addBuffer(particle)
+			# print("recording")
+			self.buildBuffer(particle)
+			# print(self.buffer[particle])
+			# print(particle)
+			# print(self.buffer)
 			return self.buffer[particle][0]
 		else:
 			return False
@@ -701,9 +797,9 @@ class MainLoop:
 		self.FPS = 1
 		self.frameWarning = False
 		self.displayData = True
-		self.DataDisplay = {
+		self.DataDisplay = [
 		#  	Title		 [<is a function>, object]
-		}
+		]
 
 	def Zero(self):
 		self.commonShiftPos = DEFAULT_ZERO_VEC
@@ -719,10 +815,10 @@ class MainLoop:
 		self.Delta = delta
 
 	def addData(self, name, data, isExpression=False, default=None):
-		self.DataDisplay[name] = [isExpression, data, default]
+		self.DataDisplay.append([name, isExpression, data, default])
 
 	def addDataLine(self):
-		self.DataDisplay["\n"] = None
+		self.DataDisplay.append("NL")
 
 	def showData(self):
 		if not self.displayData: return False
@@ -739,35 +835,41 @@ class MainLoop:
 		else:
 			distString = numPrefix(abs(camera.pos - self.closestParticle.pos), "m")
 		text = """Frame Rate: %s
-Buffermode: %s (%d)
-Particle Count: %d Delta: %f
-Paused: %s         Time:  %s
+Buffermode: %s (%d) \tScreenDepth: %f
+Particle Count: %d  \tDelta: %f
+Paused: %s          \tTime:  %s
 Distance to closest particle: %s
 		""" % (
 			(("%.2f"%self.FPS) if self.FPS != 999 else "INFINITY!!"),
 			Buffer.bufferModeString(),
 			(0 if Buffer.bufferCount == 0 else Buffer.bufferLength / Buffer.bufferCount),
-			len(particleList),
+			camera.screenDepth, len(particleList),
 			self.Delta,
 			pauseString,
 			time,
 			distString)
 			#("---" if not self.closestParticle else numPrefix(abs(camera.pos - self.closestParticle.pos), "m"))
 
+		maxLen = max([len(x[0]) for x in self.DataDisplay])
 
 		for data in self.DataDisplay:
 			text += "\n"
-			if self.DataDisplay[data] == None:
+			if data == "NL":
 				continue
-			text += data + ":\t"
-			if (self.DataDisplay[data][0]):
-				# print(self.DataDisplay[data][1])
+			text += data[0] + (maxLen - len(data[0]))*"  " + ("\t: " if data[1] else "")
+			if (data[1]):
 				try:
-					value = eval(self.DataDisplay[data][1])
+					value = eval(data[2])
+				# except KeyError:
+				# 	value = "KEY_ERROR"
+				# except NameError:
+				# 	value = "NAME_ERROR"
+				# except ValueError:
+				# 	value = "VALERROR"
 				except Exception:
-					value = self.DataDisplay[data][2]
+					value = data[3]
 			else:
-				value = self.DataDisplay[data][1]
+				value = data[2]
 			text += str(value)
 
 		width = screenWidth()
@@ -812,15 +914,14 @@ Distance to closest particle: %s
 			camera.drawParticle(m)
 		clickTarget = None
 		if (self.clickTarget):
-			clickTarget = self.clickTarget.pop(0)
+			clickTarget = self.clickTarget.pop(0)       # Puts the earliest click position in clickTarget
 			if (clickTarget[2] == 0):
-				camera.panTrackSet()
+				# camera.panTrackSet()                  # Left click
+				pass
 			elif (clickTarget[2] == 1):
-				camera.rotTrackSet()
+				camera.rotTrackSet()                    # Right click
 		self.closestParticle = None
 
-		# camera.pos += self.commonShiftPos
-		# print("Target pos: %s" % ("None" if not MainLoop.target else MainLoop.target.pos))
 		camera.step((delta if doStep else 0), pan, panAmount)
 		if doStep:
 			if camera.panTrack:
@@ -831,6 +932,15 @@ Distance to closest particle: %s
 			camera.panFollow()
 		if camera.rotTrack:
 			camera.rotFollow()
+		# if Buffer.bufferMode == 0:
+		# 	stepList = particleList
+		# 	buffering = False
+		# elif Buffer.bufferMode == 1:
+		# 	stepList = Buffer.readBuffer()
+		# 	buffering = True
+		# else:
+		# 	stepList = Buffer.playBuffer()
+		# 	buffering = True
 		for I, p  in enumerate(particleList):
 			if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
 				# Swap the previous one with the current one
@@ -841,7 +951,7 @@ Distance to closest particle: %s
 				self.closestParticle = p
 			elif (pWarp and pWarp < warpedDistance(self.closestParticle)):
 				self.closestParticle = p
-			# if (doStep):
+
 			if doStep and not (p == camera.panTrack or p == camera.rotTrack):
 				p.step(delta, camera)
 				# This bit is for preset 5, shouldn't be used otherwise
@@ -880,8 +990,6 @@ Distance to closest particle: %s
 							# Right click
 							camera.rotTrackSet(p)
 
-
-
 		frameEnd = time.time()
 		frameLength = frameEnd - frameStart
 		if (frameLength == 0):
@@ -919,6 +1027,19 @@ Distance to closest particle: %s
 		if self.displayData: self.showData()
 		self.Zero()
 
+class Matrix:
+	def __init__(self, array):
+		"""Array should be 2 dimensional, ie: [[Column], ..., [Column]] etc."""
+		self.array = array
+
+	def vecFromColumn(self, colIndex):
+		return vector(self.array[colIndex])
+
+	def vecFromRow(self, rowIndex):
+		return vector([x[rowIndex] for x in self.array])
+
+	def vecMultiply(self, vec):
+		return vector([self.vecFromRow(x).dot(vec) for x in range(len(self.array))])
 
 class camera:
 	# Main job: work out where a dot should go on the screen given the cameras position and rotation and the objects position.
@@ -937,7 +1058,7 @@ class camera:
 		], unit=True)
 		self.panStart = self.pos # When flying to a position, the speed is based on the progress from start to finish.
 		self.rotStart = self.rot # Similar to above but for rotation
-
+		self.TransformMatrix = Matrix([[0, 0], [0, 0], [0, 0]])
 	# total distance, maxSpeed, destination, at speed(0, 1 or 2), stopping distance, position of closest particle at start.
 	# Stored so they aren't calculated each step.
 	panInfo = [0, 0, vector([0, 0, 0]),
@@ -952,12 +1073,16 @@ class camera:
 	absolutePan = vector([0, 0, 0])
 
 	def setScreenDepth(self, value, increment=False):
+		if (-value >= self.screenDepth):
+			print("Screen depth already at {}, can't decrement by {}.".format(self.screenDepth, -value))
+			return False
 		if increment:
 			self.screenDepth += value
 			difference = value
 		else:
 			difference = value - self.screenDepth
 			self.screenDepth = value
+
 		# self.pos -= self.rot * difference
 
 	#   Checks if the camera is still moving to the particle or if it has arrived
@@ -975,7 +1100,7 @@ class camera:
 		# direction as a 2 element list [x, y]
 		self.screenXaxis = self.screenXaxis.rotateAbout(self.screenYaxis, direction[0] * rate)
 		self.screenYaxis = self.screenYaxis.rotateAbout(self.screenXaxis, direction[1] * rate)
-		self.rot = self.screenYaxis.cross(self.screenXaxis)
+		self.rot =         self.screenYaxis.cross(self.screenXaxis)
 		self.screenXaxis = self.screenXaxis.rotateAbout(self.rot,         direction[2] * rate)
 		self.screenYaxis = self.screenYaxis.rotateAbout(self.rot,         direction[2] * rate)
 		self.rot.setMag(1)
@@ -985,7 +1110,7 @@ class camera:
 	# 	converted from the particles m/s to m/step for the camera, simply by
 	# 	multiplying the velocity in m/s by the time step (delta)
 	def step(self, delta, pan=[0, 0, 0], panRate=1):
-		self.screenRadius = (screenWidth()**2 + screenHeight()**2)**(1/2)
+		if (self.screenRadius == 0): self.screenRadius = (screenWidth()**2 + screenHeight()**2)**(1/2)
 		panShift = (pan[0] * self.screenXaxis +
 					pan[1] * self.screenYaxis +
 					pan[2] * self.rot) * panRate
@@ -995,11 +1120,14 @@ class camera:
 
 		self.vel = panShift
 		if self.panTrack:
-			self.vel += self.panTrack.vel * delta
+			self.vel += self.panTrack.vel * delta + self.panTrack.acc * delta**2
 			# self.trackSeparate += panShift
 		self.vel += self.absolutePan
 		self.pos += self.vel
 		self.absolutePan *= 0
+		# if (self.vel):
+		#
+		# 	self.TransformMatrix = Matrix([[]])
 
 	def panTrackSet(self, target = None):
 		# panInfo: [total distance, maxSpeed, destination, atSpeed (0, 1 or 2), stopping distance]. Stored so they aren't calculated each step.
@@ -1014,7 +1142,10 @@ class camera:
 			self.panInfo[5] = minDist
 			self.panStart = self.pos.getClone()
 			if ((20 * target.radius) < abs(self.pos - target.pos)):
-				destination = self.rot.mag(-20 * target.radius)
+				if (self.rotTrack and self.rotTrack != target):
+					destination = (target.pos - self.rotTrack.pos).mag(20 * target.radius) # Aligns the new destination so that we will see the object after rotating
+				else:
+					destination = self.rot.mag(-20 * target.radius)
 			else:
 				destination = self.pos - target.pos
 			self.panInfo[0] = abs(target.pos + destination - self.pos)
@@ -1071,16 +1202,14 @@ class camera:
 		# if not self.onScreen(particle): return False
 		self.rot.setMag(1)
 
-		# screenAngleX = atan(( turtle.window_width() / 2 ) / self.screenDepth)
-		# screenAngleY = atan(( turtle.window_height() / 2 ) / self.screenDepth)
 		if drawAt:
 			pos = particle[0]
 			radius = particle[1]
 			colour = particle[2]
 		else:
-			appMag = None
-			if ("absmag" in particle.info):
-				appMag = particle.info["absmag"] + 5 * log(abs(particle.pos - self.pos) / (10 * PARSEC), 10)
+			appMag = particle.absmag
+			if (appMag != None):
+				appMag += 5 * log(abs(particle.pos - self.pos) / (10 * PARSEC), 10)
 				particle.info["appmag"] = appMag
 				if (appMag > MAX_VISIBILE_MAG):
 					return False
@@ -1089,10 +1218,12 @@ class camera:
 			colour = particle.colour
 
 		# Get relative position to camera's position.
-
-
 		relPosition = pos - self.pos
 		distance = abs(relPosition)
+		# if (not drawAt):
+			# self.rot.setMag(self.screenDepth)
+			# relRotVel = min((particle.vel - self.vel).dot(self.rot), LIGHT_SPEED - 1)
+			# self.rot.setMag(1 / sqrt(1 - (relRotVel/LIGHT_SPEED)**2))
 		if (relPosition.dot(self.rot) <= 0):
 			# Only condition to exit draw if ALWAYS_DRAW is True
 			return False
@@ -1103,11 +1234,11 @@ class camera:
 			return False
 		ScreenParticleDistance = self.screenDepth * abs(relPosition) * abs(self.rot) / (relPosition.dot(self.rot))
 		relPosOnScreen = relPosition * ScreenParticleDistance / abs(relPosition)
-		relPosUnit = relPosition / abs(relPosition)
-		relRotation = relPosUnit - self.rot
-		x_r, y_r, z_r = self.rot.elements
-		x_CSP, y_CSP, z_CSP = relPosOnScreen.elements
-		x_CSC, y_CSC, z_CSC = self.rot.getClone().setMag(self.screenDepth).elements
+		# relPosUnit = relPosition / abs(relPosition)
+		# relRotation = relPosUnit - self.rot
+		# x_r, y_r, z_r = self.rot.elements
+		# x_CSP, y_CSP, z_CSP = relPosOnScreen.elements
+		# x_CSC, y_CSC, z_CSC = self.rot.getClone().setMag(self.screenDepth).elements
 
 		X = relPosOnScreen.dot(self.screenXaxis) / abs(self.screenXaxis)
 		Y = relPosOnScreen.dot(self.screenYaxis) / abs(self.screenYaxis)
@@ -1136,7 +1267,7 @@ class camera:
 			angle = 0
 		else:
 			angle = pi/2
-		drawOval(X, Y, majorAxis, minorAxis, angle, colour, box, mag=appMag)
+		drawOval(X, Y, majorAxis, minorAxis, angle, colour, box, mag=(appMag if not drawAt else None))
 		return [X, Y, majorAxis, minorAxis]
 
 	def drawAt(self, posVector, radius, colour = None, box=False):
@@ -1181,7 +1312,7 @@ class camera:
 		else:
 			relAngle = relPos.relAngle(self.rot)
 				# 'shift' is equivalent to a portion of the arc from the current rotation to the end rotation.
-			shift    = followRate * ((relAngle + 0.01) if (relAngle > 0.001 and followRate != 1) else relAngle)
+			shift    = followRate * ((relAngle + 0.02) if (relAngle > 0.001 and followRate != 1) else relAngle)
 				# shiftMag is a modified 'shift' so that adding it to rot results in a rotation of 'shift' through that arc
 			shiftMag = sin(shift) / (cos(relAngle/2 - shift))
 				# rotShift is simply a vector from the current rotation to the desired rotation of magnitude shiftMag
@@ -1292,10 +1423,11 @@ def rightClick(x, y):
 	MainLoop.clickTarget.append([x, y, 1])    # 0 for left click, 1 for right
 
 def upScreenDepth():
-	camera.setScreenDepth(10, True)
+	camera.setScreenDepth(1.05 * camera.screenDepth)
 
 def downScreenDepth():
-	camera.setScreenDepth(-10, True)
+	camera.setScreenDepth((1/1.05) * camera.screenDepth)
+	# camera.setScreenDepth(-10, True)
 
 def upMaxMag():
 	global MAX_VISIBILE_MAG
@@ -1307,10 +1439,16 @@ def downMaxMag():
 
 def upDelta():
 	# global Delta
+	# global FLARE_BASE
+	# FLARE_BASE += 0.01
+	# print(FLARE_BASE)
 	MainLoop.setDelta(MainLoop.Delta * 1.2)
 
 def downDelta():
 	# global Delta
+	# global FLARE_BASE
+	# FLARE_BASE -= 0.01
+	# print(FLARE_BASE)
 	MainLoop.setDelta(MainLoop.Delta * 1 / 1.2)
 
 def revDelta():
@@ -1355,18 +1493,18 @@ def toggleScreenData():
 	MainLoop.displayData = False if MainLoop.displayData else True
 
 def cycleTargets():
-	global planetList
+	global planetTree
 	global shiftL
 	try:
 		if not shiftL:
 			if MainLoop.target:
-				MainLoop.target = (planetList + [planetList[0]])[planetList.index(MainLoop.target) + 1]
-			else:
+				MainLoop.target = findNext(planetTree, MainLoop.target)
+			if not MainLoop.target:
 				MainLoop.target = planetList[0]
 		else:
 			if MainLoop.target:
-				MainLoop.target = planetList[planetList.index(MainLoop.target) - 1]
-			else:
+				MainLoop.target = findNext(planetTree, MainLoop.target, previous=True)
+			if not MainLoop.target:
 				MainLoop.target = planetList[-1]
 	except NameError:
 		return
@@ -1387,6 +1525,9 @@ def search(term=None, listen=True):
 		return False
 	bestBody = None
 	for body in Pmodule.particleList:
+		if term == str(body.HIPid):
+			bestBody = body
+			break
 		if not body.name: continue
 		if term == body.name:
 			MainLoop.target = body
@@ -1425,8 +1566,6 @@ camera = camera(pos = vector([0, 0, 0]))
 
 setup()
 Running = True
-
-Buffer = buffer()
 
 if preset == "1":
 	if (not args["-tn"][-1]):
@@ -1470,6 +1609,18 @@ elif preset == "2":
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
 elif preset == "3":
+	#############################
+	# Loading this preset will load planets from SolSystem.txt
+	# And, if the relevant argument is used, starts from StarsData.txt
+	# Additional notes:
+	#   - Random planets will create random planets on a certain percentage of stars
+	#     given by the -rp argument.
+	#   - All randomly created bodies (except asteroid/ring objects) will have the relevant parent assigned
+	#     to their info attribute.
+	#   - All solar system bodies (except the sun) have the relevant parent given
+	#     in the text file. Stars don't get parents. :(
+	#   - Parents are stored as objects! under:
+	#         Particle.info["parent"] = <particle object>
 	if (not args["-G"][-1]): Pmodule.G = REAL_G
 
 	if (not args["-sf"][-1]): smoothFollow = 0.04
@@ -1478,6 +1629,7 @@ elif preset == "3":
 	MainLoop.addData("Camera pan lock", "camera.panTrackLock and (camera.panTrack.name or 'True')", True)
 	MainLoop.addData("Camera rot lock", "camera.rotTrackLock and (camera.rotTrack.name or 'True')", True)
 
+	planetTree = {}
 	AUTO_RATE_CONSTANT = 1.0e9
 	Pmodule.ALL_IMMUNE = True
 	planetList = []
@@ -1505,16 +1657,17 @@ elif preset == "3":
 	MainLoop.addData("Distance to Target", "")
 	MainLoop.addData("Centre", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ), 2 ), 'm' )", True, "---")
 	MainLoop.addData("Surface", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ) - MainLoop.target.radius, 2 ), 'm' )", True, "---")
+	MainLoop.addData("Light time", "timeString(abs(MainLoop.target.pos - camera.pos)/LIGHT_SPEED)", True, "---")
 	MainLoop.addDataLine()
 	MainLoop.addData("Speed of camera", "numPrefix(abs(camera.vel), 'm/step', 2)", True, "---")
-	MainLoop.addData("Target speed relative to camera", "(numPrefix(abs(camera.panTrack.vel - camera.vel / MainLoop.Delta), 'm/s') if abs(camera.panTrack.vel - camera.vel / MainLoop.Delta) > 0.0001 else 0)", True, "---")
+	MainLoop.addData("Target speed relative to camera", "(numPrefix(abs(MainLoop.target.vel - camera.vel / MainLoop.Delta), 'm/s') if abs(MainLoop.target.vel - camera.vel / MainLoop.Delta) > 0.0001 else 0)", True, "---")
 	MainLoop.addDataLine()
 
 	bigVec = vector([0, 0, 0])
 	for planet in Data:
 		data = Data[planet]
 		if (planet == "$VAR"):
-			if ("TIME" in Data[planet]): MainLoop.Time = Data[planet]["TIME"]
+			if ("TIME" in data): MainLoop.Time = data["TIME"]
 			continue
 
 		if data["$valid"]:
@@ -1522,20 +1675,51 @@ elif preset == "3":
 			vel = vector([data["VX"], data["VY"], data["VZ"]]) * 1000
 			mass = data["MASS"]
 			density = data["DENSITY"]
+			planetName = data["NAME"]
 			new = particle(mass, pos, vel, density=density, autoColour=False,
-						colour=(colours[planet] if planet in colours else [0.5, 0.5, 0.5]),
-						limitRadius=False, name=planet)
+						colour=(colours[planetName] if planetName in colours else [0.5, 0.5, 0.5]),
+						limitRadius=False, name=planetName)
 			new.info["appmag"] = 0
 			if data["ABSMAG"]: new.info["absmag"] = data["ABSMAG"]
+			if data["PARENT"]: new.info["parent"] = data["PARENT"]
+
 			planetList.append(new)
-			planets[planet] = new
+			planets[planetName] = new
+
 			bigVec += new.pos
-	camera.pos = bigVec
+
+	camera.pos = bigVec.cross(planets["Mercury"].pos.mag(1))
+	camera.rotTrackSet(planets["Sun"])
+	camera.lockRot()
 	MainLoop.target = planets["Earth"]
 	if "Phobos" in planets:
 		planets["Phobos"].immune = False # Screw you phobos
 	MainLoop.addData("Absolute Magnitude", "MainLoop.target.info['absmag']", True, "---")
 	MainLoop.addData("Apparent Magnitude", "round(MainLoop.target.info['appmag'],2)", True, "---")
+
+	if args["-sr"][1]:
+		# Make saturnian rings
+		objectCount = args["-sr"][1]
+		STRN_RING_MIN_RADIUS = planets["Saturn"].radius + STRN_RING_MIN_RADIUS
+		STRN_RING_MAX_RADIUS = planets["Saturn"].radius + STRN_RING_MAX_RADIUS
+		ringWidth = STRN_RING_MAX_RADIUS - STRN_RING_MIN_RADIUS
+		saturnPos = planets["Saturn"].pos
+		# Make axis from average axis of other moons
+		ringAxis = vector([0, 0, 0])
+		for moon in [m for m in particleList if (m.parent == "Saturn")]:
+			ringAxis += moon.pos
+		ringAxis.setMag(1)
+		for i in range(objectCount):
+			# objectRadius = random.random() * ringWidth + STRN_RING_MIN_RADIUS
+			objectMass = random.random() * (
+				STRN_RING_MAX_MASS - STRN_RING_MIN_MASS
+			) + STRN_RING_MIN_MASS
+			objectPos = randomVector(3, STRN_RING_MIN_RADIUS, STRN_RING_MAX_RADIUS).makeOrthogonal(ringAxis)
+			offset = randomVector(3, 0, STRN_RING_THICKNESS)
+			objectPos += offset
+			new = particle(objectMass, objectPos + saturnPos, autoColour = False,
+			        colour = "white", limitRadius=False, immune=False)
+			new.circularise(planets["Saturn"], axis = ringAxis)
 
 	if makeAsteroids:
 		beltRadius = (AsteroidsEnd - AsteroidsStart) / 2
@@ -1557,20 +1741,22 @@ elif preset == "3":
 	if makeSatellites:
 		for i in range(makeSatellites):
 			offset = randomVector(3, radius)
-			particle(1000, earthVec + offset, autoColour = False, colour = "grey").circularise(planets["Earth"])
+			particle(10000, earthVec + offset, autoColour = False, colour = "grey", immune=True).circularise(planets["Earth"])
 
 	if getStars:
 		print("Loading stars...")
 		MainLoop.addData("Maximum visible magnitude", "round(MAX_VISIBILE_MAG,2)", True)
-		MainLoop.addData("Earth magnitude", "MainLoop.target.info['mag']", True, "---")
-		MainLoop.addData("Surface temperature", "MainLoop.target.info['temp']", True, "---")
-		MainLoop.addData("Colour index", "MainLoop.target.info['ci']", True, "---")
+		MainLoop.addData("Earth magnitude", "MainLoop.target.mag", True, "---")
+		MainLoop.addData("Surface temperature", "MainLoop.target.temp", True, "---")
+		MainLoop.addData("Colour index", "MainLoop.target.ci", True, "---")
 		MainLoop.addDataLine()
-		MainLoop.addData("Hipparcos catalog id", "MainLoop.target.info['HIP id']", True, "---")
-		if (getStars < 22):
+		MainLoop.addData("Hipparcos catalog id", "MainLoop.target.HIPid", True, "---")
+		if (getStars < 10):
 			STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)], quiet=False)
+			# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($absmag < {})".format(getStars)], quiet=False)
 		else:
 			STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
+			# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist<={}".format(getStars)], quiet=False)
 #			print("Loading named stars...")
 #			STARS_DATA.update(loadSystem.loadFile("StarsData.txt", key=["\"$proper\" != 'None'", "$dist != 100000"], quiet = False))
 
@@ -1596,7 +1782,7 @@ elif preset == "3":
 			vY = STAR["vy"]
 			vZ = STAR["vz"]
 			# print("Looking at star:", STAR["proper"], end = "")
-			massIndex = random.random() * 10 + 30
+			massIndex = random.random() * 1.5 + 30
 			new = particle(10**(massIndex), vector([X, Y, Z]) * PARSEC,
 				vector([vX, vY, vZ]) * PARSEC / YEAR, static=True,
 				name=STAR["proper"], density=1e3, immune=True, limitRadius=False)
@@ -1606,7 +1792,7 @@ elif preset == "3":
 			new.info["appmag"] = 0
 			new.info["absmag"] = STAR["absmag"]
 			new.info["mag"] = STAR["mag"]
-			new.info["HIP id"] = "None" if not STAR["hip"] else int(STAR["hip"])
+			new.info["HIPid"] = "None" if not STAR["hip"] else int(STAR["hip"])
 			new.info["ci"] = (None if not STAR["ci"] else STAR["ci"])
 			if (new.info["ci"] != None):
 				new.info["temp"] = 4600 * ((1 / ((0.92 * new.info["ci"]) + 1.7)) + (1 / ((0.92 * new.info["ci"]) + 0.62)) )
@@ -1626,12 +1812,13 @@ elif preset == "3":
 				system.static = False
 				Pmodule.nonStaticList.append(system)
 				dbgCounter = 0
-				maxRadius = (Pmodule.G * system.mass * MAX_PERIOD**2 / 4 * pi) ** (1/3)
-				minRadius = (Pmodule.G * system.mass * MIN_PERIOD**2 / 4 * pi) ** (1/3)
+				maxRadius = (Pmodule.G * system.mass * MAX_PERIOD**2 / 4 * pi**2) ** (1/3)
+				minRadius = (Pmodule.G * system.mass * MIN_PERIOD**2 / 4 * pi**2) ** (1/3)
 				planetCount = ( int( random.random() * (MAX_PLANET_COUNT - MIN_PLANET_COUNT) ) + MIN_PLANET_COUNT)
 				for i in range(planetCount):
 					dbgCounter += 1
-					newPos = randomVector(3, minRadius, maxRadius).makeOrthogonal(systemAxis + randomVector(3, 0, 3))
+					radius = random.random()**3 * (maxRadius - minRadius) + minRadius
+					newPos = randomVector(3, radius).makeOrthogonal(systemAxis + randomVector(3, 0, 3))
 					newPos += system.pos
 					newMass = EarthMass*10**(((random.random()-1/2)*2)**3 * 2)
 					new = particle(
@@ -1642,6 +1829,7 @@ elif preset == "3":
 						density = (random.random() + 0.5)*density, limitRadius = False,
 						name = "%s - %d"%(system.name, i))
 					new.circularise(system, axis = systemAxis + randomVector(3, 0, 2))
+					new.info["parent"] = system
 					planetList.append(new)
 				print("Making system for %s. %d planets made." % (system.name, dbgCounter))
 					# MainLoop.target = new
@@ -1650,7 +1838,43 @@ elif preset == "3":
 	search("Earth", listen=False)
 	togglePanTrack()
 	clearTarget()
-	# time.sleep(1)
+
+	# Fill out tree
+	print("Building parent-child tree...")
+	for p in particleList:
+		if p.parent:
+			if (type(p.parent) == str):
+				if p.parent not in planets:
+					print("Error: Non existant parent (%s) referred to." % (p.parent))
+					p.parent = None
+					continue
+				else:
+					p.parent = planets[p.parent]
+			if not p.parent.child:
+				p.parent.info["child"] = [p]
+			else:
+				p.parent.child.append(p)
+
+	# Now for the long bit...
+	for p in particleList:
+		if not p.parent:
+			if not p.child:
+				planetTree[p] = None
+			else:
+				planetTree[p] = fillDict(p)
+
+	# printTree(planetTree)
+	# for i in range(10):
+	# 	randParticle = random.sample(particleList, 1)[0]
+	# 	print("Random planet: %s" % (randParticle.name))
+	# 	nextParticle = findNext(planetTree, randParticle)
+	# 	print("Next planet: %s" % (nextParticle.name))
+	# 	prevParticle = findNext(planetTree, randParticle, previous=True)
+	# 	print("Previous particle: %s" % (prevParticle.name))
+	# 	print()
+
+	# for p in planetTree:
+	# MainLoop.abort()
 
 elif preset == "4":
 	# defaultDensity = 10
@@ -1696,8 +1920,11 @@ elif preset == "5":
 	new = particle(100, vector([0, 0, 0]), radius = 90, immune=True, limitRadius=False)
 # if not TestMode:
 
+# print("True nbody: {}, supplied: {}".format(TRUE_NBODY, args["-tn"][-1]))
 
-if not (TRUE_NBODY):
+Buffer = buffer()
+
+if (TRUE_NBODY == False or TRUE_NBODY == "False"):
 	print("Auto-assigning systems...")
 
 	# forces = {}
@@ -1705,7 +1932,7 @@ if not (TRUE_NBODY):
 		forces = []
 		# Now go through the list a second time and find the accelerations due to each particle
 		for p2 in particleList:
-			if (p1 == p2): continue
+			if (p1.pos == p2.pos): continue
 			forces.append([p2, abs(p1.calcAcc(p2, True))])
 		# Pick the top few particles attracting p1
 		forces.sort(key=lambda x:x[1], reverse = True)
@@ -1716,8 +1943,14 @@ if not (TRUE_NBODY):
 	# print("ISS system:", ", ".join([x.name for x in planets["ISS"].system]))
 	# print("Earth system:", ", ".join([x.name for x in planets["Earth"].system]))
 	# print("Voyager1 system:", ", ".join([x.name for x in planets["Voyager1"].system]))
+# else:
+# 	print("TRUE_NBODY:", TRUE_NBODY, "Type:", type(TRUE_NBODY))
 
+orderedParticleList = list(particleList)
 print("Done! Starting simulation...")
+PROGRAM_LOADED = time.time()
+loadTime = PROGRAM_LOADED - PROGRAM_START
+print("Simulation loaded in %s" % (timeString(loadTime)))
 
 def startRecord():
 	global RECORD_SCREEN
@@ -1916,7 +2149,7 @@ if TestMode:
 	exit()
 
 turtle.listen()
-
+Buffer.initialise()
 frameStart = time.time()
 MainLoop.setDelta(Delta)
 if REAL_TIME:
