@@ -288,21 +288,7 @@ class vector:
 	# Makes the vector orthogonal to other. (?)
 	def makeOrthogonal(self, other):
 		return other.cross(self).cross(other).mag(abs(self))
-		# """element --> index of the array of elements, default 2
-		# Maintains magnitude"""
-		# initialMag = self.getMag()
-		# if self.dim != other.dim: return False
-		# result = 0
-		# if other.elements[element] == 0:
-		# 	while other.elements[element] == 0:
-		# 		element = (element + 1) % self.dim # Loops through only the elements in the vector
-		# for i in range(self.dim):
-		# 	if i != element:
-		# 		result += self.elements[i] * other.elements[i]
-		# result = -(result / other.elements[element])
-		# self.elements[element] = result
-		# self.setMag(initialMag)
-		# return True
+		
 
 def randomVector(dim, mag, maxMag=0, fixComponents=[1,1,1]):
 	"""(dimensions, magnitude, maximum magnitude (defaults to magnitude),
