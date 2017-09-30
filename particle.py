@@ -69,6 +69,11 @@ class particle:
 
 	newMass = False # the mass of the particle after it respawns
 	# colour parameter only used if autoColour is off
+	def __getattr__(self, attr):
+		if (attr in self.info):
+			return self.info[attr]
+		else:
+			return None
 	def setColour(self, colour=None):
 		if self.autoColour:
 			self.colour = [min(self.radius/radiusLimit, 1), 0, min(1, (0 if (radiusLimit < self.radius) else (radiusLimit - self.radius)/radiusLimit))]
