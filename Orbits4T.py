@@ -79,6 +79,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-tn" :     [str,   False,  False,  True], # True n-body simulation. When off program makes some sacrifices for performance boost.
 "-asb" :    [int,   4,      True], # Number of bodies in the auto-systems.
 "-flim":    [float, False,	True], # Frame limit
+"-demo":    [str,   False,  False,  True], # Run demo
 "-df" :     [str, "SolSystem.txt", True], # Path of the data file
 "-test":    [str,	 False, False, True], # Test mode
 "-getStars":[float,  False,	False, 4], # Get stars from the datafile.
@@ -98,7 +99,7 @@ if len(sys.argv) > 1:
 This version contains the following presets:
 1)  Centre body with '-n' number of planets orbiting in random places. (Default 10)
 2)  'Galaxy' kinda thing (Miserable failure, don't waste your time with this one)
-3)  Our very own Solar System!
+3)  THE WHOLE UNIVERSE
 4)  Another small test. Large body with a line of small bodies orbiting in a circle.
 5)  Repulsive particles on the surface of a sphere, that eventually sort themselves into an even spread. Just cool to watch.
 The third one is way better, don't even bother with the others. They were just practice.
@@ -131,6 +132,7 @@ Key|Parameter type|Description
 -ab  :  int         Make asteroid belt (Wouldn't recommend on presets other than 3..)
 -es  :  int         Make earth satellites.
 -WB  :              Write buffer to file.
+-sr  :  int         Make rings around Saturn, the given number represents how many objects to make.
 -rp  :  float       Make random planets, give a percentage of stars to have systems.
                         (only for preset 3, if stars are also made)
 -tn  :              Runs the simulation in True N-body mode, making calculations of acceleration due the
@@ -140,8 +142,10 @@ Key|Parameter type|Description
                         start are the only ones that affect that body for the rest of the simulation.
                         But, for some presets this is ON by default.
 -asb :  int         Number of bodies in auto generated systems.
+-demo:              Runs a demo. Only usable in preset 3, goes through bodies looking around them
+                        then moving onto the next body.
 -flim:  float       Frame limit.
--df  :  string      Path of the data file.
+-df  :  string      Path of the data file. (Not implemented)
 -test:              Enter test mode.* (See below)
 -getStars: float	Loads stars from a database of almost 120,000 stars in the night sky. The value
                         given with this parameter will be used as the maximum apparent magnitude from
@@ -850,7 +854,8 @@ Distance to closest particle: %s
 			distString)
 			#("---" if not self.closestParticle else numPrefix(abs(camera.pos - self.closestParticle.pos), "m"))
 
-		maxLen = max([len(x[0]) for x in self.DataDisplay])
+
+		if self.DataDisplay: maxLen = max([len(x[0]) for x in self.DataDisplay])
 
 		for data in self.DataDisplay:
 			text += "\n"
@@ -1603,7 +1608,7 @@ elif preset == "2":
 		forceVec = vector([0, 0, 0])
 		for p2 in particleList:
 			if p2 == p: continue
-			forceVec += (p.pos - p2.pos).setMag(particle.G * p.mass * p2.mass / (abs(p.pos - p2.pos)**2))
+			forceVec += (p.pos - p2.pos).setMag(Pmodule.G * p.mass * p2.mass / (abs(p.pos - p2.pos)**2))
 		velVec = forceVec.cross(vector([0, 1, 0]))
 		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)))
 		p.vel = velVec
@@ -1653,10 +1658,11 @@ elif preset == "3":
 	MainLoop.addData("Mass", "'%.5e'%(MainLoop.target.mass) + 'kg \t(' + massTerm(MainLoop.target.mass) + ')'", True, "---")
 	MainLoop.addData("Radius", "numPrefix(round(MainLoop.target.radius, 2), 'm') + '   \t(' + radiusTerm(MainLoop.target.radius) + ')'", True, "---")
 	MainLoop.addData("Velocity", "numPrefix(round(abs(MainLoop.target.vel), 5), 'm/s')", True, "---")
+	MainLoop.addData("Surface gravity", "numPrefix( round(MainLoop.target.mass*Pmodule.G/MainLoop.target.radius**2, 3) , 'm/s^2')", True, "---")
 	MainLoop.addDataLine()
 	MainLoop.addData("Distance to Target", "")
-	MainLoop.addData("Centre", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ), 2 ), 'm' )", True, "---")
-	MainLoop.addData("Surface", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ) - MainLoop.target.radius, 2 ), 'm' )", True, "---")
+	MainLoop.addData("Centre", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ), 3 ), 'm' )", True, "---")
+	MainLoop.addData("Surface", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ) - MainLoop.target.radius, 3 ), 'm' )", True, "---")
 	MainLoop.addData("Light time", "timeString(abs(MainLoop.target.pos - camera.pos)/LIGHT_SPEED)", True, "---")
 	MainLoop.addDataLine()
 	MainLoop.addData("Speed of camera", "numPrefix(abs(camera.vel), 'm/step', 2)", True, "---")
