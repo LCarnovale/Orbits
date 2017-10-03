@@ -60,6 +60,9 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-sd" :     [float, 2000,	True], # Default screen depth
 "-ps" :     [float, 0.01,	True], # Maximum pan speed
 "-rs" :     [float, 0.01,	True], # Rotational speed
+"-ip" :     [str,   "Earth",True], # Initial pan track
+"-ir" :     [str,   "Sun",  True], # Initial rot track
+"-ae" :     [str,   False,  False,  True], # Auto "exposure"
 "-mk" :     [str,   False,	False,  True], # Show marker points
 "-ep" :     [int,   360,	True], # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
 "-sf" :     [float, 0.5,	True], # Rate at which the camera follows its target
@@ -118,6 +121,9 @@ Key|Parameter type|Description
 -sd:    float       Default screen depth.
 -ps:    float       Maximum pan speed.
 -rs:    float       Rotational speed.
+-ip:    string      Starts the simulation with pan track at a body with the given name. (ONLY PRESET 3)
+                        The body is found by using the search function, so a HIP id will work too.
+-ir:    string      Starts the simulation with rot track at a body with the given name, like -ip. (ONLY PRESET 3)
 -mk:                Show marker points (static X, Y, Z and Origin coloured particles)
 -ep:    int         Number of points on each ellipse (Irrelevant if SMART_DRAW is on (which it is))
 -sf:    float       Rate at which the camera follows its target.
@@ -135,7 +141,7 @@ Key|Parameter type|Description
 -sr  :  int         Make rings around Saturn, the given number represents how many objects to make.
 -rp  :  float       Make random planets, give a percentage of stars to have systems.
                         (only for preset 3, if stars are also made)
--tn  :              Runs the simulation in True N-body mode, making calculations of acceleration due the
+-tn  : (True/False) Runs the simulation in True N-body mode, making calculations of acceleration due the
                         gravity of all bodies to all bodies. Much slower but usually much more accurate
                         (Really not worth turning on for presets like the solar system)
                         If left on, (ie the argument is not used) then the most influencial bodies at the
@@ -332,13 +338,18 @@ DEFAULT_ZERO_VEC = [0, 0, 0]
 DEFAULT_UNIT_VEC = [1, 0, 0]
 
 # Drawing/Visual constants
-MAG_SHIFT  = 1               # All apparent magnitudes are shifted by this amount before being drawn
+MAG_SHIFT  = -1              # All apparent magnitudes are shifted by this amount before being drawn
 FLARE_BASE = 1.06            # Must be greater than 1
 MIN_CLICK_RESPONSE_SIZE = 10 # Radius of area (in pixels) around centre of object that can be clicked
                              # depending on its size
 MIN_BOX_WIDTH = 50
 COMPLEX_FLARE = args["-cf"][1]
 SHOW_SCREENDEPTH = True
+FLARE_RAD_EXP = 1.5
+AUTO_EXPOSURE = args["-ae"][1]
+AUTO_EXPOSURE_STEP = 0.3
+
+lowestApparentMag = 0
 
 ## Load presets
 inBuiltPresets = ["1", "2", "3", "4", "5"]
@@ -473,11 +484,11 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	if (mag != None): mag += MAG_SHIFT
 	if (mag != None and points <= 2):
 		# fill = [1, 1, 1]
-		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)**(1.4)
+		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)**(FLARE_RAD_EXP)
 	elif (points <= 2 and mag == None):
 		fill = [1, 1, 1]
-	elif (mag):
-		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)**(1.4)
+	elif (mag != None):
+		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)**(FLARE_RAD_EXP)
 
 	if box:
 		boxRadius = max(MIN_BOX_WIDTH, major * 1.4 + flareWidth) / 2
@@ -532,10 +543,10 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 			a = 1 + 1 / (FLARE_BASE**flareWidth - 1)
 			for r in range(int(flareWidth), 0, -1):
 				rMag = a * FLARE_BASE**(-r) - a + 1
-				if (rMag < 0.001): continue
+				if (rMag < 0.005): continue
 				turtle.pencolor([x * rMag for x in fill])
 				turtle.dot((r) + minor)
-		else:
+		elif not COMPLEX_FLARE:
 			for r in range(int(flareWidth), 0, -1):
 				rMag = ((flareWidth - r) / flareWidth) ** 2
 				if (rMag < 0.005): continue
@@ -897,6 +908,9 @@ Distance to closest particle: %s
 		global particleList
 		global DRAW_VEL_VECS
 		global panRate
+		global lowestApparentMag
+		global MAX_VISIBILE_MAG
+
 		delta = self.Delta
 		if (self.closestParticle != None):
 			panAmount = (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius) * maxPan#maxPan/(AUTO_RATE_CONSTANT)
@@ -937,15 +951,6 @@ Distance to closest particle: %s
 			camera.panFollow()
 		if camera.rotTrack:
 			camera.rotFollow()
-		# if Buffer.bufferMode == 0:
-		# 	stepList = particleList
-		# 	buffering = False
-		# elif Buffer.bufferMode == 1:
-		# 	stepList = Buffer.readBuffer()
-		# 	buffering = True
-		# else:
-		# 	stepList = Buffer.playBuffer()
-		# 	buffering = True
 		for I, p  in enumerate(particleList):
 			if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
 				# Swap the previous one with the current one
@@ -994,6 +999,17 @@ Distance to closest particle: %s
 						elif (clickBut == 1):
 							# Right click
 							camera.rotTrackSet(p)
+
+		if AUTO_EXPOSURE:
+			targetMaxMag = lowestApparentMag + 5        # The new max mag. Probably better ways to calculate this
+			if (abs(MAX_VISIBILE_MAG - targetMaxMag) <= AUTO_EXPOSURE_STEP):
+				MAX_VISIBILE_MAG = targetMaxMag
+			elif (MAX_VISIBILE_MAG < targetMaxMag):
+				MAX_VISIBILE_MAG += AUTO_EXPOSURE_STEP
+			elif (MAX_VISIBILE_MAG > targetMaxMag):
+				MAX_VISIBILE_MAG -= AUTO_EXPOSURE_STEP
+			lowestApparentMag = 100
+
 
 		frameEnd = time.time()
 		frameLength = frameEnd - frameStart
@@ -1206,7 +1222,10 @@ class camera:
 		# drawAt: if the desired particle isn't actually where we want to draw it, parse [pos, radius [, colour]] and set drawAt = True
 		# if not self.onScreen(particle): return False
 		self.rot.setMag(1)
+		global lowestApparentMag
+		global MAX_VISIBILE_MAG
 
+		newLow = False
 		if drawAt:
 			pos = particle[0]
 			radius = particle[1]
@@ -1216,6 +1235,8 @@ class camera:
 			if (appMag != None):
 				appMag += 5 * log(abs(particle.pos - self.pos) / (10 * PARSEC), 10)
 				particle.info["appmag"] = appMag
+				if (appMag < lowestApparentMag):
+					newLow = True
 				if (appMag > MAX_VISIBILE_MAG):
 					return False
 			pos = particle.pos
@@ -1225,10 +1246,6 @@ class camera:
 		# Get relative position to camera's position.
 		relPosition = pos - self.pos
 		distance = abs(relPosition)
-		# if (not drawAt):
-			# self.rot.setMag(self.screenDepth)
-			# relRotVel = min((particle.vel - self.vel).dot(self.rot), LIGHT_SPEED - 1)
-			# self.rot.setMag(1 / sqrt(1 - (relRotVel/LIGHT_SPEED)**2))
 		if (relPosition.dot(self.rot) <= 0):
 			# Only condition to exit draw if ALWAYS_DRAW is True
 			return False
@@ -1239,11 +1256,6 @@ class camera:
 			return False
 		ScreenParticleDistance = self.screenDepth * abs(relPosition) * abs(self.rot) / (relPosition.dot(self.rot))
 		relPosOnScreen = relPosition * ScreenParticleDistance / abs(relPosition)
-		# relPosUnit = relPosition / abs(relPosition)
-		# relRotation = relPosUnit - self.rot
-		# x_r, y_r, z_r = self.rot.elements
-		# x_CSP, y_CSP, z_CSP = relPosOnScreen.elements
-		# x_CSC, y_CSC, z_CSC = self.rot.getClone().setMag(self.screenDepth).elements
 
 		X = relPosOnScreen.dot(self.screenXaxis) / abs(self.screenXaxis)
 		Y = relPosOnScreen.dot(self.screenYaxis) / abs(self.screenYaxis)
@@ -1255,8 +1267,6 @@ class camera:
 		if (minAngle > screenAngle):
 			return False
 		if (radius >= distance and not point):
-			# prin += ("Inside particle, not drawing")
-			# if PRINT_DATA: print(prin)
 			return False
 		if point:
 			majorAxis, minorAxis = 1, 1
@@ -1273,6 +1283,7 @@ class camera:
 		else:
 			angle = pi/2
 		drawOval(X, Y, majorAxis, minorAxis, angle, colour, box, mag=(appMag if not drawAt else None))
+		if newLow: lowestApparentMag = appMag
 		return [X, Y, majorAxis, minorAxis]
 
 	def drawAt(self, posVector, radius, colour = None, box=False):
@@ -1523,13 +1534,14 @@ def clearTarget():
 # 'listen' determines if the function hands back focus to the turtle screen.
 def search(term=None, listen=True):
 	global TestMode
+	global particleList
 	if TestMode: return False
 	if term == None: term = turtle.textinput("Search for a body", "Enter a search term:")
 	if not term:
 		if listen: turtle.listen()
 		return False
 	bestBody = None
-	for body in Pmodule.particleList:
+	for body in particleList:
 		if term == str(body.HIPid):
 			bestBody = body
 			break
@@ -1582,10 +1594,10 @@ if preset == "1":
 	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
 	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
 	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
-	particle(25000, vector([defaultScreenDepth, 0, 0]))
+	particle(25000, vector([150+defaultScreenDepth, 0, 0]))
 	for i in range(PARTICLE_COUNT):
-		particle(variableMass, vector([150 + defaultScreenDepth, 0, 0]) + randomVector(3, 50, 400),
-                         colour = [random.random(), random.random(), random.random()], autoColour=False).circularise(particleList[0])
+		particle(variableMass, vector([150 + defaultScreenDepth, 0, 0]) + randomVector(3, 50, 400).makeOrthogonal(vector([random.random()*0.2, 1, random.random()*0.2])),
+                         colour = [random.random(), random.random(), random.random()], autoColour=False).circularise(particleList[0], axis=vector([0, 1, 0]))
 elif preset == "2":
 	# Galaxy kinda thing
 	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
@@ -1657,8 +1669,8 @@ elif preset == "3":
 	MainLoop.addData("Selected target", "MainLoop.target.name", True, "None")
 	MainLoop.addData("Mass", "'%.5e'%(MainLoop.target.mass) + 'kg \t(' + massTerm(MainLoop.target.mass) + ')'", True, "---")
 	MainLoop.addData("Radius", "numPrefix(round(MainLoop.target.radius, 2), 'm') + '   \t(' + radiusTerm(MainLoop.target.radius) + ')'", True, "---")
-	MainLoop.addData("Velocity", "numPrefix(round(abs(MainLoop.target.vel), 5), 'm/s')", True, "---")
-	MainLoop.addData("Surface gravity", "numPrefix( round(MainLoop.target.mass*Pmodule.G/MainLoop.target.radius**2, 3) , 'm/s^2')", True, "---")
+	MainLoop.addData("Velocity", "numPrefix(abs(MainLoop.target.vel), 'm/s', 5)", True, "---")
+	MainLoop.addData("Surface gravity", "numPrefix( MainLoop.target.mass*Pmodule.G/MainLoop.target.radius**2 , 'm/s^2', 5)", True, "---")
 	MainLoop.addDataLine()
 	MainLoop.addData("Distance to Target", "")
 	MainLoop.addData("Centre", "numPrefix( round( abs( MainLoop.target.pos - camera.pos ), 3 ), 'm' )", True, "---")
@@ -1695,9 +1707,9 @@ elif preset == "3":
 			bigVec += new.pos
 
 	camera.pos = bigVec.cross(planets["Mercury"].pos.mag(1))
-	camera.rotTrackSet(planets["Sun"])
-	camera.lockRot()
-	MainLoop.target = planets["Earth"]
+	# camera.rotTrackSet(planets["Sun"])
+	# camera.lockRot()
+	# MainLoop.target = planets["Earth"]
 	if "Phobos" in planets:
 		planets["Phobos"].immune = False # Screw you phobos
 	MainLoop.addData("Absolute Magnitude", "MainLoop.target.info['absmag']", True, "---")
@@ -1710,10 +1722,13 @@ elif preset == "3":
 		STRN_RING_MAX_RADIUS = planets["Saturn"].radius + STRN_RING_MAX_RADIUS
 		ringWidth = STRN_RING_MAX_RADIUS - STRN_RING_MIN_RADIUS
 		saturnPos = planets["Saturn"].pos
+		saturnVel = planets["Saturn"].vel
 		# Make axis from average axis of other moons
 		ringAxis = vector([0, 0, 0])
 		for moon in [m for m in particleList if (m.parent == "Saturn")]:
-			ringAxis += moon.pos
+			# if (moon.name in ["Cassini", "Phoebe"]): continue
+			ringAxis += (moon.pos - saturnPos).cross(moon.vel - saturnVel).mag(1)
+		# ringAxis = ringAxis.makeOrthogonal(planets["Titan"].pos - planets["Saturn"].pos)
 		ringAxis.setMag(1)
 		for i in range(objectCount):
 			# objectRadius = random.random() * ringWidth + STRN_RING_MIN_RADIUS
@@ -1840,9 +1855,8 @@ elif preset == "3":
 				print("Making system for %s. %d planets made." % (system.name, dbgCounter))
 					# MainLoop.target = new
 
-	if search("Acrux", listen=False): toggleRotTrack()
-	search("Earth", listen=False)
-	togglePanTrack()
+	if search(args["-ir"][1], listen=False): camera.rotTrackSet(MainLoop.target)
+	if search(args["-ip"][1], listen=False): camera.panTrackSet(MainLoop.target)
 	clearTarget()
 
 	# Fill out tree
