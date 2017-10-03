@@ -346,10 +346,11 @@ MIN_BOX_WIDTH = 50
 COMPLEX_FLARE = args["-cf"][1]
 SHOW_SCREENDEPTH = True
 FLARE_RAD_EXP = 1.5
+EXPOSURE = 1                 # The width of the flares are multiplied by this
 AUTO_EXPOSURE = args["-ae"][1]
-AUTO_EXPOSURE_STEP = 0.3
+AUTO_EXPOSURE_STEP = 0.05
 
-lowestApparentMag = 0
+lowestApparentMag = None
 
 ## Load presets
 inBuiltPresets = ["1", "2", "3", "4", "5"]
@@ -482,13 +483,13 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 
 	flareWidth = 0
 	if (mag != None): mag += MAG_SHIFT
-	if (mag != None and points <= 2):
+	if (mag != None):
 		# fill = [1, 1, 1]
-		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)**(FLARE_RAD_EXP)
+		flareWidth = EXPOSURE * max(MAX_VISIBILE_MAG - mag, 0)**(FLARE_RAD_EXP)
 	elif (points <= 2 and mag == None):
 		fill = [1, 1, 1]
-	elif (mag != None):
-		flareWidth = max(MAX_VISIBILE_MAG - mag, 0)**(FLARE_RAD_EXP)
+	# elif (mag != None):
+	# 	flareWidth = max(MAX_VISIBILE_MAG - mag, 0)**(FLARE_RAD_EXP)
 
 	if box:
 		boxRadius = max(MIN_BOX_WIDTH, major * 1.4 + flareWidth) / 2
@@ -909,7 +910,7 @@ Distance to closest particle: %s
 		global DRAW_VEL_VECS
 		global panRate
 		global lowestApparentMag
-		global MAX_VISIBILE_MAG
+		global EXPOSURE
 
 		delta = self.Delta
 		if (self.closestParticle != None):
@@ -1000,15 +1001,17 @@ Distance to closest particle: %s
 							# Right click
 							camera.rotTrackSet(p)
 
-		if AUTO_EXPOSURE:
-			targetMaxMag = lowestApparentMag + 5        # The new max mag. Probably better ways to calculate this
-			if (abs(MAX_VISIBILE_MAG - targetMaxMag) <= AUTO_EXPOSURE_STEP):
-				MAX_VISIBILE_MAG = targetMaxMag
-			elif (MAX_VISIBILE_MAG < targetMaxMag):
-				MAX_VISIBILE_MAG += AUTO_EXPOSURE_STEP
-			elif (MAX_VISIBILE_MAG > targetMaxMag):
-				MAX_VISIBILE_MAG -= AUTO_EXPOSURE_STEP
-			lowestApparentMag = 100
+		if AUTO_EXPOSURE and drawStars and lowestApparentMag != None:
+			AUTO_EXP_BASE = 1.06
+			targetExp = AUTO_EXP_BASE ** lowestApparentMag
+			if targetExp < 0.05: targetExp = 0.05
+			if (abs(EXPOSURE - targetExp) <= AUTO_EXPOSURE_STEP):
+				EXPOSURE = targetExp
+			elif (EXPOSURE < targetExp):
+				EXPOSURE += AUTO_EXPOSURE_STEP
+			elif (EXPOSURE > targetExp):
+				EXPOSURE -= AUTO_EXPOSURE_STEP
+			lowestApparentMag = None
 
 
 		frameEnd = time.time()
@@ -1235,7 +1238,7 @@ class camera:
 			if (appMag != None):
 				appMag += 5 * log(abs(particle.pos - self.pos) / (10 * PARSEC), 10)
 				particle.info["appmag"] = appMag
-				if (appMag < lowestApparentMag):
+				if (lowestApparentMag == None or appMag < lowestApparentMag):
 					newLow = True
 				if (appMag > MAX_VISIBILE_MAG):
 					return False
@@ -1666,6 +1669,9 @@ elif preset == "3":
 	print("Loading planets...")
 	Data = loadSystem.loadFile(DATA_FILE)
 	MainLoop.addDataLine()
+	if drawStars:
+		MainLoop.addData("Exposure", "EXPOSURE", True)
+		MainLoop.addDataLine()
 	MainLoop.addData("Selected target", "MainLoop.target.name", True, "None")
 	MainLoop.addData("Mass", "'%.5e'%(MainLoop.target.mass) + 'kg \t(' + massTerm(MainLoop.target.mass) + ')'", True, "---")
 	MainLoop.addData("Radius", "numPrefix(round(MainLoop.target.radius, 2), 'm') + '   \t(' + radiusTerm(MainLoop.target.radius) + ')'", True, "---")
@@ -1680,6 +1686,7 @@ elif preset == "3":
 	MainLoop.addData("Speed of camera", "numPrefix(abs(camera.vel), 'm/step', 2)", True, "---")
 	MainLoop.addData("Target speed relative to camera", "(numPrefix(abs(MainLoop.target.vel - camera.vel / MainLoop.Delta), 'm/s') if abs(MainLoop.target.vel - camera.vel / MainLoop.Delta) > 0.0001 else 0)", True, "---")
 	MainLoop.addDataLine()
+
 
 	bigVec = vector([0, 0, 0])
 	for planet in Data:
