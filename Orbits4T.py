@@ -57,7 +57,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-ss" :     [str,   False,	False,  True], # staggered simulation
 "-G"  :     [float, 20,		True], # Gravitational constant
 "-pd" :     [str,   False,	False,  True], # Print data
-"-sd" :     [float, 2000,	True], # Default screen depth
+"-sd" :     [float, 2500,	True], # Default screen depth
 "-ps" :     [float, 0.01,	True], # Maximum pan speed
 "-rs" :     [float, 0.01,	True], # Rotational speed
 "-ip" :     [str,   "Earth",True], # Initial pan track
@@ -249,6 +249,7 @@ makeSatellites	        = args["-es"][1]
 writeBuffer		        = args["-WB"][1]
 FRAME_LIMIT 	        = args["-flim"][1]
 getStars 		        = args["-getStars"][1]
+DEMO                    = args["-demo"][1]
 
 presetMaker             = args["-PM"][1]
 presetShow              = args["-P?"][1]
@@ -302,7 +303,7 @@ PRESET_4_MAX_RADIUS = 400
 
 # Physical constants
 REAL_G       = 6.67408e-11
-EARTH_MASS   = 5.97e24
+EARTH_MASS   = 5.97e24   # These are all the actual values, not simulated.
 EARTH_RADIUS = 6.371e6
 SUN_MASS     = 1.989e30
 SUN_RADIUS   = 695.7e6
@@ -325,9 +326,10 @@ SMART_DRAW = True               # Changes the number of points on each ellipse
 FPS_AVG_COUNT = 10
 SCREEN_SETUP = False            # True when the screen is made, to avoid setting it up multiple times
 RECORD_SCREEN = args["-rg"][1]
-
+DRAW_MARKERS = args["-mk"][1]
 # Camera constants
 DEFAULT_ROTATE_FOLLOW_RATE = 0.04
+GOTO_DURATION       = 4     # Approximately the number of seconds taken to travel to an object using pan track toggling
 AUTO_RATE_CONSTANT  = 10    # A mysterious constant which determines the autoRate speed, 100 works well.
 FOLLOW_RATE_COEFF   = 0.4
 FOLLOW_RATE_BASE    = 1.1
@@ -339,18 +341,28 @@ DEFAULT_UNIT_VEC = [1, 0, 0]
 
 # Drawing/Visual constants
 MAG_SHIFT  = -1              # All apparent magnitudes are shifted by this amount before being drawn
-FLARE_BASE = 1.06            # Must be greater than 1
 MIN_CLICK_RESPONSE_SIZE = 10 # Radius of area (in pixels) around centre of object that can be clicked
                              # depending on its size
 MIN_BOX_WIDTH = 50
 COMPLEX_FLARE = args["-cf"][1]
 SHOW_SCREENDEPTH = True
-FLARE_RAD_EXP = 1.5
+
+# Exposure options
 EXPOSURE = 1                 # The width of the flares are multiplied by this
 AUTO_EXPOSURE = args["-ae"][1]
 AUTO_EXPOSURE_STEP = 0.05
+EXPOSURE_MIN = 0.2
+AUTO_EXP_BASE = 1.08         # Increasing this will make the auto exposure 'stronger' (Must be > 1)
 
-lowestApparentMag = None
+# Flare options
+FLARE_RAD_EXP = 1.5
+FLARE_BASE = 1.02            # Must be greater than 1
+FLARE_POLY_POINTS = 20
+FLARE_POLY_MAX_POINTS = 100
+
+
+currentDisplay = ""          # Holds the last data shown on screen incase of an auto-abort
+lowestApparentMag = None     # The lowest apparent mag of an object on screen, used for auto exposure
 
 ## Load presets
 inBuiltPresets = ["1", "2", "3", "4", "5"]
@@ -466,10 +478,38 @@ def screenWidth():
 def screenHeight():
 	return turtle.window_height()
 
+def polyDot(radius, fill=None, x=None, y=None):
+	if SMART_DRAW:
+		numPoints = int(
+		max(radius / SMART_DRAW_PARAMETER,
+		    FLARE_POLY_MAX_POINTS))
+	else:
+		numPoints = FLARE_POLY_POINTS
+
+	turtle.up()
+	if (x != None and y != None):
+		turtle.goto(x, y)
+	else:
+		x, y = turtle.position()
+	angleSep = 2*pi / numPoints
+	if (fill != None):
+		turtle.pencolor(fill)
+		turtle.fillcolor(fill)
+	turtle.goto(x + radius, y)
+	turtle.down()
+	turtle.begin_fill()
+	for i in range(1, numPoints):
+		turtle.goto(x + radius*cos(i * angleSep),
+		            y + radius*sin(i * angleSep))
+	turtle.end_fill()
+	turtle.up()
+	turtle.goto(x, y)
+
 
 def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = None):
 	global ellipsePoints
 	global drawStars
+	global FLARE_POLY_POINTS
 	if SMART_DRAW:
 		perimApprox = 2*pi*sqrt((major**2 + minor**2) / 2)
 		points = int(perimApprox / SMART_DRAW_PARAMETER)
@@ -484,8 +524,7 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	flareWidth = 0
 	if (mag != None): mag += MAG_SHIFT
 	if (mag != None):
-		# fill = [1, 1, 1]
-		flareWidth = EXPOSURE * max(MAX_VISIBILE_MAG - mag, 0)**(FLARE_RAD_EXP)
+		flareWidth = (EXPOSURE) * max(MAX_VISIBILE_MAG - mag, 0)**(FLARE_RAD_EXP)
 	elif (points <= 2 and mag == None):
 		fill = [1, 1, 1]
 	# elif (mag != None):
@@ -540,6 +579,7 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 
 		# The function: brightness = (a*b^r - a + 1) gives a good gradient for a flare
 		# b is FLARE_BASE, the higher it is the steeper the curve, and the faster it fades to black.
+
 		if COMPLEX_FLARE and (FLARE_BASE**flareWidth != 1):
 			a = 1 + 1 / (FLARE_BASE**flareWidth - 1)
 			for r in range(int(flareWidth), 0, -1):
@@ -547,12 +587,14 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 				if (rMag < 0.005): continue
 				turtle.pencolor([x * rMag for x in fill])
 				turtle.dot((r) + minor)
+				# polyDot(r + minor, fill = [x * rMag for x in fill])
 		elif not COMPLEX_FLARE:
 			for r in range(int(flareWidth), 0, -1):
 				rMag = ((flareWidth - r) / flareWidth) ** 2
 				if (rMag < 0.005): continue
 				turtle.pencolor([x * rMag for x in fill])
-				turtle.dot((r) + minor)
+				# turtle.dot((r) + minor)
+				polyDot(r + minor, fill = [x * rMag for x in fill])
 
 
 	# else:
@@ -838,6 +880,7 @@ class MainLoop:
 
 	def showData(self):
 		if not self.displayData: return False
+		global currentDisplay
 		global planets
 		# delta = self.Delta
 		pauseString = "True"
@@ -889,6 +932,7 @@ Distance to closest particle: %s
 				value = data[2]
 			text += str(value)
 
+		currentDisplay = text
 		width = screenWidth()
 		height = screenHeight()
 		textX = -width / 2 + 10
@@ -901,7 +945,14 @@ Distance to closest particle: %s
 
 	def abort(self):
 		global Running
+		global currentDisplay
 		Running = False
+
+		print("Current screen data:")
+		print(currentDisplay)
+		print()
+
+
 		print("Auto Aborting!!!")
 
 	def STEP(self, camera, draw = True):
@@ -930,8 +981,9 @@ Distance to closest particle: %s
 
 		if (abs(camera.pos) > 1e5):
 			self.commonShiftPos = -camera.pos
-		for m in sorted(markerList, key = lambda x: abs(x.pos - camera.pos), reverse = True):
-			camera.drawParticle(m)
+		if DRAW_MARKERS:
+			for m in sorted(markerList, key = lambda x: abs(x.pos - camera.pos), reverse = True):
+				camera.drawParticle(m)
 		clickTarget = None
 		if (self.clickTarget):
 			clickTarget = self.clickTarget.pop(0)       # Puts the earliest click position in clickTarget
@@ -1002,9 +1054,8 @@ Distance to closest particle: %s
 							camera.rotTrackSet(p)
 
 		if AUTO_EXPOSURE and drawStars and lowestApparentMag != None:
-			AUTO_EXP_BASE = 1.06
 			targetExp = AUTO_EXP_BASE ** lowestApparentMag
-			if targetExp < 0.05: targetExp = 0.05
+			if targetExp < EXPOSURE_MIN: targetExp = EXPOSURE_MIN
 			if (abs(EXPOSURE - targetExp) <= AUTO_EXPOSURE_STEP):
 				EXPOSURE = targetExp
 			elif (EXPOSURE < targetExp):
@@ -1050,20 +1101,20 @@ Distance to closest particle: %s
 				self.frameWarning = False
 		if self.displayData: self.showData()
 		self.Zero()
-
-class Matrix:
-	def __init__(self, array):
-		"""Array should be 2 dimensional, ie: [[Column], ..., [Column]] etc."""
-		self.array = array
-
-	def vecFromColumn(self, colIndex):
-		return vector(self.array[colIndex])
-
-	def vecFromRow(self, rowIndex):
-		return vector([x[rowIndex] for x in self.array])
-
-	def vecMultiply(self, vec):
-		return vector([self.vecFromRow(x).dot(vec) for x in range(len(self.array))])
+#
+# class Matrix:
+# 	def __init__(self, array):
+# 		"""Array should be 2 dimensional, ie: [[Column], ..., [Column]] etc."""
+# 		self.array = array
+#
+# 	def vecFromColumn(self, colIndex):
+# 		return vector(self.array[colIndex])
+#
+# 	def vecFromRow(self, rowIndex):
+# 		return vector([x[rowIndex] for x in self.array])
+#
+# 	def vecMultiply(self, vec):
+# 		return vector([self.vecFromRow(x).dot(vec) for x in range(len(self.array))])
 
 class camera:
 	# Main job: work out where a dot should go on the screen given the cameras position and rotation and the objects position.
@@ -1082,7 +1133,7 @@ class camera:
 		], unit=True)
 		self.panStart = self.pos # When flying to a position, the speed is based on the progress from start to finish.
 		self.rotStart = self.rot # Similar to above but for rotation
-		self.TransformMatrix = Matrix([[0, 0], [0, 0], [0, 0]])
+		# self.TransformMatrix = Matrix([[0, 0], [0, 0], [0, 0]])
 	# total distance, maxSpeed, destination, at speed(0, 1 or 2), stopping distance, position of closest particle at start.
 	# Stored so they aren't calculated each step.
 	panInfo = [0, 0, vector([0, 0, 0]),
@@ -1115,8 +1166,9 @@ class camera:
 			if not (self.panTrack or self.rotTrack):
 				self.moving = False
 
-	def goTo(self, particle):
+	def goTo(self, particle, lock=False):
 		self.moving = True
+		if lock: self.moving = 2 # Allows an option to lock the rot track to an object after going to it
 		self.rotTrackSet(particle)
 		# self.panTrackSet(particle)
 
@@ -1153,6 +1205,8 @@ class camera:
 		#
 		# 	self.TransformMatrix = Matrix([[]])
 
+	# Moves the camera to a particle if its too far away,
+	# then locks the camera's movement to that object
 	def panTrackSet(self, target = None):
 		# panInfo: [total distance, maxSpeed, destination, atSpeed (0, 1 or 2), stopping distance]. Stored so they aren't calculated each step.
 		self.panTrack = target
@@ -1173,7 +1227,7 @@ class camera:
 			else:
 				destination = self.pos - target.pos
 			self.panInfo[0] = abs(target.pos + destination - self.pos)
-			travelSteps = max(2 * MainLoop.FPS, TRAVEL_STEPS_MIN) # No less than 100 steps
+			travelSteps = max(GOTO_DURATION * MainLoop.FPS, TRAVEL_STEPS_MIN) # No less than 100 steps
 			self.panInfo[1] = self.panInfo[0] / travelSteps
 			self.panInfo[2] = destination
 			self.panInfo[3] = 0 # at speed: 0 for accelerating, 1 for at speed, 2 for slowing down.
@@ -1357,7 +1411,10 @@ class camera:
 	def lockRot(self):
 		if (self.moving):
 			self.panTrackSet(self.rotTrack)
-			self.rotTrackSet()
+			if (self.moving != 2):
+				self.rotTrackSet()
+			else:
+				self.rotTrackLock = True
 		else:
 			self.rotTrackLock = True
 		self.moving = False
@@ -1503,9 +1560,9 @@ def toggleRotTrack():
 	else:
 		camera.rotTrackSet()
 
-def goToTarget():
+def goToTarget(lock=False):
 	if MainLoop.target:
-		camera.goTo(MainLoop.target)
+		camera.goTo(MainLoop.target, lock=lock)
 
 def toggleScreenData():
 	# MainLoop.target = None
@@ -1670,7 +1727,7 @@ elif preset == "3":
 	Data = loadSystem.loadFile(DATA_FILE)
 	MainLoop.addDataLine()
 	if drawStars:
-		MainLoop.addData("Exposure", "EXPOSURE", True)
+		MainLoop.addData("Exposure", "round(EXPOSURE, 4)", True)
 		MainLoop.addDataLine()
 	MainLoop.addData("Selected target", "MainLoop.target.name", True, "None")
 	MainLoop.addData("Mass", "'%.5e'%(MainLoop.target.mass) + 'kg \t(' + massTerm(MainLoop.target.mass) + ')'", True, "---")
@@ -1862,8 +1919,10 @@ elif preset == "3":
 				print("Making system for %s. %d planets made." % (system.name, dbgCounter))
 					# MainLoop.target = new
 
-	if search(args["-ir"][1], listen=False): camera.rotTrackSet(MainLoop.target)
-	if search(args["-ip"][1], listen=False): camera.panTrackSet(MainLoop.target)
+	search(args["-ir"][1], listen=False)
+	camera.rotTrackSet(MainLoop.target)
+	search(args["-ip"][1], listen=False)
+	camera.panTrackSet(MainLoop.target)
 	clearTarget()
 
 	# Fill out tree
@@ -2114,10 +2173,6 @@ if TestMode:
 				checkNames = [x[0] for x in checkData[checkTimes[0]]]
 				for p in testList:
 
-				#	if (p.name in checkNames):
-				#		checkData = [x for x in testData if x[0] == p.name]
-#					if ((p.name in checkNames) and checkTimes[0] == testData[1]):
-					# if (p.name == checkData[checkTimes[0]][0]):
 					if (p.name in checkNames):
 						# Check the data.
 						targetData = checkData[checkTimes[0]][checkNames.index(p.name)]
@@ -2178,6 +2233,7 @@ if TestMode:
 turtle.listen()
 Buffer.initialise()
 frameStart = time.time()
+# demoTimer = frameStart
 MainLoop.setDelta(Delta)
 if REAL_TIME:
 	Delta = 0
@@ -2190,6 +2246,14 @@ def save():
 	turtle.getcanvas().postscript(file = "frames/frame_{0:05d}.eps".format(frameCount))
 	frameCount += 1
 
+if DEMO: # Run a nice looking screen saver type thing
+	print("Running demo. Note that during the demo you may have to fight with the program")
+	print("for control of the camera sometimes. The screen display can be brought back by")
+	print("pressing 'H' at any time.")
+	toggleScreenData()
+	start_particle = particleList[0]
+	demoTimer = frameStart
+
 while Running:
 	turtle.clear()
 	if STAGGERED_SIM: input()
@@ -2197,6 +2261,18 @@ while Running:
 	if REAL_TIME:
 		MainLoop.setDelta(time.time() - frameStart)
 		frameStart = time.time()
+	if DEMO:
+		if (int(time.time() - demoTimer) % 15 >= 14) and (camera.panTrackLock):
+			# demoTimer = time.time()
+			camera.panTrackLock = False
+			cycleTargets()
+			goToTarget(lock = True)
+		if (camera.panTrackLock and camera.rotTrackLock):
+			pan[0] = 0.5
+		else:
+			demoTimer = time.time() # Set the timer to now while its moving
+			pan[0] = 0
+
 	turtle.update()
 	if (RECORD_SCREEN):
 		save()
