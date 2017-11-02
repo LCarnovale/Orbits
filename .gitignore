@@ -71,3 +71,5 @@ quicky.py
 /backup/*
 FunctionCalls.txt
 waves.py
+handler.py
+RunOrbits4T.bat
