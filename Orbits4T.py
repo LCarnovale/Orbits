@@ -62,7 +62,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-rs" :     [float, 0.01,	True], # Rotational speed
 "-ip" :     [str,   "Earth",True], # Initial pan track
 "-ir" :     [str,   "Sun",  True], # Initial rot track
-"-ae" :     [str,   False,  False,  True], # Auto "exposure"
+"-ae" :     [str,   True,  False,  True], # Auto "exposure"
 "-mk" :     [str,   False,	False,  True], # Show marker points
 "-ep" :     [int,   360,	True], # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
 "-sf" :     [float, 0.5,	True], # Rate at which the camera follows its target
@@ -76,19 +76,21 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-es" :     [int,	False,	False,  5], # Make earth satellites
 "-WB" :     [str,   False,	False,	True], # Write buffer to file
 "-rp" :     [float, False,  False,  0.6], # Make random planets
-"-cf" :     [str,	False,  False,  True], # Use complex flares
+"-cf" :     [str,	True,  False,  True], # Use complex flares
 "-sr" :     [int,   False,  True], # Make rings (really just a thin asteroid belt) around Saturn
 "-rg" :     [str,   False,  False,  True], # Record gif shots
 "-tn" :     [str,   False,  False,  True], # True n-body simulation. When off program makes some sacrifices for performance boost.
 "-asb" :    [int,   4,      True], # Number of bodies in the auto-systems.
-"-flim":    [float, False,	True], # Frame limit
+"-flim":    [float, False,  True], # Frame limit
 "-demo":    [str,   False,  False,  True], # Run demo
+"-dfs":     [int,   0,      True], # Draw diffraction spikes (Experimental)
 "-df" :     [str, "SolSystem.txt", True], # Path of the data file
-"-test":    [str,	 False, False, True], # Test mode
-"-getStars":[float,  False,	False, 4], # Get stars from the datafile.
+"-test":    [str,   False,  False, True], # Test mode
+"-getStars":[float, False,  False, 4], # Get stars from the datafile.
 "-PM":      [str,   False,  False, True],  # Enter the preset maker
+"-dbg":     [str,   False,  False, True],  # Enter debug mode. (Frame by frame with command line options)
 "-P?":      [str,   False,  False, True],  # Show available presets and quit
-"-AA_OFF":  [str, True, 	False, 	False]   # Turn off AutoAbort.
+"-AA_OFF":  [str,   True,   False, False]   # Turn off AutoAbort.
 }
 
 originalG = args["-G"][1]
@@ -139,6 +141,7 @@ Key|Parameter type|Description
 -es  :  int         Make earth satellites.
 -WB  :              Write buffer to file.
 -sr  :  int         Make rings around Saturn, the given number represents how many objects to make.
+-dfs :  int         Draw diffraction spikes around stars. Enter the number of spikes after -dfs. *Experimental*
 -rp  :  float       Make random planets, give a percentage of stars to have systems.
                         (only for preset 3, if stars are also made)
 -tn  : (True/False) Runs the simulation in True N-body mode, making calculations of acceleration due the
@@ -205,7 +208,12 @@ have their correct position and velocity compared with the correct values.""")
 					args[arg][1] = args[arg][0](argv[i + 1])
 				else: # No parameter needed, set it to args[arg][3]
 					if (len(argv) > i + 1 and (argv[i + 1] not in args)):
-						args[arg][1] = args[arg][0](argv[i + 1])
+						if (argv[i + 1] == "False"):
+							args[arg][1] = False
+						elif (argv[i + 1] == "True"):
+							args[arg][1] = True
+						else:
+							args[arg][1] = args[arg][0](argv[i + 1])
 					else:
 						args[arg][1] = args[arg][3]
 				args[arg][-1] = True
@@ -264,7 +272,6 @@ MAX_POINTS = args["-me"][1]  # Lazy way of limiting the number of points drawn t
 
 particle.TestMode = TestMode
 
-MAX_VISIBILE_MAG = 7
 
 
 # Time lengths constants
@@ -327,6 +334,8 @@ FPS_AVG_COUNT = 10
 SCREEN_SETUP = False            # True when the screen is made, to avoid setting it up multiple times
 RECORD_SCREEN = args["-rg"][1]
 DRAW_MARKERS = args["-mk"][1]
+
+MAX_VISIBILE_MAG = 9
 # Camera constants
 DEFAULT_ROTATE_FOLLOW_RATE = 0.04
 GOTO_DURATION       = 4     # Approximately the number of seconds taken to travel to an object using pan track toggling
@@ -347,19 +356,40 @@ MIN_BOX_WIDTH = 50
 COMPLEX_FLARE = args["-cf"][1]
 SHOW_SCREENDEPTH = True
 
+
 # Exposure options
 EXPOSURE = 1                 # The width of the flares are multiplied by this
+EXP_COEFF = 400
+# MAX_EXPOSURE = None
 AUTO_EXPOSURE = args["-ae"][1]
-AUTO_EXPOSURE_STEP = 0.05
-EXPOSURE_MIN = 0.2
-AUTO_EXP_BASE = 1.08         # Increasing this will make the auto exposure 'stronger' (Must be > 1)
+AUTO_EXPOSURE_STEP_UP = 0.007   # Percentage of exposure gap to jump each frame
+AUTO_EXPOSURE_STEP_DN = 0.7     # When decreasing exposure, mimic a 'shock' reaction
+#                               # By going faster down in exposure. (This is close the human eye's behaviour i think)
+
+# AUTO_EXP_BASE = 2             # Increasing this will make the auto exposure 'stronger' (Must be > 1)
+REFERENCE_INTENSITY = 1E-65     # 'R', The intensity of a zero magnitude object. Theoretically in units of W/m^2
+INTENSITY_BASE = 10**(5/2)      # 'C', Intensity of a body = R*C^( - apparent magnitude)
+MIN_VISIBLE_INTENSITY = 4E-70   # Only compared with the intensity after exposure has been applied.
+  # Auto Exposure Profile:
+REFERENCE_EXPOSURE = 3e6        # Exposure when looking at a zero-mag object
+EXPOSURE_POWER = 1.3            # AutoExposure = REF_EXP * e^(EXP_PWR*Magnitude)
+AUTO_EXP_BASE = e**EXPOSURE_POWER
 
 # Flare options
 FLARE_RAD_EXP = 1.5
-FLARE_BASE = 1.02            # Must be greater than 1
+FLARE_BASE = 1e6             # Scales the size of the flares
 FLARE_POLY_POINTS = 20
 FLARE_POLY_MAX_POINTS = 100
-
+MIN_RMAG = 0.05              # min 'brightness' of the rings in a flare
+  # Diffraction variables
+DIFF_SPIKES = args["-dfs"][1]
+PRIMARY_WAVELENGTH = 600E-9  # Average wavelength of light from stars. in m.
+FOCAL_LENGTH = 2E-2          # Focal length of the 'eyeball' in the camera
+PUPIL_WIDTH_FACTOR = 0.01   # This multiplied by the exposure gives the width of the pupil in calculations
+AIRY_RATIO = 1/50            # The ratio of the intensity between successive maximums in an airy disk
+  # Not user defined, don't change these. Computed now to save time later
+AIRY_COEFF = 1 / log(AIRY_RATIO)
+DIFFRACTION_RADIUS = 2.4 * FLARE_BASE * FOCAL_LENGTH * PRIMARY_WAVELENGTH / ( PUPIL_WIDTH_FACTOR )
 
 currentDisplay = ""          # Holds the last data shown on screen incase of an auto-abort
 lowestApparentMag = None     # The lowest apparent mag of an object on screen, used for auto exposure
@@ -495,20 +525,27 @@ def polyDot(radius, fill=None, x=None, y=None):
 	if (fill != None):
 		turtle.pencolor(fill)
 		turtle.fillcolor(fill)
-	turtle.goto(x + radius, y)
+	turtle.goto(x, y + radius)
 	turtle.down()
 	turtle.begin_fill()
 	for i in range(1, numPoints):
-		turtle.goto(x + radius*cos(i * angleSep),
-		            y + radius*sin(i * angleSep))
+		angle = i * angleSep
+		if DIFF_SPIKES: rad = radius * (1 + sin(angle * DIFF_SPIKES/2) ** 100)
+		else: rad = radius
+		turtle.goto(x + rad*sin(angle),
+		            y + rad*cos(angle))
 	turtle.end_fill()
 	turtle.up()
 	turtle.goto(x, y)
 
+def getIntensity(apparentMag):
+	global REFERENCE_INTENSITY
+	return REFERENCE_INTENSITY * INTENSITY_BASE**(-apparentMag)
 
 def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = None):
 	global ellipsePoints
 	global drawStars
+	global lowestApparentMag
 	global FLARE_POLY_POINTS
 	if SMART_DRAW:
 		perimApprox = 2*pi*sqrt((major**2 + minor**2) / 2)
@@ -524,11 +561,26 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	flareWidth = 0
 	if (mag != None): mag += MAG_SHIFT
 	if (mag != None):
-		flareWidth = (EXPOSURE) * max(MAX_VISIBILE_MAG - mag, 0)**(FLARE_RAD_EXP)
+		# This uses Rayleigh Criterion to determine the width of the diffraction 'flare'
+		# ie, an 'Airy disk'. Using this it is then sufficient to set the intensity
+		# of the centre to 100%, and the edge of the disk to 0%, and then have a linear
+		# slope through the radius.
+
+		# Generally the middle ring about x = 0 will be the only one visible, however when
+		# the camera is close to very bright lights further maximums will be visible and overlap
+		# (since we wouldn't be working with a point source).
+		# Assume that each sucessive maximum is 1/50th (AIRY_RATIO) the intensity of
+		# the previous
+		intensity = EXPOSURE * getIntensity(mag)
+		tempDiffRadius = DIFFRACTION_RADIUS
+		flareWidth = AIRY_COEFF * log(MIN_VISIBLE_INTENSITY / intensity) * tempDiffRadius
+
+		if (lowestApparentMag == None):
+			lowestApparentMag = mag
+		elif (lowestApparentMag and mag < lowestApparentMag):
+			lowestApparentMag = mag
 	elif (points <= 2 and mag == None):
 		fill = [1, 1, 1]
-	# elif (mag != None):
-	# 	flareWidth = max(MAX_VISIBILE_MAG - mag, 0)**(FLARE_RAD_EXP)
 
 	if box:
 		boxRadius = max(MIN_BOX_WIDTH, major * 1.4 + flareWidth) / 2
@@ -548,17 +600,10 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 		turtle.fillcolor(fill)
 		onScreen = True
 		Drawn = False
-		# Check if the oval is overly big, only draw the points visible
 		screenRadius = camera.screenRadius
 		centreRadius = (x**2 + y**2)**(1/2)
 		start = 0
 		end = points
-		# if (centreRadius >= screenRadius):
-		# 	start = int( points * (-acos((centreRadius - screenRadius)/major))/(2*pi) )
-		# 	end = -start
-		#
-		# 	print("OFfset angle: %f" % (-start))
-		# 	# start, end = 0, points
 		for i in range(start, end):
 			localX = major/2 * cos(2 * pi * i / points)
 			localY = minor/2 * sin(2 * pi * i / points)
@@ -576,27 +621,19 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 				turtle.dot(2)
 			return True
 
+		# Scale up fill:
+		if type(fill) == list:
+			M = max(fill)
+			fill = [x * 1/M for x in fill]
 
-		# The function: brightness = (a*b^r - a + 1) gives a good gradient for a flare
-		# b is FLARE_BASE, the higher it is the steeper the curve, and the faster it fades to black.
-
-		if COMPLEX_FLARE and (FLARE_BASE**flareWidth != 1):
-			a = 1 + 1 / (FLARE_BASE**flareWidth - 1)
-			for r in range(int(flareWidth), 0, -1):
-				rMag = a * FLARE_BASE**(-r) - a + 1
-				if (rMag < 0.005): continue
-				turtle.pencolor([x * rMag for x in fill])
-				turtle.dot((r) + minor)
-				# polyDot(r + minor, fill = [x * rMag for x in fill])
-		elif not COMPLEX_FLARE:
-			for r in range(int(flareWidth), 0, -1):
-				rMag = ((flareWidth - r) / flareWidth) ** 2
-				if (rMag < 0.005): continue
-				turtle.pencolor([x * rMag for x in fill])
-				# turtle.dot((r) + minor)
-				polyDot(r + minor, fill = [x * rMag for x in fill])
-
-
+		for r in range(int(flareWidth), 0, -1):
+			# Ir: Intensity at radius 'r' (Scaled so that 0 is the minimum threshold)
+			# Ir = intensity * (1 - r / flareWidth)
+			scale = (1 - r / flareWidth) ** 2
+			if (scale < MIN_RMAG): continue
+			turtle.pencolor([x * scale for x in fill])
+			if not DIFF_SPIKES: turtle.dot((r) + minor)
+			else: polyDot(r + minor, fill = [x * scale for x in fill])
 	# else:
 	# 	return False
 	return True
@@ -1054,14 +1091,17 @@ Distance to closest particle: %s
 							camera.rotTrackSet(p)
 
 		if AUTO_EXPOSURE and drawStars and lowestApparentMag != None:
-			targetExp = AUTO_EXP_BASE ** lowestApparentMag
-			if targetExp < EXPOSURE_MIN: targetExp = EXPOSURE_MIN
-			if (abs(EXPOSURE - targetExp) <= AUTO_EXPOSURE_STEP):
+			# GreatestIntensity = getIntensity(lowestApparentMag)
+			targetExp = REFERENCE_EXPOSURE * AUTO_EXP_BASE ** lowestApparentMag
+			# if targetExp < EXPOSURE_MIN: targetExp = EXPOSURE_MIN
+			# elif targetExp > MAX_EXPOSURE: targetExp = MAX_EXPOSURE
+			expStep = (targetExp - EXPOSURE)
+			if (abs(EXPOSURE - targetExp) < 0.01*EXPOSURE):
 				EXPOSURE = targetExp
-			elif (EXPOSURE < targetExp):
-				EXPOSURE += AUTO_EXPOSURE_STEP
-			elif (EXPOSURE > targetExp):
-				EXPOSURE -= AUTO_EXPOSURE_STEP
+			else:
+				if    (expStep > 0): expStep *= AUTO_EXPOSURE_STEP_UP
+				elif  (expStep < 0): expStep *= AUTO_EXPOSURE_STEP_DN
+				EXPOSURE += expStep
 			lowestApparentMag = None
 
 
@@ -1279,7 +1319,6 @@ class camera:
 		# drawAt: if the desired particle isn't actually where we want to draw it, parse [pos, radius [, colour]] and set drawAt = True
 		# if not self.onScreen(particle): return False
 		self.rot.setMag(1)
-		global lowestApparentMag
 		global MAX_VISIBILE_MAG
 
 		newLow = False
@@ -1340,7 +1379,6 @@ class camera:
 		else:
 			angle = pi/2
 		drawOval(X, Y, majorAxis, minorAxis, angle, colour, box, mag=(appMag if not drawAt else None))
-		if newLow: lowestApparentMag = appMag
 		return [X, Y, majorAxis, minorAxis]
 
 	def drawAt(self, posVector, radius, colour = None, box=False):
@@ -1506,12 +1544,20 @@ def downScreenDepth():
 	# camera.setScreenDepth(-10, True)
 
 def upMaxMag():
-	global MAX_VISIBILE_MAG
-	MAX_VISIBILE_MAG += 0.1
+	global REFERENCE_EXPOSURE
+	global EXPOSURE
+	# global MAX_VISIBILE_MAG
+	# MAX_VISIBILE_MAG += 0.1
+	REFERENCE_EXPOSURE *= 1.1
+	EXPOSURE *= 1.1
 
 def downMaxMag():
-	global MAX_VISIBILE_MAG
-	MAX_VISIBILE_MAG -= 0.1
+	global REFERENCE_EXPOSURE
+	global EXPOSURE
+	# global MAX_VISIBILE_MAG
+	# MAX_VISIBILE_MAG -= 0.1
+	REFERENCE_EXPOSURE /= 1.1
+	EXPOSURE /= 1.1
 
 def upDelta():
 	# global Delta
@@ -1831,6 +1877,7 @@ elif preset == "3":
 	if getStars:
 		print("Loading stars...")
 		MainLoop.addData("Maximum visible magnitude", "round(MAX_VISIBILE_MAG,2)", True)
+		# MainLoop.addData("Min intensity", "MIN_VISIBLE_INTENSITY", True)
 		MainLoop.addData("Earth magnitude", "MainLoop.target.mag", True, "---")
 		MainLoop.addData("Surface temperature", "MainLoop.target.temp", True, "---")
 		MainLoop.addData("Colour index", "MainLoop.target.ci", True, "---")
@@ -2241,6 +2288,9 @@ if START_PAUSED:
 	pause()
 frameCount = 0
 
+# Debug options:
+
+
 def save():
 	global frameCount
 	turtle.getcanvas().postscript(file = "frames/frame_{0:05d}.eps".format(frameCount))
@@ -2256,7 +2306,8 @@ if DEMO: # Run a nice looking screen saver type thing
 
 while Running:
 	turtle.clear()
-	if STAGGERED_SIM: input()
+	if STAGGERED_SIM or args["-dbg"][1]:
+		inp = input()
 	MainLoop.STEP(camera)
 	if REAL_TIME:
 		MainLoop.setDelta(time.time() - frameStart)
