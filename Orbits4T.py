@@ -62,7 +62,8 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-rs" :     [float, 0.01,	True], # Rotational speed
 "-ip" :     [str,   "Earth",True], # Initial pan track
 "-ir" :     [str,   "Sun",  True], # Initial rot track
-"-ae" :     [str,   True,  False,  True], # Auto "exposure"
+"-ae" :     [str,   True,   False,  True], # Auto "exposure"
+"-rel":     [str,   False,  False,  True], # Visualise special relativity effects (Experimental)
 "-mk" :     [str,   False,	False,  True], # Show marker points
 "-ep" :     [int,   360,	True], # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
 "-sf" :     [float, 0.5,	True], # Rate at which the camera follows its target
@@ -334,11 +335,14 @@ FPS_AVG_COUNT = 10
 SCREEN_SETUP = False            # True when the screen is made, to avoid setting it up multiple times
 RECORD_SCREEN = args["-rg"][1]
 DRAW_MARKERS = args["-mk"][1]
+RELATIVITY_EFFECTS = args["-rel"][1]
+RELATIVITY_SPEED = 0
 
-MAX_VISIBILE_MAG = 9
+
+MAX_VISIBILE_MAG = 15
 # Camera constants
 DEFAULT_ROTATE_FOLLOW_RATE = 0.04
-GOTO_DURATION       = 4     # Approximately the number of seconds taken to travel to an object using pan track toggling
+GOTO_DURATION       = 6     # Approximately the number of seconds taken to travel to an object using pan track toggling
 AUTO_RATE_CONSTANT  = 10    # A mysterious constant which determines the autoRate speed, 100 works well.
 FOLLOW_RATE_COEFF   = 0.4
 FOLLOW_RATE_BASE    = 1.1
@@ -380,7 +384,7 @@ FLARE_RAD_EXP = 1.5
 FLARE_BASE = 1e6             # Scales the size of the flares
 FLARE_POLY_POINTS = 20
 FLARE_POLY_MAX_POINTS = 100
-MIN_RMAG = 0.05              # min 'brightness' of the rings in a flare
+MIN_RMAG = 0.01              # min 'brightness' of the rings in a flare
   # Diffraction variables
 DIFF_SPIKES = args["-dfs"][1]
 PRIMARY_WAVELENGTH = 600E-9  # Average wavelength of light from stars. in m.
@@ -573,7 +577,7 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 		# the previous
 		intensity = EXPOSURE * getIntensity(mag)
 		tempDiffRadius = DIFFRACTION_RADIUS
-		flareWidth = AIRY_COEFF * log(MIN_VISIBLE_INTENSITY / intensity) * tempDiffRadius
+		flareWidth = (AIRY_COEFF * log(MIN_VISIBLE_INTENSITY / intensity)) * tempDiffRadius
 
 		if (lowestApparentMag == None):
 			lowestApparentMag = mag
@@ -895,6 +899,7 @@ class MainLoop:
 		self.DataDisplay = [
 		#  	Title		 [<is a function>, object]
 		]
+		self.smoothAcc = 0 # Used mainly for relativity stuff
 
 	def Zero(self):
 		self.commonShiftPos = DEFAULT_ZERO_VEC
@@ -1001,10 +1006,14 @@ Distance to closest particle: %s
 		global EXPOSURE
 
 		delta = self.Delta
-		if (self.closestParticle != None):
+		if pan[0:-1]: self.smoothAcc += 0.01
+		else: self.smoothAcc -= 0.01
+		if (self.closestParticle != None) and not RELATIVITY_EFFECTS:
 			panAmount = (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius) * maxPan#maxPan/(AUTO_RATE_CONSTANT)
 			if (pan[-1]):
 				panAmount *= 15
+		elif RELATIVITY_EFFECTS:
+			panAmount = RELATIVITY_SPEED * LIGHT_SPEED * delta * self.smoothAcc
 		else:
 			panAmount = maxPan
 		panRate = panAmount
@@ -1173,6 +1182,7 @@ class camera:
 		], unit=True)
 		self.panStart = self.pos # When flying to a position, the speed is based on the progress from start to finish.
 		self.rotStart = self.rot # Similar to above but for rotation
+		self.speedParameter = 1 # sqrt(1 - v^2/c^2), not the traditional v/c
 		# self.TransformMatrix = Matrix([[0, 0], [0, 0], [0, 0]])
 	# total distance, maxSpeed, destination, at speed(0, 1 or 2), stopping distance, position of closest particle at start.
 	# Stored so they aren't calculated each step.
@@ -1230,7 +1240,6 @@ class camera:
 		panShift = (pan[0] * self.screenXaxis +
 					pan[1] * self.screenYaxis +
 					pan[2] * self.rot) * panRate
-
 		if (panShift and self.panTrack and not self.panTrackLock):
 			self.panTrackSet()
 
@@ -1239,8 +1248,17 @@ class camera:
 			self.vel += self.panTrack.vel * delta + self.panTrack.acc * delta**2
 			# self.trackSeparate += panShift
 		self.vel += self.absolutePan
-		self.pos += self.vel
+		# if abs(self.vel) > 0.99 * LIGHT_SPEED * delta:
+			# self.vel.setMag(0.99 * LIGHT_SPEED * delta)
+
 		self.absolutePan *= 0
+		# self.absolutePan = panShift
+		if RELATIVITY_EFFECTS:
+			# if delta:
+			self.speedParameter = sqrt( 1 - RELATIVITY_SPEED**2 )
+			self.vel *= 1 / (self.speedParameter) * panRate
+			# time travelled will be a bit more as observed by a stationary observer
+		self.pos += self.vel
 		# if (self.vel):
 		#
 		# 	self.TransformMatrix = Matrix([[]])
@@ -1338,10 +1356,19 @@ class camera:
 			pos = particle.pos
 			radius = particle.radius
 			colour = particle.colour
-
 		# Get relative position to camera's position.
 		relPosition = pos - self.pos
+
+		# Make object's distance to camera in the direction of motion
+		# smaller based on speed parameter.
+		if RELATIVITY_EFFECTS and self.vel:
+			vDistance = relPosition.dot(self.vel) / abs(self.vel)
+			# else: vDistance = 0
+			vDistWarped = vDistance * self.speedParameter
+			vDiff = vDistance - vDistWarped
+			relPosition -= self.vel.mag(1) * vDiff #/ abs(self.vel)
 		distance = abs(relPosition)
+
 		if (relPosition.dot(self.rot) <= 0):
 			# Only condition to exit draw if ALWAYS_DRAW is True
 			return False
@@ -1350,7 +1377,9 @@ class camera:
 			return False
 		elif (distance > MAX_DRAW_DIST and appMag == None):
 			return False
+
 		ScreenParticleDistance = self.screenDepth * abs(relPosition) * abs(self.rot) / (relPosition.dot(self.rot))
+		# ScreenParticleDistance *= sqrt( 1 - self.speedParameter )
 		relPosOnScreen = relPosition * ScreenParticleDistance / abs(relPosition)
 
 		X = relPosOnScreen.dot(self.screenXaxis) / abs(self.screenXaxis)
@@ -1787,6 +1816,7 @@ elif preset == "3":
 	MainLoop.addData("Light time", "timeString(abs(MainLoop.target.pos - camera.pos)/LIGHT_SPEED)", True, "---")
 	MainLoop.addDataLine()
 	MainLoop.addData("Speed of camera", "numPrefix(abs(camera.vel), 'm/step', 2)", True, "---")
+	if RELATIVITY_EFFECTS: MainLoop.addData("Speed Parameter", "'{} *c*dt'.format(RELATIVITY_SPEED)", True, "---")
 	MainLoop.addData("Target speed relative to camera", "(numPrefix(abs(MainLoop.target.vel - camera.vel / MainLoop.Delta), 'm/s') if abs(MainLoop.target.vel - camera.vel / MainLoop.Delta) > 0.0001 else 0)", True, "---")
 	MainLoop.addDataLine()
 
@@ -1876,19 +1906,21 @@ elif preset == "3":
 
 	if getStars:
 		print("Loading stars...")
+		if not args["-ds"][-1]: drawStars = True
 		MainLoop.addData("Maximum visible magnitude", "round(MAX_VISIBILE_MAG,2)", True)
 		# MainLoop.addData("Min intensity", "MIN_VISIBLE_INTENSITY", True)
 		MainLoop.addData("Earth magnitude", "MainLoop.target.mag", True, "---")
 		MainLoop.addData("Surface temperature", "MainLoop.target.temp", True, "---")
 		MainLoop.addData("Colour index", "MainLoop.target.ci", True, "---")
 		MainLoop.addDataLine()
+		MainLoop.addData("HYG database id", "MainLoop.target.ID", True, "---")
 		MainLoop.addData("Hipparcos catalog id", "MainLoop.target.HIPid", True, "---")
 		if (getStars < 10):
 			STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)], quiet=False)
 			# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($absmag < {})".format(getStars)], quiet=False)
 		else:
-			STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
-			# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist<={}".format(getStars)], quiet=False)
+			# STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
+			STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist<={}".format(getStars)], quiet=False)
 #			print("Loading named stars...")
 #			STARS_DATA.update(loadSystem.loadFile("StarsData.txt", key=["\"$proper\" != 'None'", "$dist != 100000"], quiet = False))
 
@@ -1924,6 +1956,7 @@ elif preset == "3":
 			new.info["appmag"] = 0
 			new.info["absmag"] = STAR["absmag"]
 			new.info["mag"] = STAR["mag"]
+			new.info["ID"] = STAR_key
 			new.info["HIPid"] = "None" if not STAR["hip"] else int(STAR["hip"])
 			new.info["ci"] = (None if not STAR["ci"] else STAR["ci"])
 			if (new.info["ci"] != None):
@@ -2093,6 +2126,16 @@ def stopRecord():
 	global RECORD_SCREEN
 	RECORD_SCREEN = False
 
+def upRelSpeed():
+	global RELATIVITY_SPEED
+	RELATIVITY_SPEED += 0.02
+	if RELATIVITY_SPEED >= 1: RELATIVITY_SPEED = 0.999
+
+def dnRelSpeed():
+	global RELATIVITY_SPEED
+	RELATIVITY_SPEED -= 0.02
+	if RELATIVITY_SPEED < 0: RELATIVITY_SPEED = 0
+
 
 
 
@@ -2174,6 +2217,9 @@ if not TestMode:
 
 	turtle.onkey(bufferRecord, "n")
 	turtle.onkey(bufferPlay, "m")
+
+	turtle.onkey(upRelSpeed, "=")
+	turtle.onkey(dnRelSpeed, "-")
 
 	turtle.onkey(search, "/")
 
