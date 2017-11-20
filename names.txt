@@ -1,3 +1,5 @@
+Tommy Wiseau
+Hospital on Gurero Street
 Adult
 Aeroplane
 Air
@@ -235,6 +237,7 @@ Woman
 Worm
 X-ray
 ---
+Sad
 Billowy
 Obedient
 Sweltering
