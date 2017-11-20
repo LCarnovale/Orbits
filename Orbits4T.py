@@ -317,27 +317,27 @@ SUN_MASS     = 1.989e30
 SUN_RADIUS   = 695.7e6
 
 # Random Planet Settings
-MIN_PERIOD   = 20 * DAY
-MAX_PERIOD   = 150 * YEAR
+MIN_PERIOD = 20  * DAY
+MAX_PERIOD = 150 * YEAR
 MAX_PLANET_COUNT = 12
 MIN_PLANET_COUNT = 1
 
 
-# Misc settings
+# Simulation settings
 particle.ALL_IMMUNE = False
 REAL_TIME           = args["-rt"][1]
 particle.defaultDensity  = 1
 particle.radiusLimit     = 1e+10       # Maximum size of particle
 voidRadius               = 5000      # Maximum distance of particle from camera
 CAMERA_UNTRACK_IF_DIE = True # If the tracked particle dies, the camera stops tracking it
-SMART_DRAW = True               # Changes the number of points on each ellipse
-FPS_AVG_COUNT = 10
-SCREEN_SETUP = False            # True when the screen is made, to avoid setting it up multiple times
+SMART_DRAW = True               # Changes the number of points on each ellipse depeding on distance
+FPS_AVG_COUNT = 10        # Frames used to calculate long average. Less->current fps, more->average fps
 RECORD_SCREEN = args["-rg"][1]
 DRAW_MARKERS = args["-mk"][1]
 RELATIVITY_EFFECTS = args["-rel"][1]
 RELATIVITY_SPEED = 0
 
+SCREEN_SETUP = False            # True when the screen is made, to avoid setting it up multiple times
 
 MAX_VISIBILE_MAG = 15
 # Camera constants
@@ -364,10 +364,10 @@ SHOW_SCREENDEPTH = True
 # Exposure options
 EXPOSURE = 1                 # The width of the flares are multiplied by this
 EXP_COEFF = 400
-# MAX_EXPOSURE = None
+MAX_EXPOSURE = 1e20
 AUTO_EXPOSURE = args["-ae"][1]
-AUTO_EXPOSURE_STEP_UP = 0.007   # Percentage of exposure gap to jump each frame
-AUTO_EXPOSURE_STEP_DN = 0.7     # When decreasing exposure, mimic a 'shock' reaction
+AUTO_EXPOSURE_STEP_UP = 0.3      # Coeffecient of the log of the current exposure to step up and down
+AUTO_EXPOSURE_STEP_DN = 0.9     # When decreasing exposure, mimic a 'shock' reaction
 #                               # By going faster down in exposure. (This is close the human eye's behaviour i think)
 
 # AUTO_EXP_BASE = 2             # Increasing this will make the auto exposure 'stronger' (Must be > 1)
@@ -384,7 +384,7 @@ FLARE_RAD_EXP = 1.5
 FLARE_BASE = 1e6             # Scales the size of the flares
 FLARE_POLY_POINTS = 20
 FLARE_POLY_MAX_POINTS = 100
-MIN_RMAG = 0.01              # min 'brightness' of the rings in a flare
+MIN_RMAG = 0.1             # min 'brightness' of the rings in a flare. Might need to differ across machines.
   # Diffraction variables
 DIFF_SPIKES = args["-dfs"][1]
 PRIMARY_WAVELENGTH = 600E-9  # Average wavelength of light from stars. in m.
@@ -542,9 +542,15 @@ def polyDot(radius, fill=None, x=None, y=None):
 	turtle.up()
 	turtle.goto(x, y)
 
+# I = R * B^(-m)
 def getIntensity(apparentMag):
-	global REFERENCE_INTENSITY
+	# global REFERENCE_INTENSITY
 	return REFERENCE_INTENSITY * INTENSITY_BASE**(-apparentMag)
+
+# m = log_B(R / I)
+def intensityToMag(intensity, exposure=1):
+	# global REFERENCE_INTENSITY
+	return log(REFERENCE_INTENSITY / (intensity / exposure)) / log(INTENSITY_BASE)
 
 def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = None):
 	global ellipsePoints
@@ -1003,6 +1009,7 @@ Distance to closest particle: %s
 		global DRAW_VEL_VECS
 		global panRate
 		global lowestApparentMag
+		global MAX_VISIBILE_MAG
 		global EXPOSURE
 
 		delta = self.Delta
@@ -1099,19 +1106,22 @@ Distance to closest particle: %s
 							# Right click
 							camera.rotTrackSet(p)
 
-		if AUTO_EXPOSURE and drawStars and lowestApparentMag != None:
+		if AUTO_EXPOSURE and drawStars:
 			# GreatestIntensity = getIntensity(lowestApparentMag)
-			targetExp = REFERENCE_EXPOSURE * AUTO_EXP_BASE ** lowestApparentMag
+			if lowestApparentMag != None: targetExp = REFERENCE_EXPOSURE * AUTO_EXP_BASE ** lowestApparentMag
+			else: targetExp = min(1.1 * EXPOSURE, MAX_EXPOSURE)
+
 			# if targetExp < EXPOSURE_MIN: targetExp = EXPOSURE_MIN
 			# elif targetExp > MAX_EXPOSURE: targetExp = MAX_EXPOSURE
 			expStep = (targetExp - EXPOSURE)
-			if (abs(EXPOSURE - targetExp) < 0.01*EXPOSURE):
+			if    (expStep > 0): expStep = EXPOSURE / (1 - AUTO_EXPOSURE_STEP_UP)
+			elif  (expStep < 0): expStep = -EXPOSURE * (AUTO_EXPOSURE_STEP_DN)
+			if (abs(EXPOSURE - targetExp) < expStep):
 				EXPOSURE = targetExp
 			else:
-				if    (expStep > 0): expStep *= AUTO_EXPOSURE_STEP_UP
-				elif  (expStep < 0): expStep *= AUTO_EXPOSURE_STEP_DN
 				EXPOSURE += expStep
 			lowestApparentMag = None
+			MAX_VISIBILE_MAG = intensityToMag(MIN_VISIBLE_INTENSITY, EXPOSURE)
 
 
 		frameEnd = time.time()
