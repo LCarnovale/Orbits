@@ -366,7 +366,7 @@ EXPOSURE = 1                 # The width of the flares are multiplied by this
 EXP_COEFF = 400
 MAX_EXPOSURE = 1e20
 AUTO_EXPOSURE = args["-ae"][1]
-AUTO_EXPOSURE_STEP_UP = 0.3      # Coeffecient of the log of the current exposure to step up and down
+AUTO_EXPOSURE_STEP_UP = 0.8      # Coeffecient of the log of the current exposure to step up and down
 AUTO_EXPOSURE_STEP_DN = 0.9     # When decreasing exposure, mimic a 'shock' reaction
 #                               # By going faster down in exposure. (This is close the human eye's behaviour i think)
 
@@ -384,7 +384,7 @@ FLARE_RAD_EXP = 1.5
 FLARE_BASE = 1e6             # Scales the size of the flares
 FLARE_POLY_POINTS = 20
 FLARE_POLY_MAX_POINTS = 100
-MIN_RMAG = 0.1             # min 'brightness' of the rings in a flare. Might need to differ across machines.
+MIN_RMAG = 0.02             # min 'brightness' of the rings in a flare. Might need to differ across machines.
   # Diffraction variables
 DIFF_SPIKES = args["-dfs"][1]
 PRIMARY_WAVELENGTH = 600E-9  # Average wavelength of light from stars. in m.
@@ -1107,6 +1107,7 @@ Distance to closest particle: %s
 							camera.rotTrackSet(p)
 
 		if AUTO_EXPOSURE and drawStars:
+			# print("LAM:", lowestApparentMag, "Exposure:", EXPOSURE, end="")
 			# GreatestIntensity = getIntensity(lowestApparentMag)
 			if lowestApparentMag != None: targetExp = REFERENCE_EXPOSURE * AUTO_EXP_BASE ** lowestApparentMag
 			else: targetExp = min(1.1 * EXPOSURE, MAX_EXPOSURE)
@@ -1116,12 +1117,13 @@ Distance to closest particle: %s
 			expStep = (targetExp - EXPOSURE)
 			if    (expStep > 0): expStep = EXPOSURE / (1 - AUTO_EXPOSURE_STEP_UP)
 			elif  (expStep < 0): expStep = -EXPOSURE * (AUTO_EXPOSURE_STEP_DN)
-			if (abs(EXPOSURE - targetExp) < expStep):
+			if (abs(EXPOSURE - targetExp) <= abs(expStep)):
 				EXPOSURE = targetExp
 			else:
 				EXPOSURE += expStep
 			lowestApparentMag = None
 			MAX_VISIBILE_MAG = intensityToMag(MIN_VISIBLE_INTENSITY, EXPOSURE)
+			# print(" ->", EXPOSURE, "Target:", targetExp)
 
 
 		frameEnd = time.time()
@@ -1361,7 +1363,7 @@ class camera:
 				particle.info["appmag"] = appMag
 				if (lowestApparentMag == None or appMag < lowestApparentMag):
 					newLow = True
-				if (appMag > MAX_VISIBILE_MAG):
+				if (appMag - 1 > MAX_VISIBILE_MAG):
 					return False
 			pos = particle.pos
 			radius = particle.radius
