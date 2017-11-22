@@ -1363,7 +1363,8 @@ class camera:
 				particle.info["appmag"] = appMag
 				if (lowestApparentMag == None or appMag < lowestApparentMag):
 					newLow = True
-				if (appMag - 1 > MAX_VISIBILE_MAG):
+				if (appMag > MAX_VISIBILE_MAG):
+					if newLow: MAX_VISIBILE_MAG = appMag
 					return False
 			pos = particle.pos
 			radius = particle.radius
