@@ -9,10 +9,11 @@
 
 from tkinter import *
 from math import *
-import turtle
+# import turtle
 import random
 import time
 import vector
+from graphics import *
 import loadSystem
 import particle as Pmodule
 import copy
@@ -33,6 +34,10 @@ print("Starting Orbits4T")
 PROGRAM_START = time.time()
 
 LINUX = False # If true, then non alphanumeric key controls will be replaced with numbers
+
+win = GraphWin(title="Orbits 4T", width = 1000, height = 600)
+win.setBackground("Black")
+
 
 #############################################################################################################################
 # args:                                                                                                                     #
@@ -507,40 +512,53 @@ def bv2rgb(bv):
 
 
 def screenWidth():
-	return turtle.window_width()
+	return win.width
 
 def screenHeight():
-	return turtle.window_height()
+	return win.height
 
-def polyDot(radius, fill=None, x=None, y=None):
-	if SMART_DRAW:
-		numPoints = int(
-		max(radius / SMART_DRAW_PARAMETER,
-		    FLARE_POLY_MAX_POINTS))
-	else:
-		numPoints = FLARE_POLY_POINTS
+print("Width:", screenWidth())
+print("Height:", screenHeight())
 
-	turtle.up()
-	if (x != None and y != None):
-		turtle.goto(x, y)
-	else:
-		x, y = turtle.position()
-	angleSep = 2*pi / numPoints
-	if (fill != None):
-		turtle.pencolor(fill)
-		turtle.fillcolor(fill)
-	turtle.goto(x, y + radius)
-	turtle.down()
-	turtle.begin_fill()
-	for i in range(1, numPoints):
-		angle = i * angleSep
-		if DIFF_SPIKES: rad = radius * (1 + sin(angle * DIFF_SPIKES/2) ** 100)
-		else: rad = radius
-		turtle.goto(x + rad*sin(angle),
-		            y + rad*cos(angle))
-	turtle.end_fill()
-	turtle.up()
-	turtle.goto(x, y)
+# def polyDot(radius, fill=None, x=None, y=None):
+# 	if SMART_DRAW:
+# 		numPoints = int(
+# 		max(radius / SMART_DRAW_PARAMETER,
+# 		    FLARE_POLY_MAX_POINTS))
+# 	else:
+# 		numPoints = FLARE_POLY_POINTS
+#
+# 	turtle.up()
+# 	if (x != None and y != None):
+# 		turtle.goto(x, y)
+# 	else:
+# 		x, y = turtle.position()
+# 	angleSep = 2*pi / numPoints
+# 	if (fill != None):
+# 		turtle.pencolor(fill)
+# 		turtle.fillcolor(fill)
+# 	turtle.goto(x, y + radius)
+# 	turtle.down()
+# 	turtle.begin_fill()
+# 	for i in range(1, numPoints):
+# 		angle = i * angleSep
+# 		if DIFF_SPIKES: rad = radius * (1 + sin(angle * DIFF_SPIKES/2) ** 100)
+# 		else: rad = radius
+# 		turtle.goto(x + rad*sin(angle),
+# 		            y + rad*cos(angle))
+# 	turtle.end_fill()
+# 	turtle.up()
+# 	turtle.goto(x, y)
+
+# Converts [0.5, 0.12, 1] etc into "#701be1" string (#ffffff type string)
+def colourString(array):
+	if type(array) == type(""): return array
+
+	R = int(225 * array[0])
+	G = int(225 * array[1])
+	B = int(225 * array[2])
+	s = "#%02x%02x%02x"%(R, G, B)
+	return s
 
 # I = R * B^(-m)
 def getIntensity(apparentMag):
@@ -557,6 +575,10 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	global drawStars
 	global lowestApparentMag
 	global FLARE_POLY_POINTS
+
+	xShift = 0#screenWidth() / 2
+	yShift = 0#-screenHeight() / 2
+
 	if SMART_DRAW:
 		perimApprox = 2*pi*sqrt((major**2 + minor**2) / 2)
 		points = int(perimApprox / SMART_DRAW_PARAMETER)
@@ -592,43 +614,40 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	elif (points <= 2 and mag == None):
 		fill = [1, 1, 1]
 
-	if box:
-		boxRadius = max(MIN_BOX_WIDTH, major * 1.4 + flareWidth) / 2
-		turtle.up()
-		turtle.pencolor([1, 1, 1])
-		turtle.goto(x - boxRadius, y - boxRadius)
-		turtle.down()
-		turtle.goto(x - boxRadius, y + boxRadius)
-		turtle.goto(x + boxRadius, y + boxRadius)
-		turtle.goto(x + boxRadius, y - boxRadius)
-		turtle.goto(x - boxRadius, y - boxRadius)
-		turtle.up()
+	# if box:
+	# 	boxRadius = max(MIN_BOX_WIDTH, major * 1.4 + flareWidth) / 2
+	# 	turtle.up()
+	# 	turtle.pencolor([1, 1, 1])
+	# 	turtle.goto(x - boxRadius, y - boxRadius)
+	# 	turtle.down()
+	# 	turtle.goto(x - boxRadius, y + boxRadius)
+	# 	turtle.goto(x + boxRadius, y + boxRadius)
+	# 	turtle.goto(x + boxRadius, y - boxRadius)
+	# 	turtle.goto(x - boxRadius, y - boxRadius)
+	# 	turtle.up()
 	if (points > 2):
-		turtle.up()
-		turtle.goto(x + screenX, y + screenY)
-		turtle.begin_fill()
-		turtle.fillcolor(fill)
-		onScreen = True
-		Drawn = False
-		screenRadius = camera.screenRadius
+		pointsList = []
+		p = Point(x + screenX + xShift, y + screenY + yShift)
+		pointsList.append(p.clone())
+		# turtle.fillcolor(fill)
 		centreRadius = (x**2 + y**2)**(1/2)
-		start = 0
-		end = points
-		for i in range(start, end):
+		for i in range(points):
 			localX = major/2 * cos(2 * pi * i / points)
 			localY = minor/2 * sin(2 * pi * i / points)
 			screenX = localX * cos(angle) - localY * sin(angle)
 			screenY = localY * cos(angle) + localX * sin(angle)
-			turtle.goto(x + screenX, y + screenY)
-		turtle.end_fill()
-
+			p = Point(x + screenX + xShift, y + screenY + yShift)
+			pointsList.append(p.clone())
+		poly = Polygon(pointsList)
+		fillStr = colourString(fill)
+		poly.setFill(fillStr)
+		poly.setOutline(fillStr)
+		poly.draw(win)
 	if (drawStars):
-		turtle.up()
-		turtle.goto(x, y)
-		turtle.pencolor(fill)
+		p = Point(x + xShift, y + yShift)
 		if (mag == None):
 			if (points < 2):
-				turtle.dot(2)
+				p.draw(win)
 			return True
 
 		# Scale up fill:
@@ -636,32 +655,37 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 			M = max(fill)
 			fill = [x * 1/M for x in fill]
 
-		for r in range(int(flareWidth), 0, -1):
+		for r in range(int(flareWidth), 0, -int(flareWidth/20)):
 			# Ir: Intensity at radius 'r' (Scaled so that 0 is the minimum threshold)
 			# Ir = intensity * (1 - r / flareWidth)
 			scale = (1 - r / flareWidth) ** 2
 			if (scale < MIN_RMAG): continue
-			turtle.pencolor([x * scale for x in fill])
-			if not DIFF_SPIKES: turtle.dot((r) + minor)
-			else: polyDot(r + minor, fill = [x * scale for x in fill])
+			c = Circle(p, r + minor)
+			newFill = colourString([x * scale for x in fill])
+			c.setOutline(newFill)
+			c.setFill(newFill)
+			c.draw(win)
+			# p = p.clone()
+			# turtle.pencolor([x * scale for x in fill])
+			# turtle.dot((r) + minor)
 	# else:
 	# 	return False
 	return True
 
-def drawLine(pointA, pointB = None, fill = "black", width = 1):
-	if (pointB == None):
-		x1, y1 = (0, 0)
-		x2, y2 = pointA
-	else:
-		x1, y1 = pointA
-		x2, y2 = pointB
-
-	turtle.pencolor(fill)
-	turtle.up()
-	turtle.goto(x1, y1)
-	turtle.down()
-	turtle.goto(x2, y2)
-	turtle.up()
+# def drawLine(pointA, pointB = None, fill = "black", width = 1):
+# 	if (pointB == None):
+# 		x1, y1 = (0, 0)
+# 		x2, y2 = pointA
+# 	else:
+# 		x1, y1 = pointA
+# 		x2, y2 = pointB
+#
+# 	turtle.pencolor(fill)
+# 	turtle.up()
+# 	turtle.goto(x1, y1)
+# 	turtle.down()
+# 	turtle.goto(x2, y2)
+# 	turtle.up()
 
 # These must be in descending order
 # A '!' indicates that the unit symbol is not shown, if the unit symbol
@@ -986,10 +1010,10 @@ Distance to closest particle: %s
 		textX = -width / 2 + 10
 		textY = height / 2 - 15 * (len(text.split("\n")) - 1) # Origin of the text box is bottom left corner
 		if (text[-1] != "\n"): textY -= 15
-		turtle.goto(textX, textY)
-		turtle.down()
-		turtle.pencolor([1, 1, 1])
-		turtle.write(text)
+		# turtle.goto(textX, textY)
+		# turtle.down()
+		# turtle.pencolor([1, 1, 1])
+		# turtle.write(text)
 
 	def abort(self):
 		global Running
@@ -1162,20 +1186,6 @@ Distance to closest particle: %s
 				self.frameWarning = False
 		if self.displayData: self.showData()
 		self.Zero()
-#
-# class Matrix:
-# 	def __init__(self, array):
-# 		"""Array should be 2 dimensional, ie: [[Column], ..., [Column]] etc."""
-# 		self.array = array
-#
-# 	def vecFromColumn(self, colIndex):
-# 		return vector(self.array[colIndex])
-#
-# 	def vecFromRow(self, rowIndex):
-# 		return vector([x[rowIndex] for x in self.array])
-#
-# 	def vecMultiply(self, vec):
-# 		return vector([self.vecFromRow(x).dot(vec) for x in range(len(self.array))])
 
 class camera:
 	# Main job: work out where a dot should go on the screen given the cameras position and rotation and the objects position.
@@ -1684,9 +1694,9 @@ def search(term=None, listen=True):
 	global TestMode
 	global particleList
 	if TestMode: return False
-	if term == None: term = turtle.textinput("Search for a body", "Enter a search term:")
+	# if term == None: term = turtle.textinput("Search for a body", "Enter a search term:")
 	if not term:
-		if listen: turtle.listen()
+		# if listen: turtle.listen()
 		return False
 	bestBody = None
 	for body in particleList:
@@ -1712,10 +1722,10 @@ def search(term=None, listen=True):
 	# 	MainLoop.target = bestBody
 	if bestBody:
 		MainLoop.target = bestBody
-		if listen: turtle.listen()
+		# if listen: turtle.listen()
 		return True
 	else:
-		if listen: turtle.listen()
+		# if listen: turtle.listen()
 		return False
 
 
@@ -2066,37 +2076,37 @@ elif preset == "4":
 	camera.pos = vector([0, 0, radius])
 	camera.rotTrackSet(Sun)
 
-elif preset == "5":
-	if PARTICLE_COUNT < 4:
-		print("Minimum particle count for this preset is 4")
-		PARTICLE_COUNT = 4
-	locked = False
-	def lockParticles():
-		global locked
-		locked = True
-	print("Press 'L' to lock the particles and start the simulation.")
-	time.sleep(1)
-	turtle.onkey(lockParticles, "l")
-	turtle.listen()
-	camera.pos = vector([-400, 0, 0])
-	if not SCREEN_SETUP:
-		window = turtle.Screen()
-		window.setup(width = 1.0, height = 1.0)
-		turtle.bgcolor([0, 0, 0])
-		turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
-		turtle.hideturtle()
-		SCREEN_SETUP = True
-
-	for i in range(PARTICLE_COUNT):
-		new = particle(-variableMass, randomVector(3, 100), autoColour=False, immune=True)
-	MainLoop.setDelta(Delta)
-	while (locked == False):
-		turtle.clear()
-		MainLoop.STEP(camera)
-		# for p in particleList:
-		# 	p.pos = p.pos.mag(100)
-		turtle.update()
-	new = particle(100, vector([0, 0, 0]), radius = 90, immune=True, limitRadius=False)
+# elif preset == "5":
+# 	if PARTICLE_COUNT < 4:
+# 		print("Minimum particle count for this preset is 4")
+# 		PARTICLE_COUNT = 4
+# 	locked = False
+# 	def lockParticles():
+# 		global locked
+# 		locked = True
+# 	print("Press 'L' to lock the particles and start the simulation.")
+# 	time.sleep(1)
+# 	# turtle.onkey(lockParticles, "l")
+# 	# turtle.listen()
+# 	camera.pos = vector([-400, 0, 0])
+# 	if not SCREEN_SETUP:
+# 		window = turtle.Screen()
+# 		window.setup(width = 1.0, height = 1.0)
+# 		turtle.bgcolor([0, 0, 0])
+# 		turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
+# 		turtle.hideturtle()
+# 		SCREEN_SETUP = True
+#
+# 	for i in range(PARTICLE_COUNT):
+# 		new = particle(-variableMass, randomVector(3, 100), autoColour=False, immune=True)
+# 	MainLoop.setDelta(Delta)
+# 	while (locked == False):
+# 		turtle.clear()
+# 		MainLoop.STEP(camera)
+# 		# for p in particleList:
+# 		# 	p.pos = p.pos.mag(100)
+# 		turtle.update()
+# 	new = particle(100, vector([0, 0, 0]), radius = 90, immune=True, limitRadius=False)
 # if not TestMode:
 
 # print("True nbody: {}, supplied: {}".format(TRUE_NBODY, args["-tn"][-1]))
@@ -2118,12 +2128,6 @@ if (TRUE_NBODY == False or TRUE_NBODY == "False"):
 		bodies = [x[0] for x in forces[0:min(DEFAULT_SYSTEM_SIZE, len(forces))]]
 		p1.system = bodies
 
-	# print("Moon system:", ", ".join([x.name for x in planets["Moon"].system]))
-	# print("ISS system:", ", ".join([x.name for x in planets["ISS"].system]))
-	# print("Earth system:", ", ".join([x.name for x in planets["Earth"].system]))
-	# print("Voyager1 system:", ", ".join([x.name for x in planets["Voyager1"].system]))
-# else:
-# 	print("TRUE_NBODY:", TRUE_NBODY, "Type:", type(TRUE_NBODY))
 
 orderedParticleList = list(particleList)
 print("Done! Starting simulation...")
@@ -2152,89 +2156,89 @@ def dnRelSpeed():
 
 
 
-if not TestMode:
-	if not SCREEN_SETUP:
-		window = turtle.Screen()
-		window.setup(width = 1.0, height = 1.0)
-		turtle.bgcolor([0, 0, 0])
+# if not TestMode:
+	# if not SCREEN_SETUP:
+	# 	window = turtle.Screen()
+	# 	window.setup(width = 1.0, height = 1.0)
+	# 	turtle.bgcolor([0, 0, 0])
+    #
+	# 	turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
+	# 	turtle.hideturtle()
+	# 	SCREEN_SETUP = True
 
-		turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
-		turtle.hideturtle()
-		SCREEN_SETUP = True
-
-	turtle.onkeypress(panLeft, "a")
-	turtle.onkeyrelease(panRight , "a")
-
-	turtle.onkeypress(panRight, "d")
-	turtle.onkeyrelease(panLeft , "d")
-
-	turtle.onkeypress(panForward, "w")
-	turtle.onkeyrelease(panBack , "w")
-
-	turtle.onkeypress(panBack, "s")
-	turtle.onkeyrelease(panForward , "s")
-
-	turtle.onkeypress(panUp, "r")
-	turtle.onkeyrelease(panDown , "r")
-
-	turtle.onkeypress(panDown, "f")
-	turtle.onkeyrelease(panUp , "f")
-
-	turtle.onkeypress(panFast, "Shift_L")
-	turtle.onkeyrelease(panSlow, "Shift_L")
-
-	turtle.onkeypress(rotRight, "Right")
-	turtle.onkeyrelease(rotLeft, "Right")
-
-	turtle.onkeypress(rotLeft, "Left")
-	turtle.onkeyrelease(rotRight, "Left")
-
-	turtle.onkeypress(rotUp, "Up")
-	turtle.onkeyrelease(rotDown, "Up")
-
-	turtle.onkeypress(rotDown, "Down")
-	turtle.onkeyrelease(rotUp, "Down")
-
-	turtle.onkeypress(rotClockWise, "e")
-	turtle.onkeyrelease(rotAntiClock, "e")
-
-	turtle.onkeypress(rotAntiClock, "q")
-	turtle.onkeyrelease(rotClockWise, "q")
-
-	turtle.onkey(escape, "Escape")
-	turtle.onkey(pause,  "space")
-
-	turtle.onkey(cycleTargets, "Tab")
-	turtle.onkeypress(togglePanTrack, "t")
-	turtle.onkey(toggleRotTrack, "y")
-	turtle.onkey(clearTarget,    "c")
-	turtle.onkey(goToTarget,	 "g")
-	turtle.onkey(toggleRealTime, "i")
-
-	turtle.onkey(toggleScreenData, "h")
-	turtle.onkey(startRecord, "j")
-	turtle.onkey(stopRecord, "k")
-
-	turtle.onkeypress(upScreenDepth, "'")
-	turtle.onkeypress(downScreenDepth, ";")
-
-	turtle.onkeypress(upMaxMag, ".")
-	turtle.onkeypress(downMaxMag, ",")
-
-	turtle.onkey(upDelta, "]")
-	turtle.onkey(downDelta, "[")
-	turtle.onkey(revDelta, "\\")
-
-	turtle.onscreenclick(leftClick, 1)
-	turtle.onscreenclick(rightClick, 3)
-
-	turtle.onkey(bufferRecord, "n")
-	turtle.onkey(bufferPlay, "m")
-
-	turtle.onkey(upRelSpeed, "=")
-	turtle.onkey(dnRelSpeed, "-")
-
-	turtle.onkey(search, "/")
+	# turtle.onkeypress(panLeft, "a")
+	# turtle.onkeyrelease(panRight , "a")
+    #
+	# turtle.onkeypress(panRight, "d")
+	# turtle.onkeyrelease(panLeft , "d")
+    #
+	# turtle.onkeypress(panForward, "w")
+	# turtle.onkeyrelease(panBack , "w")
+    #
+	# turtle.onkeypress(panBack, "s")
+	# turtle.onkeyrelease(panForward , "s")
+    #
+	# turtle.onkeypress(panUp, "r")
+	# turtle.onkeyrelease(panDown , "r")
+    #
+	# turtle.onkeypress(panDown, "f")
+	# turtle.onkeyrelease(panUp , "f")
+    #
+	# turtle.onkeypress(panFast, "Shift_L")
+	# turtle.onkeyrelease(panSlow, "Shift_L")
+    #
+	# turtle.onkeypress(rotRight, "Right")
+	# turtle.onkeyrelease(rotLeft, "Right")
+    #
+	# turtle.onkeypress(rotLeft, "Left")
+	# turtle.onkeyrelease(rotRight, "Left")
+    #
+	# turtle.onkeypress(rotUp, "Up")
+	# turtle.onkeyrelease(rotDown, "Up")
+    #
+	# turtle.onkeypress(rotDown, "Down")
+	# turtle.onkeyrelease(rotUp, "Down")
+    #
+	# turtle.onkeypress(rotClockWise, "e")
+	# turtle.onkeyrelease(rotAntiClock, "e")
+    #
+	# turtle.onkeypress(rotAntiClock, "q")
+	# turtle.onkeyrelease(rotClockWise, "q")
+    #
+	# turtle.onkey(escape, "Escape")
+	# turtle.onkey(pause,  "space")
+    #
+	# turtle.onkey(cycleTargets, "Tab")
+	# turtle.onkeypress(togglePanTrack, "t")
+	# turtle.onkey(toggleRotTrack, "y")
+	# turtle.onkey(clearTarget,    "c")
+	# turtle.onkey(goToTarget,	 "g")
+	# turtle.onkey(toggleRealTime, "i")
+    #
+	# turtle.onkey(toggleScreenData, "h")
+	# turtle.onkey(startRecord, "j")
+	# turtle.onkey(stopRecord, "k")
+    #
+	# turtle.onkeypress(upScreenDepth, "'")
+	# turtle.onkeypress(downScreenDepth, ";")
+    #
+	# turtle.onkeypress(upMaxMag, ".")
+	# turtle.onkeypress(downMaxMag, ",")
+    #
+	# turtle.onkey(upDelta, "]")
+	# turtle.onkey(downDelta, "[")
+	# turtle.onkey(revDelta, "\\")
+    #
+	# turtle.onscreenclick(leftClick, 1)
+	# turtle.onscreenclick(rightClick, 3)
+    #
+	# turtle.onkey(bufferRecord, "n")
+	# turtle.onkey(bufferPlay, "m")
+    #
+	# turtle.onkey(upRelSpeed, "=")
+	# turtle.onkey(dnRelSpeed, "-")
+    #
+	# turtle.onkey(search, "/")
 
 if TestMode:
 	try:
@@ -2336,7 +2340,7 @@ if TestMode:
 		exit()
 	exit()
 
-turtle.listen()
+# turtle.listen()
 Buffer.initialise()
 frameStart = time.time()
 # demoTimer = frameStart
@@ -2352,7 +2356,7 @@ frameCount = 0
 
 def save():
 	global frameCount
-	turtle.getcanvas().postscript(file = "frames/frame_{0:05d}.eps".format(frameCount))
+	# turtle.getcanvas().postscript(file = "frames/frame_{0:05d}.eps".format(frameCount))
 	frameCount += 1
 
 if DEMO: # Run a nice looking screen saver type thing
@@ -2364,7 +2368,7 @@ if DEMO: # Run a nice looking screen saver type thing
 	demoTimer = frameStart
 
 while Running:
-	turtle.clear()
+	# turtle.clear()
 	if STAGGERED_SIM or args["-dbg"][1]:
 		inp = input()
 	MainLoop.STEP(camera)
@@ -2382,7 +2386,7 @@ while Running:
 		else:
 			demoTimer = time.time() # Set the timer to now while its moving
 			pan[0] = 0
-
-	turtle.update()
+	# win.clearAll()
+	# turtle.update()
 	if (RECORD_SCREEN):
 		save()
