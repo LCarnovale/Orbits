@@ -603,6 +603,7 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 		turtle.goto(x + boxRadius, y - boxRadius)
 		turtle.goto(x - boxRadius, y - boxRadius)
 		turtle.up()
+	if flareWidth < 0: return False
 	if (points > 2):
 		turtle.up()
 		turtle.goto(x + screenX, y + screenY)
@@ -1731,6 +1732,7 @@ camera = camera(pos = vector([0, 0, 0]))
 
 setup()
 Running = True
+Buffer = buffer()
 
 if preset == "1":
 	if (not args["-tn"][-1]):
@@ -2101,7 +2103,6 @@ elif preset == "5":
 
 # print("True nbody: {}, supplied: {}".format(TRUE_NBODY, args["-tn"][-1]))
 
-Buffer = buffer()
 
 if (TRUE_NBODY == False or TRUE_NBODY == "False"):
 	print("Auto-assigning systems...")
