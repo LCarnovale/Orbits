@@ -15,7 +15,8 @@ import time
 import vector
 import loadSystem
 import particle as Pmodule
-import copy
+# import copy
+import numpy as np
 
 randomVector = vector.randomVector
 vector = vector.vector
@@ -384,7 +385,7 @@ FLARE_RAD_EXP = 1.5
 FLARE_BASE = 1e6             # Scales the size of the flares
 FLARE_POLY_POINTS = 20
 FLARE_POLY_MAX_POINTS = 100
-MIN_RMAG = 0.02             # min 'brightness' of the rings in a flare. Might need to differ across machines.
+MIN_RMAG = 0.01             # min 'brightness' of the rings in a flare. Might need to differ across machines.
   # Diffraction variables
 DIFF_SPIKES = args["-dfs"][1]
 PRIMARY_WAVELENGTH = 600E-9  # Average wavelength of light from stars. in m.
