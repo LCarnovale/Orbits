@@ -2377,7 +2377,8 @@ while Running:
 		if (int(time.time() - demoTimer) % 15 >= 14) and (camera.panTrackLock):
 			# demoTimer = time.time()
 			camera.panTrackLock = False
-			cycleTargets()
+			for i in range(random.randint(1, 10)):
+				cycleTargets()
 			goToTarget(lock = True)
 		if (camera.panTrackLock and camera.rotTrackLock):
 			pan[0] = 0.5
