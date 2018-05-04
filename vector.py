@@ -2,9 +2,19 @@ from math import *
 import random
 
 class vector:
-	def __init__(self, elements, unit=False): #NOFP
+	def __init__(self, elements, unit=False, dim=None): #NOFP
+		# if unit = True, then all operations on the vector
+		# return a unit vector of length 1
 		self.elements 	= elements
-		self.dim 		= len(elements)
+		if (type(elements) in [int, float]):
+			if (dim == None):
+				# Not enough information for vector provided
+				print("Error: vector/__init__() unable to create vector with scalar element but no dimension")
+				exit()
+			else:
+				self.elements = [elements] * dim
+				self.dim = dim
+		self.dim 		= (dim if dim else len(elements))
 		self.unit 		= unit
 
 	def __len__(self):
@@ -288,7 +298,7 @@ class vector:
 	# Makes the vector orthogonal to other. (?)
 	def makeOrthogonal(self, other):
 		return other.cross(self).cross(other).mag(abs(self))
-		
+
 
 def randomVector(dim, mag, maxMag=0, fixComponents=[1,1,1]):
 	"""(dimensions, magnitude, maximum magnitude (defaults to magnitude),
@@ -306,3 +316,7 @@ def randomVector(dim, mag, maxMag=0, fixComponents=[1,1,1]):
 	else:
 		endMag = random.random() * abs(maxMag - mag) + mag
 	return vector(tempVec).setMag(endMag)
+
+# returns a unit vector of the given vector
+def unit(vec):
+	return vec / abs(vec)
