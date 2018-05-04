@@ -1,4 +1,4 @@
-from vector import vector, randomVector
+from vector import *
 from math import *
 import random
 
@@ -19,51 +19,129 @@ CAMERA_UNTRACK_IF_DIE = True
 G = 1
 
 TestMode = False
+R_POWER = 2 # For N-power force function, force is GMm/(r^n)
+
+
+
+### FORCE FUNCTIONS
+# Example generic force function, given 2 particles A and B
+# returns the force vector acting on A
+def gravitationalForce(particleA, particleB):
+	mag = G * particleA.mass * particleB.mass / abs(particleA.pos - particleB.pos)**2
+	vec = mag * unit(particleB.pos - particleA.pos)
+	return vec
+
+def cubicForce(particleA, particleB):
+	mag = G * particleA.mass * particleB.mass / abs(particleA.pos - particleB.pos)**3
+	vec = mag * unit(particleB.pos - particleA.pos)
+	return vec
+
+def nPowerForce(particleA, particleB):
+	mag = G * particleA.mass * particleB.mass / abs(particleA.pos - particleB.pos)**R_POWER
+	vec = mag * unit(particleB.pos - particleA.pos)
+	return vec
+
+
+### CIRCULARISE FUNCTIONS
+# def gravitationalCircularise(particleA, particleB):
+
+
+
+
 
 class particle:
 	def __init__(
-			self, mass, position, velocity=0, acceleration=0,
+			self, mass=None, position=0, velocity=0, acceleration=0,
 			density=defaultDensity, autoColour=True, colour=[0, 0, 1],
 			limitRadius=True, name=None, static=False, immune=False,
-		radius=None):
-		self.mass = mass
+			radius=None, respawn=True):
+
+		massProv = mass != None
+		densityProv = density != defaultDensity
+		radiusProv = radius != None
+		# print([massProv, densityProv, radiusProv].count(True), "values given")
+		if [massProv, radiusProv].count(True) < 1:
+			print("Error: particle/__init__(): Atleast mass or radius must be provided")
+			exit()
+		else:
+			# If either mass or radius is provided, then the other is calculated
+			# If mass and radius are provided, density is ignored and recalculated
+			#   regardless of if it was also provided as an argument. If density
+			#   is provided along with mass and radius then a warning is given
+			if not radiusProv:
+				self.mass = mass
+				self.density = density
+				self.radius = (3 * mass/(4 * pi * density))**(1/3)
+			elif not massProv:
+				self.radius = radius
+				self.density = density
+				self.mass = density * (4/3 * pi) * radius**3
+			else:
+				self.density = mass / (4/3 * pi * radius**3)
+				self.mass = mass
+				self.radius = radius
+				if (densityProv): print("Warning: particle/__init__(): radius, mass and density provided, density will be ignored and re-calculated.")
+
+
 		self.pos = position
-		self.dim = len(position.elements)
-		self.density = density
 		self.limitRadius = limitRadius
 		self.name = name
 		self.static = static
 		self.system = [] # If this is not empty, then the particle will only feel force from the bodies in this list
 		self.info = {}
 
+		dims = [x.dim for x in [position, velocity, acceleration] if type(x) == vector]
+		if dims:
+			# A vector value is given
+			if (max(dims) == min(dims)):
+				# All dims are equal
+				self.dim = dims[0]
+			else:
+				print("Error: particle/__init__(): Inconsistent dimensions of position, velocity and acceleration")
+				exit()
+		else:
+			print("Error: particle/__init__(): No vector quantity provided in position, velocity or acceleration.")
+			exit()
+
+		if position == 0:
+			self.pos = vector(0, dim = self.dim)
+		elif (type(position) == vector):
+			self.pos = position
+		else:
+			print("Error: particle/__init__(): Non zero scalar provided where vector or zero scalar expected for position")
+
 		if velocity == 0:
-			self.vel = vector([0 for i in range(self.dim)])
-		else:
+			self.vel = vector(0, dim = self.dim)
+		elif (type(velocity) == vector):
 			self.vel = velocity
-		if acceleration == 0:
-			self.acc = vector([0 for i in range(self.dim)])
 		else:
+			print("Error: particle/__init__(): Non zero scalar provided where vector or zero scalar expected for velocity")
+
+		if acceleration == 0:
+			self.acc = vector(0, dim = self.dim)
+		elif (type(acceleration) == vector):
 			self.acc = acceleration
+		else:
+			print("Error: particle/__init__(): Non zero scalar provided where vector or zero scalar expected for acceleration")
+
+		self.colour = [0, 0, 0]
 		self.autoColour = autoColour
-		self.setRadius(radius) # Providing a radius will override the mass
 		self.immune = immune
 		if not autoColour:
 			self.setColour(colour)
+		else:
+			self.setColour()
 		particleList.append(self)
 		if static:
 			staticList.append(self)
 		else:
 			nonStaticList.append(self)
-		if self.pos.dim != self.vel.dim:
-			print("This class is badly made! (non consistant dimensions):", self)
-		# self.setColour()
-		# self.colour = [self.radius/radiusLimit, 0, (radiusLimit - self.radius)/radiusLimit]
 
+		self._respawn = respawn
 
 	alive = True
-	respawn = True
 	specialColour = False
-	colour = [0, 0, 0]
+	forceFunc = gravitationalForce
 
 	inbound = False
 
@@ -92,12 +170,15 @@ class particle:
 
 
 	def calcAcc(self, other, returnResult=False):
-		force = (G * self.mass * other.mass) / (abs(self.pos - other.pos) ** 2)
-		forceVector = other.pos.subtract(self.pos)
+		# force = (G * self.mass * other.mass) / (abs(self.pos - other.pos) ** 2) ## THIS IS THE NORMAL ONE USE THIS ONE
+		# forceVector = other.pos.subtract(self.pos)
+		if (self.pos == other.pos): return None
+		forceVector = particle.forceFunc(self, other)
+		force = abs(forceVector)
 		if (not returnResult):
-			self.acc += (forceVector.setMag(force/self.mass))
+			self.acc += (forceVector / self.mass)
 		else:
-			return (forceVector.setMag(force/self.mass))
+			return (forceVector / self.mass)
 	def checkCollision(self, other):
 		if other.alive and (self.mass > 0) and (abs(self.pos.subtract(other.pos)) < self.radius + other.radius):
 			self.contest(other)
@@ -147,11 +228,12 @@ class particle:
 
 	def die(self, killer=None):
 		# print("%s dying to %s" % (self.name, killer.name))
-		if self.respawn:
+		if self._respawn:
 			# if CAMERA_UNTRACK_IF_DIE and camera.panTrack == self:
 			# 	camera.panTrackSet(killer)
 			self.respawn()
 		else:
+			self.respawn()
 			if self in particleList:
 				try:
 					if camera.panTrack: camera.panTrackSet()
@@ -194,14 +276,22 @@ class particle:
 
 		return True
 
-	def circularise(self, other, plane = None, axis=None):
+	def circularise(self, other, plane = None, axis=None, binary=False):
 		# If axis is supplied, the resulting orbit is in the direction of the
-		# cross product of the displacement vector from the body to parent and the axis
+		#   cross product of the displacement vector from the body to parent and the axis
+		# If binary is true, then each body will be placed in an orbit around the centre of mass
+		#   and the final velocity of the pair will be equal to the velocity of self
 		if other == self:
 			return False
+		if binary:
+			reducedMass = self.mass * other.mass / (self.mass + other.mass)
+			fullMass = self.mass + other.mass
+		# 	centreOfMass = (self.pos + other.pos) / (self.mass + other.mass)
+		# 	oldOther = other
+		# 	other = [self.mass + other.mass, centreOfMass, self.vel.getClone()]
 		if type(other) == list:
 			# Can specify a mass at a position instead of a particle
-			# Parse as [mass, position, vel=0]
+			# Parse as [mass, position, vel=(0-vector)]
 			mass = other[0]
 			position = other[1]
 			if (len(other) > 2):
@@ -211,11 +301,16 @@ class particle:
 		else:
 			mass = other.mass
 			position = other.pos
-			otherVel = other.vel
+			otherVel = other.vel.getClone()
 
 		# if inclination == "r":
 		#     inclination = random.random() * 360 - 180
-		speed = sqrt(G * mass/abs(self.pos - position))
+		fullDist = abs(self.pos - position)
+		if binary:
+			# speed = speed * (self.mass / reducedMass)
+			speed = mass * sqrt(G / (fullDist * fullMass))
+		else:
+			speed = sqrt(G * mass / fullDist)
 		vel = randomVector(3, 1)
 		if (axis == None):
 			vel.makeOrthogonal(position - self.pos)
@@ -223,6 +318,10 @@ class particle:
 		else:
 			vel = axis.cross(position - self.pos)
 		self.vel = vel.mag(speed) + otherVel
+		if binary:
+			# altSpeed = (mass / reducedMass) * sqrt(G / (self.mass * fullDist))
+			altSpeed = self.mass * sqrt(G / (fullDist * fullMass))
+			other.vel = -vel.mag(altSpeed) + otherVel
 		return True
 
 		# if type(other) == particle:
