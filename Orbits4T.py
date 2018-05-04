@@ -53,6 +53,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-d"  :     [float,	0.025,	True], # Delta time per step
 "-n"  :     [int,   20,		True], # Particle count
 "-p"  :     [str,   "1",	True], # preset
+"-rn" :     [int,   2,      True], # Power of r (F = -GMm/r^n) for preset 4.5
 "-rt" :     [str,   False,  False,  True], # Run in real time
 "-sp" :     [str,   False,	False,  True], # start paused
 "-ss" :     [str,   False,	False,  True], # staggered simulation
@@ -63,6 +64,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-rs" :     [float, 0.01,	True], # Rotational speed
 "-ip" :     [str,   "Earth",True], # Initial pan track
 "-ir" :     [str,   "Sun",  True], # Initial rot track
+"-sep":     [float, 700,    True], # Separation of bodies A and B in preset 6
 "-ae" :     [str,   True,   False,  True], # Auto "exposure"
 "-rel":     [str,   False,  False,  True], # Visualise special relativity effects (Experimental)
 "-mk" :     [str,   False,	False,  True], # Show marker points
@@ -338,7 +340,7 @@ DRAW_MARKERS = args["-mk"][1]
 RELATIVITY_EFFECTS = args["-rel"][1]
 RELATIVITY_SPEED = 0
 
-SCREEN_SETUP = False            # True when the screen is made, to avoid setting it up multiple times
+SCREEN_SETUP = False        # True when the screen is made, to avoid setting it up multiple times
 
 MAX_VISIBILE_MAG = 15
 # Camera constants
@@ -347,8 +349,10 @@ GOTO_DURATION       = 6     # Approximately the number of seconds taken to trave
 AUTO_RATE_CONSTANT  = 10    # A mysterious constant which determines the autoRate speed, 100 works well.
 FOLLOW_RATE_COEFF   = 0.4
 FOLLOW_RATE_BASE    = 1.1
-TRAVEL_STEPS_MIN	= 100   # Number of steps to spend flying to a target (at full speed, doesn't include speeding up or slowing down)
+TRAVEL_STEPS_MIN    = 100   # Number of steps to spend flying to a target (at full speed, doesn't include speeding up or slowing down)
 MAX_DRAW_DIST       = 3 * LIGHT_YEAR  # Maximum distance to draw bodies that don't have a given magnitude (ie planets, stars are not affected)
+MAX_PAN_DIST        = 100   # When toggling to track a target, if the camera is more than this many radii of the planet then
+                            # the camera will be moved to be within this distance of the target.
 
 DEFAULT_ZERO_VEC = [0, 0, 0]
 DEFAULT_UNIT_VEC = [1, 0, 0]
@@ -1181,7 +1185,10 @@ Distance to closest particle: %s
 
 class camera:
 	# Main job: work out where a dot should go on the screen given the cameras position and rotation and the objects position.
-	def __init__(self, pos = vector(DEFAULT_ZERO_VEC), rot = vector(DEFAULT_UNIT_VEC), vel = vector(DEFAULT_ZERO_VEC), screenDepth = defaultScreenDepth):
+	def __init__(self, pos = vector(DEFAULT_ZERO_VEC),
+	                   rot = vector(DEFAULT_UNIT_VEC),
+	                   vel = vector(DEFAULT_ZERO_VEC),
+	                   screenDepth = defaultScreenDepth):
 		self.pos = pos
 		self.rot = rot.setMag(1)
 		self.vel = vel
@@ -1291,11 +1298,13 @@ class camera:
 					minDist = p.pos
 			self.panInfo[5] = minDist
 			self.panStart = self.pos.getClone()
-			if ((20 * target.radius) < abs(self.pos - target.pos)):
+			comfortableDistance = MAX_PAN_DIST * target.radius # if the camera is further than this distance
+                                                                           # from the target it will move to this distance from it
+			if ((comfortableDistance) < abs(self.pos - target.pos)):
 				if (self.rotTrack and self.rotTrack != target):
-					destination = (target.pos - self.rotTrack.pos).mag(20 * target.radius) # Aligns the new destination so that we will see the object after rotating
+					destination = (target.pos - self.rotTrack.pos).mag(comfortableDistance) # Aligns the new destination so that we will see the object after rotating
 				else:
-					destination = self.rot.mag(-20 * target.radius)
+					destination = self.rot.mag(-comfortableDistance)
 			else:
 				destination = self.pos - target.pos
 			self.panInfo[0] = abs(target.pos + destination - self.pos)
@@ -1304,8 +1313,6 @@ class camera:
 			self.panInfo[2] = destination
 			self.panInfo[3] = 0 # at speed: 0 for accelerating, 1 for at speed, 2 for slowing down.
 			self.panInfo[4] = (self.panInfo[1] / FOLLOW_RATE_COEFF)
-		# print("Setting panTrack to %s from %s, mag %s" % (self.trackSeparate.string(2), "none" if not target else target.name, numPrefix(abs(self.trackSeparate), "m", 2)))
-			# print("Travel steps: {}, Total distance: {}, maxSpeed: {}, stopping distance: {}".format(travelSteps, self.panInfo[0], self.panInfo[1], self.panInfo[4]))
 		return target
 
 	def rotTrackSet(self, target = None):
@@ -1318,9 +1325,9 @@ class camera:
 		return target
 
 	# Not used, this can be removed
-	def autoRate(self, rate, distance):
-		newRate = dist * 0.5# * rate/(AUTO_RATE_CONSTANT)
-		return newRate
+	#def autoRate(self, rate, distance):
+	#	newRate = dist * 0.5# * rate/(AUTO_RATE_CONSTANT)
+	#	return newRate
 
 	def zeroCameraPosVel(self):
 		MainLoop.commonShiftPos = self.pos.negate()
@@ -1500,6 +1507,7 @@ class camera:
 		else:
 			self.rotTrackLock = True
 		self.moving = False
+
 markerList = []
 
 autoRateValue = maxPan
@@ -1745,10 +1753,17 @@ if preset == "1":
 	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
 	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
 	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
-	particle(25000, vector([150+defaultScreenDepth, 0, 0]))
+	new = particle(25000, vector([150+defaultScreenDepth, 0, 0]))
+	print(new.colour)
+
 	for i in range(PARTICLE_COUNT):
-		particle(variableMass, vector([150 + defaultScreenDepth, 0, 0]) + randomVector(3, 50, 400).makeOrthogonal(vector([random.random()*0.2, 1, random.random()*0.2])),
-                         colour = [random.random(), random.random(), random.random()], autoColour=False).circularise(particleList[0], axis=vector([0, 1, 0]))
+		new = particle( mass=variableMass,
+		    position=vector([150 + defaultScreenDepth, 0, 0]) + randomVector(3, 50, 400).makeOrthogonal(vector([random.random()*0.2, 1, random.random()*0.2])),
+		    colour = [random.random(), random.random(), random.random()],
+		autoColour=False, respawn=False )
+		new.circularise(particleList[0], axis=vector([0, 1, 0]))
+
+		# new.vel *= 0
 elif preset == "2":
 	# Galaxy kinda thing
 	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
@@ -2045,18 +2060,7 @@ elif preset == "3":
 			else:
 				planetTree[p] = fillDict(p)
 
-	# printTree(planetTree)
-	# for i in range(10):
-	# 	randParticle = random.sample(particleList, 1)[0]
-	# 	print("Random planet: %s" % (randParticle.name))
-	# 	nextParticle = findNext(planetTree, randParticle)
-	# 	print("Next planet: %s" % (nextParticle.name))
-	# 	prevParticle = findNext(planetTree, randParticle, previous=True)
-	# 	print("Previous particle: %s" % (prevParticle.name))
-	# 	print()
 
-	# for p in planetTree:
-	# MainLoop.abort()
 
 elif preset == "4":
 	# defaultDensity = 10
@@ -2068,6 +2072,23 @@ elif preset == "4":
 		particleList[-1].circularise(Sun, axis = vector([0, -1, 0]))
 	camera.pos = vector([0, 0, radius])
 	camera.rotTrackSet(Sun)
+
+elif preset == "4.5":
+	Pmodule.particle.forceFunc = Pmodule.nPowerForce
+	RN = args["-rn"][1]
+	Pmodule.R_POWER = RN
+	Sun = particle(30000000, vector([0, 0, 0]), density=1000, name="Sun",
+			colour=[1,0,0], autoColour=False)
+	avgRadius = (PRESET_4_MAX_RADIUS + PRESET_4_MIN_RADIUS) / 2
+	vel = sqrt(Pmodule.G*Sun.mass * avgRadius**(1 - RN)) * vector([0, 1, 0])
+
+
+	for i in range(PARTICLE_COUNT):
+		radius = i / (PARTICLE_COUNT - 1) * (PRESET_4_MAX_RADIUS - PRESET_4_MIN_RADIUS) + PRESET_4_MIN_RADIUS
+		particle(variableMass, position=vector([radius, 0, 0]), velocity=vel, radius=2, respawn=False)
+	camera.pos = vector([0, 0, radius])
+	camera.rotTrackSet(Sun)
+
 
 elif preset == "5":
 	if PARTICLE_COUNT < 4:
@@ -2100,6 +2121,17 @@ elif preset == "5":
 		# 	p.pos = p.pos.mag(100)
 		turtle.update()
 	new = particle(100, vector([0, 0, 0]), radius = 90, immune=True, limitRadius=False)
+# preset6
+elif preset == "6":
+	# Lagrange points
+	sep = args["-sep"][1]
+	A = particle(1e7, vector([0, 0,   0]), immune=True)
+	B = particle(1e2, vector([0, 0, sep]), immune=True)
+	B.circularise(A, binary=True, axis = vector([1, 0, 0]))
+	# A.circularise(B, axis=vector([0, -1, 0]))
+	MainLoop.addData("A-B dist", "abs(A.pos - B.pos)", True, "---")
+	camera.pos = vector([-3 * sep, 0, 0.5 * sep])
+
 # if not TestMode:
 
 # print("True nbody: {}, supplied: {}".format(TRUE_NBODY, args["-tn"][-1]))
