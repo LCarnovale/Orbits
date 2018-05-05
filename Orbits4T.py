@@ -274,7 +274,7 @@ SMART_DRAW_PARAMETER = args["-sdp"][1]     # Approx number of pixels between eac
 MAX_POINTS = args["-me"][1]  # Lazy way of limiting the number of points drawn to stop the program
                              # grinding to a halt everytime you get too close to a particle
 
-particle.TestMode = TestMode
+Pmodule.TestMode = TestMode
 
 
 
@@ -325,13 +325,19 @@ MAX_PERIOD = 150 * YEAR
 MAX_PLANET_COUNT = 12
 MIN_PLANET_COUNT = 1
 
+# Buffer constants
+BUFFER_NORMAL = 0
+BUFFER_RECORD = 1
+BUFFER_PLAY = 2
+BUFFER_DONT_DRAW = 9
+
 
 # Simulation settings
-particle.ALL_IMMUNE = False
+Pmodule.ALL_IMMUNE = False
 REAL_TIME           = args["-rt"][1]
-particle.defaultDensity  = 1
-particle.radiusLimit     = 1e+10       # Maximum size of particle
-voidRadius               = 5000      # Maximum distance of particle from camera
+Pmodule.defaultDensity  = 1
+Pmodule.radiusLimit     = 1e+10       # Maximum size of particle
+voidRadius               = 50000000   # Maximum distance of particle from camera
 CAMERA_UNTRACK_IF_DIE = True # If the tracked particle dies, the camera stops tracking it
 SMART_DRAW = True               # Changes the number of points on each ellipse depeding on distance
 FPS_AVG_COUNT = 10        # Frames used to calculate long average. Less->current fps, more->average fps
@@ -341,6 +347,8 @@ RELATIVITY_EFFECTS = args["-rel"][1]
 RELATIVITY_SPEED = 0
 
 SCREEN_SETUP = False        # True when the screen is made, to avoid setting it up multiple times
+LOW_FPS_LIMIT = 0.25         # If the frame rate is below this for two consecutive frames then abort the sim
+
 
 MAX_VISIBILE_MAG = 15
 # Camera constants
@@ -805,8 +813,9 @@ class buffer:
 		self.buffer = {}
 		self.bufferMode = 0 # 0: Normal. 1: Recording, sim paused. 2: Playing.
 		self.bufferLength = 0
-		self.emptyBuffers = len(particleList)
-		self.bufferCount = self.emptyBuffers
+		self.nonEmptyBuffers = 0
+		self.bufferCount = self.nonEmptyBuffers
+		self.deathFrames = {p:None for p in particleList}
 
 
 	def initialise(self):
@@ -816,18 +825,18 @@ class buffer:
 
 
 	def bufferModeString(self):
-		if (self.bufferMode == 0):
+		if (self.bufferMode == BUFFER_NORMAL):
 			return "Normal"
-		elif (self.bufferMode == 1):
+		elif (self.bufferMode == BUFFER_RECORD):
 			return "Recording"
-		elif (self.bufferMode == 2):
+		elif (self.bufferMode == BUFFER_PLAY):
 			return "Playing"
 
 	# Takes a particle and if needed stores its position.
 	# Can be called on a particle regardless of whether or not
 	# the buffer is buffering.
 	def storeBuffer(self, particle):
-		if (self.bufferMode == 1):
+		if (self.bufferMode == BUFFER_RECORD):
 			# Store the position.
 			print("Storing", particle)
 			self.buffer[p].append(
@@ -842,16 +851,19 @@ class buffer:
 
 
 	def buildBuffer(self, particle):
-		pos = particle.pos.getClone()
-		rad = particle.radius
-		colour = particle.colour
-		vel = particle.vel.getClone()
-		acc = particle.acc.getClone()
-		if (DRAW_VEL_VECS):
-			self.buffer[particle].append([pos, rad, colour, vel, acc])
+		if particle.alive:
+			pos = particle.pos.getClone()
+			rad = particle.radius
+			colour = particle.colour
+			vel = particle.vel.getClone()
+			acc = particle.acc.getClone()
+			if (DRAW_VEL_VECS):
+				self.buffer[particle].append([pos, rad, colour, vel, acc])
+			else:
+				self.buffer[particle].append([pos, rad, colour])
 		else:
-			self.buffer[particle].append([pos, rad, colour])
-		if len(self.buffer[particle]) == 1: self.emptyBuffers -= 1
+			self.buffer[particle].append(BUFFER_DONT_DRAW)
+		if len(self.buffer[particle]) == 1: self.nonEmptyBuffers += 1
 
 
 
@@ -859,29 +871,26 @@ class buffer:
 		if (index > len(self.buffer[particle])):
 			print("Attempting to access non-existant buffer.")
 			exit()
-		elif not self.buffer[particle]: return False
-		if len(self.buffer[particle]) == 1: self.emptyBuffers += 1
+		elif not self.buffer[particle]: return False # Buffer empty
+		if len(self.buffer[particle]) == 1: self.nonEmptyBuffers -= 1
 		return self.buffer[particle].pop(index)
 
 
 	def processPosition(self, particle, playIndex = 0, playRemove = True):
 		# A kind of autopilot, takes in a position and returns basically what the camera should see.
-		if self.bufferMode == 2:
-			if (self.emptyBuffers == self.bufferCount):
+		if self.bufferMode == BUFFER_PLAY:
+			if (self.nonEmptyBuffers == 0):
 				# All buffers are empty.
-				self.bufferMode = 0
+				self.bufferMode = BUFFER_NORMAL
 				return False
 			# playing
 			play = self.playBuffer(particle, playIndex)
+			# if play == 0: return BUFFER_DONT_DRAW
 			return play
 
-		elif self.bufferMode == 1:
+		elif self.bufferMode == BUFFER_RECORD:
 			# recording. Don't let the particle move.
-			# print("recording")
 			self.buildBuffer(particle)
-			# print(self.buffer[particle])
-			# print(particle)
-			# print(self.buffer)
 			return self.buffer[particle][0]
 		else:
 			return False
@@ -1063,24 +1072,35 @@ Distance to closest particle: %s
 			camera.panFollow()
 		if camera.rotTrack:
 			camera.rotFollow()
+		popList = []
 		for I, p  in enumerate(particleList):
-			if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
-				# Swap the previous one with the current one
-				particleList = particleList[:I - 1] + [particleList[I], particleList[I-1]] + particleList[I + 1:]
+			if (not p.alive and Buffer.bufferMode == BUFFER_NORMAL):
+				popList.append(p)
+				continue
 
-			pWarp = warpedDistance(p)
-			if (self.closestParticle == None):
-				self.closestParticle = p
-			elif (pWarp and pWarp < warpedDistance(self.closestParticle)):
-				self.closestParticle = p
+			if p.alive:
+				if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
+					# Swap the previous one with the current one
+					particleList = particleList[:I - 1] + [particleList[I], particleList[I-1]] + particleList[I + 1:]
 
-			if doStep and not (p == camera.panTrack or p == camera.rotTrack):
-				p.step(delta, camera)
-				# This bit is for preset 5, shouldn't be used otherwise
-				if p.mass < 0:
-					p.pos = p.pos.mag(100)
+				pWarp = warpedDistance(p)
+				if (self.closestParticle == None):
+					self.closestParticle = p
+				elif (pWarp and pWarp < warpedDistance(self.closestParticle)):
+					self.closestParticle = p
+
+				if doStep and not (p == camera.panTrack or p == camera.rotTrack):
+					p.step(delta, camera)
+					# This bit is for preset 5, shouldn't be used otherwise
+					if p.mass < 0:
+						p.pos = p.pos.mag(100)
 
 			buff = Buffer.processPosition(p) # Returns something if it wants anything other than the actual particle to be drawn
+			if buff == BUFFER_DONT_DRAW:
+				# if Buffer.bufferMode == BUFFER_PLAY:
+				popList.append(p)
+				continue
+
 			if not buff:
 				drawResult = camera.drawParticle(p, box = (self.target == p and self.displayData))
 			else:
@@ -1111,6 +1131,10 @@ Distance to closest particle: %s
 						elif (clickBut == 1):
 							# Right click
 							camera.rotTrackSet(p)
+		if Buffer.bufferMode == BUFFER_NORMAL:
+			for p in popList:
+				particleList.remove(p)
+			# popList = []
 
 		if AUTO_EXPOSURE and drawStars:
 			# print("LAM:", lowestApparentMag, "Exposure:", EXPOSURE, end="")
@@ -1159,10 +1183,12 @@ Distance to closest particle: %s
 		self.FPS += FPS / FPS_AVG_COUNT
 
 		if (AUTO_ABORT):
-			if (FPS < 1):
+			if (FPS < LOW_FPS_LIMIT):
 				if (self.frameWarning):
+					print("Fps too low again!:", FPS, "Aborting!")
 					self.abort()
 				else:
+					print("Fps too low!:", FPS, "Warning!")
 					self.frameWarning = True
 			else:
 				self.frameWarning = False
@@ -1775,9 +1801,9 @@ elif preset == "2":
 	particleMass = variableMass
 	centreVec = vector([defaultScreenDepth, 0, 0])
 	for i in range(PARTICLE_COUNT):
-		randomVec = randomVector(3, minDist, maxDist, [1, 0, 1])
+		randomVec = randomVector(3, minDist, maxDist, [0, 1, 1])
 		randomVec = randomVec.setMag(maxDist * (abs(randomVec) / maxDist)**2)
-		particle(particleMass, centreVec + randomVec + randomVector(3, 25))
+		particle(particleMass, centreVec + randomVec + randomVector(3, 25),density=20, respawn=False)
 		COM += particleList[-1].pos
 
 	COM = COM / PARTICLE_COUNT
@@ -1787,8 +1813,8 @@ elif preset == "2":
 		for p2 in particleList:
 			if p2 == p: continue
 			forceVec += (p.pos - p2.pos).setMag(Pmodule.G * p.mass * p2.mass / (abs(p.pos - p2.pos)**2))
-		velVec = forceVec.cross(vector([0, 1, 0]))
-		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)))
+		velVec = forceVec.cross(vector([1, 0, 0]))
+		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)*0.5))
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
 elif preset == "3":
