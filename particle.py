@@ -228,6 +228,7 @@ class particle:
 
 	def die(self, killer=None):
 		# print("%s dying to %s" % (self.name, killer.name))
+		global particleList
 		if self._respawn:
 			# if CAMERA_UNTRACK_IF_DIE and camera.panTrack == self:
 			# 	camera.panTrackSet(killer)
