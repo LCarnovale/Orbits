@@ -128,7 +128,7 @@ Key|Parameter type|Description
 -ps:    float       Maximum pan speed.
 -rs:    float       Rotational speed.
 -ip:    string      Starts the simulation with pan track at a body with the given name. (ONLY PRESET 3)
-                        The body is found by using the search function, so a HIP id will work too.
+						The body is found by using the search function, so a HIP id will work too.
 -ir:    string      Starts the simulation with rot track at a body with the given name, like -ip. (ONLY PRESET 3)
 -mk:                Show marker points (static X, Y, Z and Origin coloured particles)
 -ep:    int         Number of points on each ellipse (Irrelevant if SMART_DRAW is on (which it is))
@@ -136,8 +136,8 @@ Key|Parameter type|Description
 -ad:                (Debug tool) Always draw. Attempts to draw particles even if they are thought not to be on screen
 -vm:    float       Variable mass. To be used in relevant places for some presets.
 -vv:                Draw velocity and acceleration vectors. Note that while velocity vectors are to scale,
-                        acceleration vectors are multiplied by 5 when being drawn. (Otherwise they are too short)
-                        Give a number parameter to scale each vector.
+						acceleration vectors are multiplied by 5 when being drawn. (Otherwise they are too short)
+						Give a number parameter to scale each vector.
 -ds  :              Draw stars, ie, make the minimum size 1 pixel, regardless of distance.
 -sdp :  int         Smart draw parameter, equivalent to the number of pixels per edge on a shape.
 -me  :  int         Maximum edges, max number of edges drawn on each shape.
@@ -147,27 +147,27 @@ Key|Parameter type|Description
 -sr  :  int         Make rings around Saturn, the given number represents how many objects to make.
 -dfs :  int         Draw diffraction spikes around stars. Enter the number of spikes after -dfs. *Experimental*
 -rp  :  float       Make random planets, give a percentage of stars to have systems.
-                        (only for preset 3, if stars are also made)
+						(only for preset 3, if stars are also made)
 -tn  : (True/False) Runs the simulation in True N-body mode, making calculations of acceleration due the
-                        gravity of all bodies to all bodies. Much slower but usually much more accurate
-                        (Really not worth turning on for presets like the solar system)
-                        If left on, (ie the argument is not used) then the most influencial bodies at the
-                        start are the only ones that affect that body for the rest of the simulation.
-                        But, for some presets this is ON by default.
+						gravity of all bodies to all bodies. Much slower but usually much more accurate
+						(Really not worth turning on for presets like the solar system)
+						If left on, (ie the argument is not used) then the most influencial bodies at the
+						start are the only ones that affect that body for the rest of the simulation.
+						But, for some presets this is ON by default.
 -asb :  int         Number of bodies in auto generated systems.
 -demo:              Runs a demo. Only usable in preset 3, goes through bodies looking around them
-                        then moving onto the next body.
+						then moving onto the next body.
 -flim:  float       Frame limit.
 -df  :  string      Path of the data file. (Not implemented)
 -test:              Enter test mode.* (See below)
 -getStars: float	Loads stars from a database of almost 120,000 stars in the night sky. The value
-                        given with this parameter will be used as the maximum apparent magnitude from
-                        Earth of the stars loaded. The default is 4.5, which loads about 510 stars.
+						given with this parameter will be used as the maximum apparent magnitude from
+						Earth of the stars loaded. The default is 4.5, which loads about 510 stars.
 -PM  :              Enters the preset maker, allowing you to design a preset.
 -P?  :              Shows the available presets then exits.
 -AA_OFF:            Turn off AutoAbort. (AutoAbort will kill the simulation if two consecutive frames
-                        last longer than a second, it's only trying to help you not bring your
-                        computer to a standstill, be careful if you choose to abandon it)
+						last longer than a second, it's only trying to help you not bring your
+						computer to a standstill, be careful if you choose to abandon it)
 -? : Enter this help screen then exit
 
 Using the program:
@@ -183,8 +183,8 @@ Using the program:
   - Click any particle to set the camera to track that particle.
   - Right click any particle to fix the camera's rotation on that particle.
   - Cycle through targeted particles with Tab/shift-Tab. (Available only in preset 3)
-        Once a particle is targeted, pressing T and Y will toggle pan and rotational
-        tracking respectively.
+		Once a particle is targeted, pressing T and Y will toggle pan and rotational
+		tracking respectively.
   - Press 'G' to go to a selected target.
   - To stop tracking, click (and/or right click) on empty space or another particle.
   - To clear the target selection, press C
@@ -272,7 +272,7 @@ AUTO_ABORT              = args["-AA_OFF"][1]      # I wouldn't change this unles
 SMART_DRAW_PARAMETER = args["-sdp"][1]     # Approx number of pixels between each point
 
 MAX_POINTS = args["-me"][1]  # Lazy way of limiting the number of points drawn to stop the program
-                             # grinding to a halt everytime you get too close to a particle
+							 # grinding to a halt everytime you get too close to a particle
 
 Pmodule.TestMode = TestMode
 
@@ -360,7 +360,7 @@ FOLLOW_RATE_BASE    = 1.1
 TRAVEL_STEPS_MIN    = 100   # Number of steps to spend flying to a target (at full speed, doesn't include speeding up or slowing down)
 MAX_DRAW_DIST       = 3 * LIGHT_YEAR  # Maximum distance to draw bodies that don't have a given magnitude (ie planets, stars are not affected)
 MAX_PAN_DIST        = 100   # When toggling to track a target, if the camera is more than this many radii of the planet then
-                            # the camera will be moved to be within this distance of the target.
+							# the camera will be moved to be within this distance of the target.
 
 DEFAULT_ZERO_VEC = [0, 0, 0]
 DEFAULT_UNIT_VEC = [1, 0, 0]
@@ -368,7 +368,7 @@ DEFAULT_UNIT_VEC = [1, 0, 0]
 # Drawing/Visual constants
 MAG_SHIFT  = -1              # All apparent magnitudes are shifted by this amount before being drawn
 MIN_CLICK_RESPONSE_SIZE = 10 # Radius of area (in pixels) around centre of object that can be clicked
-                             # depending on its size
+							 # depending on its size
 MIN_BOX_WIDTH = 50
 COMPLEX_FLARE = args["-cf"][1]
 SHOW_SCREENDEPTH = True
@@ -478,45 +478,45 @@ def roundList(list, places):
 # Source: 'https://stackoverflow.com/questions/21977786/star-b-v-color-index-to-apparent-rgb-color'
 # Author: 'https://stackoverflow.com/users/2521214/spektre' (paddyg converted it to python)
 def bv2rgb(bv):
-    if bv < -0.40: bv = -0.40
-    if bv > 2.00: bv = 2.00
+	if bv < -0.40: bv = -0.40
+	if bv > 2.00: bv = 2.00
 
-    r = 0.0
-    g = 0.0
-    b = 0.0
+	r = 0.0
+	g = 0.0
+	b = 0.0
 
-    if  -0.40 <= bv<0.00:
-        t=(bv+0.40)/(0.00+0.40)
-        r=0.61+(0.11*t)+(0.1*t*t)
-    elif 0.00 <= bv<0.40:
-        t=(bv-0.00)/(0.40-0.00)
-        r=0.83+(0.17*t)
-    elif 0.40 <= bv<2.10:
-        t=(bv-0.40)/(2.10-0.40)
-        r=1.00
-    if  -0.40 <= bv<0.00:
-        t=(bv+0.40)/(0.00+0.40)
-        g=0.70+(0.07*t)+(0.1*t*t)
-    elif 0.00 <= bv<0.40:
-        t=(bv-0.00)/(0.40-0.00)
-        g=0.87+(0.11*t)
-    elif 0.40 <= bv<1.60:
-        t=(bv-0.40)/(1.60-0.40)
-        g=0.98-(0.16*t)
-    elif 1.60 <= bv<2.00:
-        t=(bv-1.60)/(2.00-1.60)
-        g=0.82-(0.5*t*t)
-    if  -0.40 <= bv<0.40:
-        t=(bv+0.40)/(0.40+0.40)
-        b=1.00
-    elif 0.40 <= bv<1.50:
-        t=(bv-0.40)/(1.50-0.40)
-        b=1.00-(0.47*t)+(0.1*t*t)
-    elif 1.50 <= bv<1.94:
-        t=(bv-1.50)/(1.94-1.50)
-        b=0.63-(0.6*t*t)
+	if  -0.40 <= bv<0.00:
+		t=(bv+0.40)/(0.00+0.40)
+		r=0.61+(0.11*t)+(0.1*t*t)
+	elif 0.00 <= bv<0.40:
+		t=(bv-0.00)/(0.40-0.00)
+		r=0.83+(0.17*t)
+	elif 0.40 <= bv<2.10:
+		t=(bv-0.40)/(2.10-0.40)
+		r=1.00
+	if  -0.40 <= bv<0.00:
+		t=(bv+0.40)/(0.00+0.40)
+		g=0.70+(0.07*t)+(0.1*t*t)
+	elif 0.00 <= bv<0.40:
+		t=(bv-0.00)/(0.40-0.00)
+		g=0.87+(0.11*t)
+	elif 0.40 <= bv<1.60:
+		t=(bv-0.40)/(1.60-0.40)
+		g=0.98-(0.16*t)
+	elif 1.60 <= bv<2.00:
+		t=(bv-1.60)/(2.00-1.60)
+		g=0.82-(0.5*t*t)
+	if  -0.40 <= bv<0.40:
+		t=(bv+0.40)/(0.40+0.40)
+		b=1.00
+	elif 0.40 <= bv<1.50:
+		t=(bv-0.40)/(1.50-0.40)
+		b=1.00-(0.47*t)+(0.1*t*t)
+	elif 1.50 <= bv<1.94:
+		t=(bv-1.50)/(1.94-1.50)
+		b=0.63-(0.6*t*t)
 
-    return (r, g, b)
+	return (r, g, b)
 
 
 def screenWidth():
@@ -529,7 +529,7 @@ def polyDot(radius, fill=None, x=None, y=None):
 	if SMART_DRAW:
 		numPoints = int(
 		max(radius / SMART_DRAW_PARAMETER,
-		    FLARE_POLY_MAX_POINTS))
+			FLARE_POLY_MAX_POINTS))
 	else:
 		numPoints = FLARE_POLY_POINTS
 
@@ -550,7 +550,7 @@ def polyDot(radius, fill=None, x=None, y=None):
 		if DIFF_SPIKES: rad = radius * (1 + sin(angle * DIFF_SPIKES/2) ** 100)
 		else: rad = radius
 		turtle.goto(x + rad*sin(angle),
-		            y + rad*cos(angle))
+					y + rad*cos(angle))
 	turtle.end_fill()
 	turtle.up()
 	turtle.goto(x, y)
@@ -1212,9 +1212,9 @@ Distance to closest particle: %s
 class camera:
 	# Main job: work out where a dot should go on the screen given the cameras position and rotation and the objects position.
 	def __init__(self, pos = vector(DEFAULT_ZERO_VEC),
-	                   rot = vector(DEFAULT_UNIT_VEC),
-	                   vel = vector(DEFAULT_ZERO_VEC),
-	                   screenDepth = defaultScreenDepth):
+					   rot = vector(DEFAULT_UNIT_VEC),
+					   vel = vector(DEFAULT_ZERO_VEC),
+					   screenDepth = defaultScreenDepth):
 		self.pos = pos
 		self.rot = rot.setMag(1)
 		self.vel = vel
@@ -1325,7 +1325,7 @@ class camera:
 			self.panInfo[5] = minDist
 			self.panStart = self.pos.getClone()
 			comfortableDistance = MAX_PAN_DIST * target.radius # if the camera is further than this distance
-                                                                           # from the target it will move to this distance from it
+																		   # from the target it will move to this distance from it
 			if ((comfortableDistance) < abs(self.pos - target.pos)):
 				if (self.rotTrack and self.rotTrack != target):
 					destination = (target.pos - self.rotTrack.pos).mag(comfortableDistance) # Aligns the new destination so that we will see the object after rotating
@@ -1936,7 +1936,7 @@ elif preset == "3":
 			offset = randomVector(3, 0, STRN_RING_THICKNESS)
 			objectPos += offset
 			new = particle(objectMass, objectPos + saturnPos, autoColour = False,
-			        colour = "white", limitRadius=False, immune=False)
+					colour = "white", limitRadius=False, immune=False)
 			new.circularise(planets["Saturn"], axis = ringAxis)
 
 	if makeAsteroids:
