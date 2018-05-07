@@ -290,6 +290,13 @@ LIGHT_YEAR  = LIGHT_SPEED * YEAR
 AU      = 149597870700
 PARSEC  = 3.085677581e+16
 
+# Preset 2
+PRESET_2_MIN_DIST = 25
+PRESET_2_MAX_DIST = 250
+
+# Preset 2.5
+PRESET_2p5_CUBE_WIDTH = 400
+
 # Preset 3
 AsteroidsStart 	 = 249.23 * 10**9 # Places the belt roughly between Mars and Jupiter.
 AsteroidsEnd 	 = 740.52 * 10**9 # Couldn't find the actual boundaries (They're probably pretty fuzzy)
@@ -340,7 +347,7 @@ Pmodule.radiusLimit     = 1e+10       # Maximum size of particle
 voidRadius               = 50000000   # Maximum distance of particle from camera
 CAMERA_UNTRACK_IF_DIE = True # If the tracked particle dies, the camera stops tracking it
 SMART_DRAW = True               # Changes the number of points on each ellipse depeding on distance
-FPS_AVG_COUNT = 10        # Frames used to calculate long average. Less->current fps, more->average fps
+FPS_AVG_COUNT = 3        # Frames used to calculate long average. Less->current fps, more->average fps
 RECORD_SCREEN = args["-rg"][1]
 DRAW_MARKERS = args["-mk"][1]
 RELATIVITY_EFFECTS = args["-rel"][1]
@@ -811,10 +818,12 @@ def timeString(seconds, rounding=3):
 class buffer:
 	def __init__(self):
 		self.buffer = {}
-		self.bufferMode = 0 # 0: Normal. 1: Recording, sim paused. 2: Playing.
+		self.bufferMode = 0  # 0: Normal. 1: Recording, sim paused. 2: Playing.
 		self.bufferLength = 0
 		self.nonEmptyBuffers = 0
-		self.bufferCount = self.nonEmptyBuffers
+		# self.bufferCount = self.nonEmptyBuffers
+		self.frameCount = 0  # Each particle has a single buffer,
+							 # a frame is a position from all buffers at a certain time.
 		self.deathFrames = {p:None for p in particleList}
 
 
@@ -863,7 +872,9 @@ class buffer:
 				self.buffer[particle].append([pos, rad, colour])
 		else:
 			self.buffer[particle].append(BUFFER_DONT_DRAW)
-		if len(self.buffer[particle]) == 1: self.nonEmptyBuffers += 1
+		newLen = len(self.buffer[particle])
+		if newLen == 1: self.nonEmptyBuffers += 1
+		if newLen != self.frameCount: self.frameCount = newLen
 
 
 
@@ -872,7 +883,10 @@ class buffer:
 			print("Attempting to access non-existant buffer.")
 			exit()
 		elif not self.buffer[particle]: return False # Buffer empty
-		if len(self.buffer[particle]) == 1: self.nonEmptyBuffers -= 1
+
+		newLen = len(self.buffer[particle])
+		if newLen == 1: self.nonEmptyBuffers -= 1
+		if newLen != self.frameCount: self.frameCount = newLen
 		return self.buffer[particle].pop(index)
 
 
@@ -882,6 +896,7 @@ class buffer:
 			if (self.nonEmptyBuffers == 0):
 				# All buffers are empty.
 				self.bufferMode = BUFFER_NORMAL
+				self.frameCount = 0
 				return False
 			# playing
 			play = self.playBuffer(particle, playIndex)
@@ -964,7 +979,8 @@ Distance to closest particle: %s
 		""" % (
 			(("%.2f"%self.FPS) if self.FPS != 999 else "INFINITY!!"),
 			Buffer.bufferModeString(),
-			(0 if Buffer.bufferCount == 0 else Buffer.bufferLength / Buffer.bufferCount),
+			Buffer.frameCount,
+			# (0 if Buffer.bufferCount == 0 else Buffer.bufferLength / Buffer.bufferCount),
 			camera.screenDepth, len(particleList),
 			self.Delta,
 			pauseString,
@@ -1350,10 +1366,6 @@ class camera:
 			self.rotStart = self.rot.getClone()
 		return target
 
-	# Not used, this can be removed
-	#def autoRate(self, rate, distance):
-	#	newRate = dist * 0.5# * rate/(AUTO_RATE_CONSTANT)
-	#	return newRate
 
 	def zeroCameraPosVel(self):
 		MainLoop.commonShiftPos = self.pos.negate()
@@ -1660,6 +1672,7 @@ def toggleRealTime():
 	REAL_TIME = False if REAL_TIME else True
 
 def bufferRecord():
+	if MainLoop.pause == 1: MainLoop.pause = -1
 	Buffer.bufferMode = 1
 
 def bufferPlay():
@@ -1780,7 +1793,7 @@ if preset == "1":
 	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
 	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
 	new = particle(25000, vector([150+defaultScreenDepth, 0, 0]))
-	print(new.colour)
+	# print(new.colour)
 
 	for i in range(PARTICLE_COUNT):
 		new = particle( mass=variableMass,
@@ -1796,13 +1809,13 @@ elif preset == "2":
 	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
 	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
 
-	minDist, maxDist = 25, 250
+	minDist, maxDist = PRESET_2_MIN_DIST, PRESET_2_MAX_DIST
 	COM = vector([0, 0, 0])     # Centre of mass
 	particleMass = variableMass
 	centreVec = vector([defaultScreenDepth, 0, 0])
 	for i in range(PARTICLE_COUNT):
 		randomVec = randomVector(3, minDist, maxDist, [0, 1, 1])
-		randomVec = randomVec.setMag(maxDist * (abs(randomVec) / maxDist)**2)
+		randomVec = randomVec.setMag(maxDist * (abs(randomVec) / maxDist)**1)
 		particle(particleMass, centreVec + randomVec + randomVector(3, 25),density=20, respawn=False)
 		COM += particleList[-1].pos
 
@@ -1814,7 +1827,7 @@ elif preset == "2":
 			if p2 == p: continue
 			forceVec += (p.pos - p2.pos).setMag(Pmodule.G * p.mass * p2.mass / (abs(p.pos - p2.pos)**2))
 		velVec = forceVec.cross(vector([1, 0, 0]))
-		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)*0.5))
+		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)*0.2))
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
 elif preset == "3":
@@ -2419,7 +2432,7 @@ if DEMO: # Run a nice looking screen saver type thing
 	print("Running demo. Note that during the demo you may have to fight with the program")
 	print("for control of the camera sometimes. The screen display can be brought back by")
 	print("pressing 'H' at any time.")
-	toggleScreenData()
+	toggleScreenData() # Hide on screen data
 	start_particle = particleList[0]
 	demoTimer = frameStart
 
