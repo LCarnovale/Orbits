@@ -1237,20 +1237,26 @@ class camera:
 		# self.trackSeparate = vector([100, 0, 0])
 		self.rotTrackOrigin = DEFAULT_UNIT_VEC
 		self.screenDepth = screenDepth
-		self.screenXaxis = vector([-self.rot[2], 0, self.rot[0]], unit=True)
+		self.screenXaxis = vector([
+			 -self.rot[2],
+			 0,
+			 self.rot[0]
+		], unit=True)
 		self.screenYaxis = vector([
 			 -self.rot[0]    * self.rot[1],
 			 (self.rot[0]**2 + self.rot[2]**2),
 			 -self.rot[2]    * self.rot[1]
-		], unit=True)
+		], unit=True) # Explanation in the maths pdf
+		# x axis points to right of screen
+		# y axis points to top of screen
+
 		self.panStart = self.pos # When flying to a position, the speed is based on the progress from start to finish.
 		self.rotStart = self.rot # Similar to above but for rotation
-		self.speedParameter = 1 # sqrt(1 - v^2/c^2), not the traditional v/c
-		# self.TransformMatrix = Matrix([[0, 0], [0, 0], [0, 0]])
+		self.speedParameter = 1 # sqrt(1 - v^2/c^2)
 	# total distance, maxSpeed, destination, at speed(0, 1 or 2), stopping distance, position of closest particle at start.
 	# Stored so they aren't calculated each step.
 	panInfo = [0, 0, vector([0, 0, 0]),
-	 			0, 0, vector([0, 0, 0])]
+				0, 0, vector([0, 0, 0])]
 	screenRadius = 0 #(screenWidth()**2 + screenHeight()**2)**(1/2)
 	panTrack = None
 	rotTrack = None
@@ -1284,6 +1290,28 @@ class camera:
 		if lock: self.moving = 2 # Allows an option to lock the rot track to an object after going to it
 		self.rotTrackSet(particle)
 		# self.panTrackSet(particle)
+
+	def pointAt(self, point):
+		if (point == self.pos):
+			print("Error: Orbits4T.py/camera/pointAt(): given point is camera's position.")
+			return None
+		direction = point - self.pos
+		self.point(direction)
+
+	# Equivalent of rotating directly to this direction.
+	def point(self, direction):
+		if not direction:
+			print("Error: Orbits4T.py/camera/point(): zero direction given.")
+			return None
+
+		self.screenXaxis = direction.cross(self.screenYaxis).mag(1)
+		self.screenYaxis = self.screenXaxis.cross(direction).mag(1)
+		self.rot = self.screenYaxis.cross(self.screenXaxis).mag(1)
+		# self.rot         =  direction.getClone()
+		# self.screenXaxis =  self.screenYaxis.cross(self.rot).mag(1)
+		# self.screenYaxis =  self.rot.cross(self.screenXaxis).mag(1)
+		# self.rot.setMag(1)
+
 
 	def rotate(self, direction, rate):
 		# direction as a 2 element list [x, y]
@@ -1792,16 +1820,18 @@ if preset == "1":
 	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
 	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
 	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
-	new = particle(25000, vector([150+defaultScreenDepth, 0, 0]))
+	new = particle(25000, vector(0, dim=3))
 	# print(new.colour)
 
 	for i in range(PARTICLE_COUNT):
 		new = particle( mass=variableMass,
-		    position=vector([150 + defaultScreenDepth, 0, 0]) + randomVector(3, 50, 400).makeOrthogonal(vector([random.random()*0.2, 1, random.random()*0.2])),
-		    colour = [random.random(), random.random(), random.random()],
+			position=randomVector(3, 50, 400).makeOrthogonal(vector([random.random()*0.2, 1, random.random()*0.2])),
+			colour = [random.random(), random.random(), random.random()],
 		autoColour=False, respawn=False )
 		new.circularise(particleList[0], axis=vector([0, 1, 0]))
 
+	camera.pos = vector([camera.screenDepth, 0, 0])
+	camera.pointAt(vector(0, dim=3))
 		# new.vel *= 0
 elif preset == "2":
 	# Galaxy kinda thing
@@ -1830,6 +1860,26 @@ elif preset == "2":
 		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)*0.2))
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
+elif preset == "2.5":
+	# Random cube of particles
+	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
+	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
+	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
+	cubeWidth = PRESET_2p5_CUBE_WIDTH
+	particleMass = variableMass
+	for i in range(PARTICLE_COUNT):
+		randXYZ = [(random.random() - 1/2)*cubeWidth for i in range(3)]
+		randPos = vector(randXYZ)
+		particle(particleMass,
+		 position=randPos, velocity=randomVector(3, 50), # Random 3D vec with mag between 0 and 1
+		 density=20, respawn=False)
+
+	camera.pos = vector([camera.screenDepth, 0, 0])
+	camera.pointAt(vector(0, dim=3))
+
+
+
+
 elif preset == "3":
 	#############################
 	# Loading this preset will load planets from SolSystem.txt

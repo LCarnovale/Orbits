@@ -2,7 +2,7 @@ from math import *
 import random
 
 class vector:
-	def __init__(self, elements, unit=False, dim=None): #NOFP
+	def __init__(self, elements, dim=None, unit=False): #NOFP
 		# if unit = True, then all operations on the vector
 		# return a unit vector of length 1
 		self.elements 	= elements
@@ -211,19 +211,18 @@ class vector:
 	def reverse(self):
 		return self * (-1)
 
-	def add(self, other, element=None):
-		if (not element and (self.dim != other.dim)): return False
-		tempVec = [x for x in self.elements]
-		if element:
-			tempVec[element] += other
-		else:
-			for i in range(self.dim):
-				tempVec[i] = tempVec[i] + other.elements[i]
-		return vector(tempVec)
+	def add(self, other):
+		if (self.dim != len(other)):
+			print("Error: vector.py/vector/add(): Inconsistent dimensions")
+			return False
+		# tempVec = [x for x in self.elements]
+		# for i in range(self.dim):
+		# 	tempVec[i] = tempVec[i] + other[i]
+		return vector([x + y for (x, y) in zip(self, other)])
 
 	def subtract(self, other, element=None):
 		# tempV = other.reverse()
-		return self.add(other.reverse())
+		return self.reverse().add(other).reverse()
 
 	def multiply(self, scalar):
 		return vector([x * scalar for x in self.elements])

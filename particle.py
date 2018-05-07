@@ -189,12 +189,12 @@ class particle:
 	def runLoop(self):
 		if not self.system:
 			for p in nonStaticList:
-				if p != self:
+				if p != self and p.alive:
 					if not self.checkCollision(p):
 						self.calcAcc(p)
 		else:
 			for p in self.system:
-				if not self.checkCollision(p):
+				if not self.checkCollision(p) and p.alive:
 					self.calcAcc(p)
 
 
@@ -243,6 +243,8 @@ class particle:
 				except NameError:
 					pass
 				particleList.remove(self)
+			if self in nonStaticList: nonStaticList.remove(self)
+			if self in staticList: staticList.remove(self)
 			self.alive = False
 
 	def contest(self, other):
