@@ -292,7 +292,7 @@ PARSEC  = 3.085677581e+16
 
 # Preset 2
 PRESET_2_MIN_DIST = 25
-PRESET_2_MAX_DIST = 250
+PRESET_2_MAX_DIST = 150
 
 # Preset 2.5
 PRESET_2p5_CUBE_WIDTH = 400
@@ -466,7 +466,7 @@ if not AUTO_ABORT:
 	print("Auto abort is off!")
 	print("This should only be done on large simulations where a low frame is expected.")
 	print("If you don't need it off, don't turn it off.")
-	time.sleep(3)
+	time.sleep(1)
 
 
 def setup():
@@ -1857,7 +1857,7 @@ elif preset == "2":
 			if p2 == p: continue
 			forceVec += (p.pos - p2.pos).setMag(Pmodule.G * p.mass * p2.mass / (abs(p.pos - p2.pos)**2))
 		velVec = forceVec.cross(vector([1, 0, 0]))
-		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)*0.2))
+		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)))
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
 elif preset == "2.5":
