@@ -54,6 +54,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-n"  :     [int,   20,		True], # Particle count
 "-p"  :     [str,   "1",	True], # preset
 "-srel":    [str,   False,  False,  True], # Use special relativistic effects
+"-sol":     [float, 299792458, True], # speed of light
 "-rn" :     [int,   2,      True], # Power of r (F = -GMm/r^n) for preset 4.5
 "-rt" :     [str,   False,  False,  True], # Run in real time
 "-sp" :     [str,   False,	False,  True], # start paused
@@ -286,7 +287,7 @@ YEAR    = 365 * DAY
 
 # Distance constants
 # LIGHT_SPEED = 1000
-LIGHT_SPEED = 299792458
+LIGHT_SPEED = args["-sol"][1]
 LIGHT_YEAR  = LIGHT_SPEED * YEAR
 AU      = 149597870700
 PARSEC  = 3.085677581e+16
