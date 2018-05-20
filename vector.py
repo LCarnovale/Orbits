@@ -1,21 +1,20 @@
 from math import *
+import numpy as np
 import random
 
 class vector:
-	def __init__(self, elements, dim=None, unit=False): #NOFP
-		# if unit = True, then all operations on the vector
+	def __init__(self, elements, dim=None): #NOFP
 		# return a unit vector of length 1
-		self.elements 	= elements
 		if (type(elements) in [int, float]):
 			if (dim == None):
 				# Not enough information for vector provided
 				print("Error: vector/__init__() unable to create vector with scalar element but no dimension")
 				exit()
 			else:
-				self.elements = [elements] * dim
-				self.dim = dim
+				elements = [elements] * dim
+				# self.dim = dim
+		self.elements 	= np.array(elements)
 		self.dim 		= (dim if dim else len(elements))
-		self.unit 		= unit
 
 	def __len__(self):
 		return len(self.elements)
@@ -54,14 +53,10 @@ class vector:
 
 	def __iadd__(self, other):
 		self = self + other
-		if self.unit:
-			self = self.mag(1)
 		return self
 
 	def __isub__(self, other):
 		self = self - other
-		if self.unit:
-			self = self.mag(1)
 		return self
 
 	def __neg__(self):
@@ -98,8 +93,6 @@ class vector:
 	def __imul__(self, value):
 		self = self * value
 		# print("Warning, attempting to modify magnitude of a unit vector. (Changes won't be made to the vector)")
-		if self.unit:
-			self = self.mag(1)
 		return self
 
 	def __iter__(self):
@@ -114,7 +107,6 @@ class vector:
 	def define(self, other):
 		self.elements	= other.elements
 		self.dim 		= len(other.elements)
-		self.unit 		= other.unit
 		return True
 
 	# Both pretty useless functions

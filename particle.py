@@ -1,6 +1,7 @@
 from vector import *
 from math import *
 import random
+import numpy as np
 
 particleList  = []
 staticList    = []

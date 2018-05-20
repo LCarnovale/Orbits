@@ -1241,7 +1241,7 @@ class camera:
 			 -self.rot[2],
 			 0,
 			 self.rot[0]
-		], unit=True)
+		])
 		self.screenYaxis = vector([
 			 -self.rot[0]    * self.rot[1],
 			 (self.rot[0]**2 + self.rot[2]**2),
