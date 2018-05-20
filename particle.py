@@ -71,7 +71,7 @@ class particle:
 			if not radiusProv:
 				self.mass = mass
 				self.density = density
-				self.radius = (3 * mass/(4 * pi * density))**(1/3)
+				self.radius = (3 * abs(mass)/(4 * pi * density))**(1/3)
 			elif not massProv:
 				self.radius = radius
 				self.density = density
@@ -81,7 +81,6 @@ class particle:
 				self.mass = mass
 				self.radius = radius
 				if (densityProv): print("Warning: particle/__init__(): radius, mass and density provided, density will be ignored and re-calculated.")
-
 
 		self.pos = position
 		self.limitRadius = limitRadius

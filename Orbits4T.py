@@ -53,6 +53,7 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-d"  :     [float,	0.025,	True], # Delta time per step
 "-n"  :     [int,   20,		True], # Particle count
 "-p"  :     [str,   "1",	True], # preset
+"-srel":    [str,   False,  False,  True], # Use special relativistic effects
 "-rn" :     [int,   2,      True], # Power of r (F = -GMm/r^n) for preset 4.5
 "-rt" :     [str,   False,  False,  True], # Run in real time
 "-sp" :     [str,   False,	False,  True], # start paused
@@ -66,7 +67,6 @@ args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-ir" :     [str,   "Sun",  True], # Initial rot track
 "-sep":     [float, 700,    True], # Separation of bodies A and B in preset 6
 "-ae" :     [str,   True,   False,  True], # Auto "exposure"
-"-rel":     [str,   False,  False,  True], # Visualise special relativity effects (Experimental)
 "-mk" :     [str,   False,	False,  True], # Show marker points
 "-ep" :     [int,   360,	True], # Number of points on each ellipse (Irrelevant if SMART_DRAW is on)
 "-sf" :     [float, 0.5,	True], # Rate at which the camera follows its target
@@ -273,7 +273,7 @@ SMART_DRAW_PARAMETER = args["-sdp"][1]     # Approx number of pixels between eac
 
 MAX_POINTS = args["-me"][1]  # Lazy way of limiting the number of points drawn to stop the program
 							 # grinding to a halt everytime you get too close to a particle
-
+SPECIAL_RELATIVITY = args["-srel"][1]
 Pmodule.TestMode = TestMode
 
 
@@ -285,6 +285,7 @@ DAY     = 24 *	HOUR
 YEAR    = 365 * DAY
 
 # Distance constants
+# LIGHT_SPEED = 1000
 LIGHT_SPEED = 299792458
 LIGHT_YEAR  = LIGHT_SPEED * YEAR
 AU      = 149597870700
@@ -350,7 +351,6 @@ SMART_DRAW = True               # Changes the number of points on each ellipse d
 FPS_AVG_COUNT = 3        # Frames used to calculate long average. Less->current fps, more->average fps
 RECORD_SCREEN = args["-rg"][1]
 DRAW_MARKERS = args["-mk"][1]
-RELATIVITY_EFFECTS = args["-rel"][1]
 RELATIVITY_SPEED = 0
 
 SCREEN_SETUP = False        # True when the screen is made, to avoid setting it up multiple times
@@ -684,6 +684,53 @@ def drawLine(pointA, pointB = None, fill = "black", width = 1):
 	turtle.goto(x2, y2)
 	turtle.up()
 
+# def drawTick()
+
+def drawSpeedo(speed, maxSpeed):
+	width = screenWidth()
+	height = screenHeight()
+	tickAdjust = np.array([0, 10])
+	start = np.array([
+		-width/2 + 10,
+		-height/2 + 20
+	])
+	end = np.array([
+		width/2 - 10,
+		-height/2 + 20
+	])
+
+	width = end[0] - start[0]
+	maxLog = log(maxSpeed, 10)
+	ratio = log(speed, 10) / log(maxSpeed, 10) if speed else 0
+	# Draw notches
+	notchPos = start
+	turtle.color("white")
+	turtle.up()
+	turtle.goto(start.tolist())
+	turtle.down()
+	for i in range(0, int(maxLog)+1):
+		notchPos = start + np.array([width * i / maxLog, 0])
+		turtle.goto(notchPos.tolist())
+		turtle.goto((notchPos+tickAdjust).tolist())
+		turtle.goto((notchPos-tickAdjust).tolist())
+		turtle.goto(notchPos.tolist())
+	# Draw final notch
+	if (int(maxLog) != maxLog):
+		turtle.goto(end.tolist())
+		turtle.goto((end+tickAdjust).tolist())
+		turtle.goto((end-tickAdjust).tolist())
+		turtle.goto(end.tolist())
+	# draw vel notch
+	velNotch = start + np.array([width * ratio, 0])
+	turtle.goto(velNotch)
+	turtle.goto((velNotch+tickAdjust).tolist())
+	turtle.goto((velNotch-tickAdjust).tolist())
+	turtle.up()
+	turtle.goto(start+tickAdjust*2)
+	turtle.write("Speed: %f" %(speed))
+
+
+
 # These must be in descending order
 # A '!' indicates that the unit symbol is not shown, if the unit symbol
 # matches one of the symbols in the respective list
@@ -919,7 +966,9 @@ def warpedDistance(particle):
 class MainLoop:
 	def __init__(self):
 		# Records the movements to all particles
-		self.Time = 0
+		self.simTime = 0
+		self.universeTime = 0
+		self.cameraTime = 0
 		self.commonShiftPos = DEFAULT_ZERO_VEC
 		self.commonShiftVel = DEFAULT_ZERO_VEC
 		self.closestParticle = None
@@ -960,12 +1009,17 @@ class MainLoop:
 		if not self.displayData: return False
 		global currentDisplay
 		global planets
+
 		# delta = self.Delta
 		pauseString = "True"
-		if self.Time != 0:
-			time = ("-" if self.Time < 0 else "") + timeString(abs(self.Time))
+		if self.simTime != 0:
+			time = ("-" if self.simTime < 0 else "") + timeString(abs(self.simTime))
+			uTime = ("-" if self.universeTime < 0 else "") + timeString(self.universeTime)
+			cTime = ("-" if self.cameraTime < 0 else "") + timeString(self.cameraTime)
 		else:
 			time = "00:00"
+			uTime = "00:00"
+			cTime = "00:00"
 		if self.pause == -1: pauseString = "False"
 		if (not self.closestParticle):
 			distString = "---"
@@ -974,7 +1028,10 @@ class MainLoop:
 		text = """Frame Rate: %s
 Buffermode: %s (%d) \tScreenDepth: %f
 Particle Count: %d  \tDelta: %f
-Paused: %s          \tTime:  %s
+Paused: %s
+Simulation time:  %s
+Universe time:    %s
+Camera time:      %s
 Distance to closest particle: %s
 		""" % (
 			(("%.2f"%self.FPS) if self.FPS != 999 else "INFINITY!!"),
@@ -985,6 +1042,8 @@ Distance to closest particle: %s
 			self.Delta,
 			pauseString,
 			time,
+			uTime,
+			cTime,
 			distString)
 			#("---" if not self.closestParticle else numPrefix(abs(camera.pos - self.closestParticle.pos), "m"))
 
@@ -1022,6 +1081,9 @@ Distance to closest particle: %s
 		turtle.pencolor([1, 1, 1])
 		turtle.write(text)
 
+		# Draw the speedo
+		drawSpeedo(abs(camera.vel), LIGHT_SPEED)
+
 	def abort(self):
 		global Running
 		global currentDisplay
@@ -1043,15 +1105,15 @@ Distance to closest particle: %s
 		global MAX_VISIBILE_MAG
 		global EXPOSURE
 
+
 		delta = self.Delta
 		if pan[0:-1]: self.smoothAcc += 0.01
 		else: self.smoothAcc -= 0.01
-		if (self.closestParticle != None) and not RELATIVITY_EFFECTS:
-			panAmount = (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius) * maxPan#maxPan/(AUTO_RATE_CONSTANT)
+		if (self.closestParticle != None):
+			# panAmount = (abs(self.closestParticle.pos - camera.pos) - self.closestParticle.radius) * maxPan#maxPan/(AUTO_RATE_CONSTANT)
+			panAmount = 5
 			if (pan[-1]):
 				panAmount *= 15
-		elif RELATIVITY_EFFECTS:
-			panAmount = RELATIVITY_SPEED * LIGHT_SPEED * delta * self.smoothAcc
 		else:
 			panAmount = maxPan
 		panRate = panAmount
@@ -1059,7 +1121,7 @@ Distance to closest particle: %s
 		if (rotate != [0, 0, 0]):
 			camera.rotate(rotate, rotSpeed)
 		frameStart = time.time()
-		if self.pause == -1 and Buffer.bufferMode != 2: self.Time += delta
+		if self.pause == -1 and Buffer.bufferMode != 2: self.simTime += delta
 
 		doStep = (self.pause == -1 and Buffer.bufferMode != 2)
 
@@ -1078,7 +1140,9 @@ Distance to closest particle: %s
 				camera.rotTrackSet()                    # Right click
 		self.closestParticle = None
 
-		camera.step((delta if doStep else 0), pan, panAmount)
+		camera.step(delta, pan[:3], panAmount, paused=(not doStep))
+		self.universeTime += delta / sqrt(1 - (abs(camera.vel)/LIGHT_SPEED)**2)
+		self.cameraTime += delta
 		if doStep:
 			if camera.panTrack:
 				camera.panTrack.step(delta, camera)
@@ -1210,20 +1274,7 @@ Distance to closest particle: %s
 				self.frameWarning = False
 		if self.displayData: self.showData()
 		self.Zero()
-#
-# class Matrix:
-# 	def __init__(self, array):
-# 		"""Array should be 2 dimensional, ie: [[Column], ..., [Column]] etc."""
-# 		self.array = array
-#
-# 	def vecFromColumn(self, colIndex):
-# 		return vector(self.array[colIndex])
-#
-# 	def vecFromRow(self, rowIndex):
-# 		return vector([x[rowIndex] for x in self.array])
-#
-# 	def vecMultiply(self, vec):
-# 		return vector([self.vecFromRow(x).dot(vec) for x in range(len(self.array))])
+
 
 class camera:
 	# Main job: work out where a dot should go on the screen given the cameras position and rotation and the objects position.
@@ -1326,33 +1377,55 @@ class camera:
 	# NB: The cameras velocity is in m/step, not m/s. To follow a target the velocity must be
 	# 	converted from the particles m/s to m/step for the camera, simply by
 	# 	multiplying the velocity in m/s by the time step (delta)
-	def step(self, delta, pan=[0, 0, 0], panRate=1):
+	def step(self, delta, pan=[0, 0, 0], panRate=1, paused=False):
+		# Accelerate:
+		# Use log(v) = log(c) * tanh(t) type of curve
+		# this gives dv/dt = 1/log(c) * (log(c)^2 - log(v)^2) * (v)
+		speed = abs(self.vel)
+		BASE = 10
+		velArray = 1.0 * np.array(self.vel.elements)
+		panArray = np.array(pan)
+		panLen = sum([x**2 for x in pan])**(1/2)
+		if panLen: panArray = panArray / panLen
+		speedArray = (velArray**2)**(1/2) # Make positive
+		smoothAcc = 100
+		dt = panRate
+		accArray = (
+			1 / smoothAcc * log(LIGHT_SPEED, BASE) *
+			(1 - (np.log(speedArray + 1)/(1 * log(LIGHT_SPEED)))**2)
+		) * (1 + speed)
+		screenAxes = np.array([
+			self.screenXaxis,
+			self.screenYaxis,
+			self.rot
+		]).transpose()
+
+		dv = screenAxes * panRate * panArray * accArray #* delta
+		dv = dv.transpose()
+		# print("dv:", dv)
+		# print(sum(dv))
+		oldSpeed = sum([x**2 for x in velArray])**(1/2)
+		dv = sum(dv)
+		velArray += dv
+		newSpeed = sum([x**2 for x in velArray])**(1/2)
+
+		if (newSpeed >= LIGHT_SPEED):
+			velArray -= dv
+			speedDiff = LIGHT_SPEED - oldSpeed
+			max_dv = dv / (dv.dot(self.vel) / (abs(self.vel))) * speedDiff * 0.1
+			velArray += max_dv
+
+		velArray = velArray.tolist()
+		# print("newVelArray:", velArray, end="-> ")
 		if (self.screenRadius == 0): self.screenRadius = (screenWidth()**2 + screenHeight()**2)**(1/2)
-		panShift = (pan[0] * self.screenXaxis +
-					pan[1] * self.screenYaxis +
-					pan[2] * self.rot) * panRate
-		if (panShift and self.panTrack and not self.panTrackLock):
-			self.panTrackSet()
 
-		self.vel = panShift
-		if self.panTrack:
-			self.vel += self.panTrack.vel * delta + self.panTrack.acc * delta**2
-			# self.trackSeparate += panShift
-		self.vel += self.absolutePan
-		# if abs(self.vel) > 0.99 * LIGHT_SPEED * delta:
-			# self.vel.setMag(0.99 * LIGHT_SPEED * delta)
-
-		self.absolutePan *= 0
-		# self.absolutePan = panShift
-		if RELATIVITY_EFFECTS:
-			# if delta:
-			self.speedParameter = sqrt( 1 - RELATIVITY_SPEED**2 )
-			self.vel *= 1 / (self.speedParameter) * panRate
-			# time travelled will be a bit more as observed by a stationary observer
-		self.pos += self.vel
-		# if (self.vel):
-		#
-		# 	self.TransformMatrix = Matrix([[]])
+		self.vel.elements = velArray
+		if SPECIAL_RELATIVITY:
+			speed = abs(self.vel)
+			gamma = 1
+			if speed: gamma = 1 / sqrt(1 - (speed / LIGHT_SPEED)**2)
+			delta *= gamma
+		self.pos += self.vel * delta
 
 	# Moves the camera to a particle if its too far away,
 	# then locks the camera's movement to that object
@@ -1426,35 +1499,39 @@ class camera:
 		self.rot.setMag(1)
 		global MAX_VISIBILE_MAG
 
+		speed = abs(self.vel)
+		# print("speed factor:", speed/LIGHT_SPEED)
+		if speed:
+			n = self.vel / speed
+		else:
+			n = self.vel
+		# gamma = 1 / sqrt(1 - (speed / LIGHT_SPEED)**2)
+		gamma = 0.95 if (speed > LIGHT_SPEED) else 1 / sqrt(1 - (speed / LIGHT_SPEED)**2)
 		newLow = False
 		if drawAt:
 			pos = particle[0]
 			radius = particle[1]
 			colour = particle[2]
+			if SPECIAL_RELATIVITY:
+				pos = pos + (gamma - 1) * ((pos-self.pos).dot(n)) * n
 		else:
 			appMag = particle.absmag
+			pos = particle.pos
+			radius = particle.radius
+			colour = particle.colour
 			if (appMag != None):
-				appMag += 5 * log(abs(particle.pos - self.pos) / (10 * PARSEC), 10)
+				appMag += 5 * log(abs(pos - self.pos) / (10 * PARSEC), 10)
 				particle.info["appmag"] = appMag
 				if (lowestApparentMag == None or appMag < lowestApparentMag):
 					newLow = True
 				if (appMag > MAX_VISIBILE_MAG):
 					if newLow: MAX_VISIBILE_MAG = appMag
 					return False
-			pos = particle.pos
-			radius = particle.radius
-			colour = particle.colour
+			if SPECIAL_RELATIVITY:
+				pos = pos + (gamma - 1) * ((pos - self.pos).dot(n)) * n
 		# Get relative position to camera's position.
 		relPosition = pos - self.pos
 
-		# Make object's distance to camera in the direction of motion
-		# smaller based on speed parameter.
-		if RELATIVITY_EFFECTS and self.vel:
-			vDistance = relPosition.dot(self.vel) / abs(self.vel)
-			# else: vDistance = 0
-			vDistWarped = vDistance * self.speedParameter
-			vDiff = vDistance - vDistWarped
-			relPosition -= self.vel.mag(1) * vDiff #/ abs(self.vel)
 		distance = abs(relPosition)
 
 		if (relPosition.dot(self.rot) <= 0):
@@ -1813,6 +1890,7 @@ Buffer = buffer()
 if preset == "1":
 	if (not args["-tn"][-1]):
 		TRUE_NBODY = True
+	LIGHT_SPEED = 1000
 
 	# for i in range(10):
 	# 	particle(50 + i*20, vector([50, 100 - 10*i, 0]))
@@ -1936,7 +2014,6 @@ elif preset == "3":
 	MainLoop.addData("Light time", "timeString(abs(MainLoop.target.pos - camera.pos)/LIGHT_SPEED)", True, "---")
 	MainLoop.addDataLine()
 	MainLoop.addData("Speed of camera", "numPrefix(abs(camera.vel), 'm/step', 2)", True, "---")
-	if RELATIVITY_EFFECTS: MainLoop.addData("Speed Parameter", "'{} *c*dt'.format(RELATIVITY_SPEED)", True, "---")
 	MainLoop.addData("Target speed relative to camera", "(numPrefix(abs(MainLoop.target.vel - camera.vel / MainLoop.Delta), 'm/s') if abs(MainLoop.target.vel - camera.vel / MainLoop.Delta) > 0.0001 else 0)", True, "---")
 	MainLoop.addDataLine()
 
@@ -1945,7 +2022,7 @@ elif preset == "3":
 	for planet in Data:
 		data = Data[planet]
 		if (planet == "$VAR"):
-			if ("TIME" in data): MainLoop.Time = data["TIME"]
+			if ("TIME" in data): MainLoop.simTime = data["TIME"]
 			continue
 
 		if data["$valid"]:
@@ -2039,8 +2116,8 @@ elif preset == "3":
 			STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)], quiet=False)
 			# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($absmag < {})".format(getStars)], quiet=False)
 		else:
-			# STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
-			STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist<={}".format(getStars)], quiet=False)
+			STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
+			# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist<={}".format(getStars)], quiet=False)
 #			print("Loading named stars...")
 #			STARS_DATA.update(loadSystem.loadFile("StarsData.txt", key=["\"$proper\" != 'None'", "$dist != 100000"], quiet = False))
 
@@ -2120,10 +2197,10 @@ elif preset == "3":
 					# MainLoop.target = new
 
 	search(args["-ir"][1], listen=False)
-	camera.rotTrackSet(MainLoop.target)
+	# camera.rotTrackSet(MainLoop.target)
 	search(args["-ip"][1], listen=False)
-	camera.panTrackSet(MainLoop.target)
-	clearTarget()
+	# camera.panTrackSet(MainLoop.target)
+	# clearTarget()
 
 	# Fill out tree
 	print("Building parent-child tree...")
@@ -2180,6 +2257,8 @@ elif preset == "4.5":
 
 
 elif preset == "5":
+	LIGHT_SPEED = 1000
+
 	if PARTICLE_COUNT < 4:
 		print("Minimum particle count for this preset is 4")
 		PARTICLE_COUNT = 4
@@ -2272,6 +2351,8 @@ def dnRelSpeed():
 	RELATIVITY_SPEED -= 0.02
 	if RELATIVITY_SPEED < 0: RELATIVITY_SPEED = 0
 
+def slowDown():
+	camera.vel *= 0.90
 
 
 
@@ -2302,6 +2383,9 @@ if not TestMode:
 
 	turtle.onkeypress(panDown, "f")
 	turtle.onkeyrelease(panUp , "f")
+
+	turtle.onkeypress(slowDown, "x")
+	# turtle.onkeyrelease()
 
 	turtle.onkeypress(panFast, "Shift_L")
 	turtle.onkeyrelease(panSlow, "Shift_L")
@@ -2357,6 +2441,7 @@ if not TestMode:
 	turtle.onkey(upRelSpeed, "=")
 	turtle.onkey(dnRelSpeed, "-")
 
+
 	turtle.onkey(search, "/")
 
 if TestMode:
@@ -2365,7 +2450,7 @@ if TestMode:
 	# 	print("""	Note that with leapfrog arithmetic,
 	# velocity and position are technically never both known at the same time,
 	# but that shouldn't affect results significantly.""")
-		Time = MainLoop.Time
+		Time = MainLoop.simTime
 		checkTimes = sorted([x[1] for x in testData])
 		checkData = {}
 		# Format of testdata: [[<Name>, <Time>, <Pos>, <vel>], ...]
