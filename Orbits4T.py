@@ -1305,6 +1305,7 @@ class camera:
 		self.panStart = self.pos # When flying to a position, the speed is based on the progress from start to finish.
 		self.rotStart = self.rot # Similar to above but for rotation
 		self.speedParameter = 1 # sqrt(1 - v^2/c^2)
+		self.accelTime = 0 # ?
 	# total distance, maxSpeed, destination, at speed(0, 1 or 2), stopping distance, position of closest particle at start.
 	# Stored so they aren't calculated each step.
 	panInfo = [0, 0, vector([0, 0, 0]),
@@ -1387,7 +1388,9 @@ class camera:
 		velArray = 1.0 * np.array(self.vel.elements)
 		panArray = np.array(pan)
 		panLen = sum([x**2 for x in pan])**(1/2)
-		if panLen: panArray = panArray / panLen
+		if panLen:
+			panArray = panArray / panLen
+			self.accelTime = MainLoop.universeTime
 		speedArray = (velArray**2)**(1/2) # Make positive
 		smoothAcc = 100
 		dt = panRate
@@ -1500,38 +1503,37 @@ class camera:
 		self.rot.setMag(1)
 		global MAX_VISIBILE_MAG
 
-		speed = abs(self.vel)
-		# print("speed factor:", speed/LIGHT_SPEED)
-		if speed:
-			n = self.vel / speed
-		else:
-			n = self.vel
 		# gamma = 1 / sqrt(1 - (speed / LIGHT_SPEED)**2)
-		gamma = 0.95 if (speed > LIGHT_SPEED) else 1 / sqrt(1 - (speed / LIGHT_SPEED)**2)
 		newLow = False
 		if drawAt:
 			pos = particle[0]
 			radius = particle[1]
 			colour = particle[2]
-			if SPECIAL_RELATIVITY:
-				pos = pos + (gamma - 1) * ((pos-self.pos).dot(n)) * n
 		else:
 			appMag = particle.absmag
 			pos = particle.pos
 			radius = particle.radius
 			colour = particle.colour
+		relPosition = pos - self.pos
+		speed = abs(self.vel)
+		gammaInv =  sqrt(1 - (speed / LIGHT_SPEED)**2)
+		if speed:
+			n = self.vel / speed
+
+		if SPECIAL_RELATIVITY and speed:
+			relPosition += (gammaInv - 1) * ((relPosition).dot(n)) * n
+
+		if not drawAt:
 			if (appMag != None):
-				appMag += 5 * log(abs(pos - self.pos) / (10 * PARSEC), 10)
+				appMag += 5 * log(abs(relPosition) / (10 * PARSEC), 10)
 				particle.info["appmag"] = appMag
 				if (lowestApparentMag == None or appMag < lowestApparentMag):
 					newLow = True
 				if (appMag > MAX_VISIBILE_MAG):
 					if newLow: MAX_VISIBILE_MAG = appMag
 					return False
-			if SPECIAL_RELATIVITY:
-				pos = pos + (gamma - 1) * ((pos - self.pos).dot(n)) * n
+				# pos = pos + (gamma - 1) * ((pos).dot(n)) * n -speed*gamma*(MainLoop.universeTime - self.accelTime)*n
 		# Get relative position to camera's position.
-		relPosition = pos - self.pos
 
 		distance = abs(relPosition)
 
@@ -1585,7 +1587,12 @@ class camera:
 		# Choose the follow rate so that the approach takes approx
 		# 5 seconds whilst at max speed, dont worry about time accelerating
 		panDest = self.panInfo[2]
+		speed = abs(self.vel)
 		relPos = (self.panTrack.pos + panDest - self.pos)
+		if SPECIAL_RELATIVITY and speed != 0:
+			gammaInv = sqrt(1 - (speed / LIGHT_SPEED)**2)
+			n = self.vel / speed
+			relPos += (gammaInv - 1) * ((relPos).dot(n)) * n
 		distTravelled = abs(self.pos - self.panStart)
 		remDist = abs(relPos)
 		if (self.panInfo[3]):
@@ -1613,6 +1620,12 @@ class camera:
 	def rotFollow(self, followRate=DEFAULT_ROTATE_FOLLOW_RATE):
 		if self.rotTrack == None: return False
 		relPos   = (self.rotTrack.pos - self.pos).mag(1)
+		speed = abs(self.vel)
+		if SPECIAL_RELATIVITY and speed != 0:
+			gamma = 1 / sqrt(1 - (speed / LIGHT_SPEED)**2)
+			n = self.vel / speed
+			relPos = relPos + (gamma - 1) * ((relPos).dot(n)) * n
+
 		if self.rotTrackLock:
 			self.rot = relPos
 		else:
