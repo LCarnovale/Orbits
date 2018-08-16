@@ -71,13 +71,13 @@ class particle:
 			if not radiusProv:
 				self.mass = mass
 				self.density = density
-				self.radius = (3 * mass/(4 * pi * density))**(1/3)
+				self.radius = (3 * abs(mass)/(4 * pi * abs(density)))**(1/3)
 			elif not massProv:
 				self.radius = radius
 				self.density = density
-				self.mass = density * (4/3 * pi) * radius**3
+				self.mass = abs(density) * (4/3 * pi) * radius**3
 			else:
-				self.density = mass / (4/3 * pi * radius**3)
+				self.density = abs(mass) / (4/3 * pi * radius**3)
 				self.mass = mass
 				self.radius = radius
 				if (densityProv): print("Warning: particle/__init__(): radius, mass and density provided, density will be ignored and re-calculated.")
@@ -268,7 +268,7 @@ class particle:
 		oldAcc = self.acc.getClone()
 		self.acc = vector([0, 0, 0])
 		self.runLoop()
-		if self.radius > radiusLimit and self.limitRadius:
+		if abs(self.radius) > radiusLimit and self.limitRadius:
 			self.die()
 			return False
 
