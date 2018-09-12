@@ -205,7 +205,7 @@ class particle:
 			out = True
 		# print("Checking")
 		if out and not self.inbound:
-			if self.respawn:
+			if self._respawn:
 				self.respawn()
 			else:
 				self.die()

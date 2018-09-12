@@ -71,11 +71,17 @@ class vector:
 		return ("<" + ", ".join([str(x) for x in self.elements]) + ">")
 
 	# A better way of getting the string format of a vector, allows rounding of each element
-	def string(self, rounding=None):
+	def string(self, rounding=None, format=False, brackets="<>", join=", "):
 		if rounding:
-			return ("<" + ", ".join([str(round(x, rounding)) for x in self]) + ">")
+			vals = [round(x, rounding) for x in self]
 		else:
-			return ("<" + ", ".join([str(x) for x in self.elements]) + ">")
+			vals = [x for x in self]
+		if format:
+			strings = [format.format(x) for x in vals]
+		else:
+			strings = [str(x) for x in vals]
+
+		return (brackets[0] + join.join(strings) + brackets[1])
 
 	def __repr__(self): #NOFP
 		return str(self)
