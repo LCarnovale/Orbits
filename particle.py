@@ -274,12 +274,12 @@ class particle:
 
 	def checkCollision(self, other):
 		if other.alive and (self.mass > 0) and (abs(self.pos.subtract(other.pos)) < self.radius + other.radius):
-			print("    {} contesting with {}".format(self.idx(), other.idx()))
+			# print("    {} contesting with {}".format(self.idx(), other.idx()))
 			self.contest(other)
 			return True
 		else:
-			print("    Ignoring collision between {} and {}".format(self.idx(), other.idx()))
-			print("    Their altitude is: {}".format(abs(other.pos - self.pos) - self.radius - other.radius))
+			# print("    Ignoring collision between {} and {}".format(self.idx(), other.idx()))
+			# print("    Their altitude is: {}".format(abs(other.pos - self.pos) - self.radius - other.radius))
 			return False
 
 	def runLoop(self):
@@ -293,6 +293,7 @@ class particle:
 		try:
 			mList[pListMap[self]] = 0
 		except IndexError:
+			print("Error: particle's index is invalid")
 			print("self:", self, "\nidx:", self.idx(), "\nalive:", self.alive)
 			exit()
 		dist =  np.array(self.pos) - pList
@@ -308,19 +309,19 @@ class particle:
 		idxs = []
 		if (collisions.any()):
 			idxs = idxList[collisions]
-			print("Collisions:", self.idx(), [[x,y] for x, y in zip(idxs, badAlts)])
+			# print("Collisions:", self.idx(), [[x,y] for x, y in zip(idxs, badAlts)])
 			[self.collisions.append(orderedList[x]) for x in idxs]
 
 
-		for p in particleList:
-			altDiff = self.radius + p.radius
-			missedCollisions = []
-			if p == self: continue
-			if (abs(p.pos - self.pos) - altDiff) < 0:
-				if p.idx() not in idxs:
-					missedCollisions.append(p.idx())
-			if missedCollisions:
-				print("Missed collisions with {}: ".format(self.idx()), missedCollisions)
+		# for p in particleList:
+		# 	altDiff = self.radius + p.radius
+		# 	missedCollisions = []
+		# 	if p == self: continue
+		# 	if (abs(p.pos - self.pos) - altDiff) < 0:
+		# 		if p.idx() not in idxs:
+		# 			missedCollisions.append(p.idx())
+		# 	if missedCollisions:
+		# 		print("Missed collisions with {}: ".format(self.idx()), missedCollisions)
 		# else:
 			# print("No collisions")
 
@@ -382,10 +383,10 @@ class particle:
 			self.respawn()
 		else:
 			# self.respawn()
-			if killer:
-				print("{} dying from {}".format(self.idx(), killer.idx()))
-			else:
-				print("{} dying from no one.".format(self.idx()))
+			# if killer:
+				# print("{} dying from {}".format(self.idx(), killer.idx()))
+			# else:
+				# print("{} dying from no one.".format(self.idx()))
 			try:
 				if camera.panTrack: camera.panTrackSet()
 				if buffer != 0:

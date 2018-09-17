@@ -1173,8 +1173,8 @@ Distance to closest particle: %s
 				if doStep and not (p == camera.panTrack or p == camera.rotTrack):
 					p.step(delta, camera)
 					if p.collisions:
-						self.target = p
-						if self.pause == -1: pause()
+						# self.target = p
+						# if self.pause == -1: pause()
 						collisionPairs.append([p, p.collisions])
 					# This bit is for preset 5, shouldn't be used otherwise
 					if p.mass < 0:
@@ -1228,7 +1228,7 @@ Distance to closest particle: %s
 				collided.append(primary)
 				for sec in c[1]:
 					if sec in collided: continue
-					print("Checking collision of {} with {}:".format(primary.idx(), sec.idx()))
+					# print("Checking collision of {} with {}:".format(primary.idx(), sec.idx()))
 					primary.checkCollision(sec)
 					collided.append(sec)
 

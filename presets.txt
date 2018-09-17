@@ -1,0 +1,12 @@
+# This file is for use by the Orbits4T python program. It will be checked for each time the program starts and
+# allows users to design presets to be loaded quickly into the simulator.
+
+# Lines beginning with a # are ignored.
+
+# Example presets are included
+
+
+ExamplePreset {
+#	Bodies:
+	!name, mass, x, y, z, vx, vy, vz, density, 
+}
