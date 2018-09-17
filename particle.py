@@ -1,10 +1,13 @@
 from vector import *
 from math import *
+import numpy as np
 import random
 
 particleList  = []
 staticList    = []
 nonStaticList = []
+orderedList   = []
+idxList = np.array([], dtype=int)
 
 markerList   = []
 
@@ -21,7 +24,10 @@ G = 1
 TestMode = False
 R_POWER = 2 # For N-power force function, force is GMm/(r^n)
 
-
+particlePosList = None
+particleMassList = np.array([])
+particleRadiusList = np.array([])
+pListMap = {}
 
 ### FORCE FUNCTIONS
 # Example generic force function, given 2 particles A and B
@@ -30,6 +36,26 @@ def gravitationalForce(particleA, particleB):
 	mag = G * particleA.mass * particleB.mass / abs(particleA.pos - particleB.pos)**2
 	vec = mag * unit(particleB.pos - particleA.pos)
 	return vec
+
+## Returns net force on a particle, and the absolute distance
+# to all other particles as an array
+def gravitationalForceL(selfMass, massList, distList):
+	# Ignore 0/0 division errors
+	with np.errstate(invalid='ignore'):
+		distAbs = np.linalg.norm(distList, 2, axis=1)
+		forces = G * massList * selfMass / (distAbs ** 3)
+
+		# print(distList)
+		# print(forces)
+		# forces = np.multiply(distList, forces)
+
+		ret = (distList.T * forces).T
+		# print("ret:",ret)
+		# print("ret.T:", ret.T)
+		ret = -np.nansum(ret.T, axis=1).T
+		# print("ret:",ret)
+		# exit()
+		return ret, distAbs
 
 def cubicForce(particleA, particleB):
 	mag = G * particleA.mass * particleB.mass / abs(particleA.pos - particleB.pos)**3
@@ -55,7 +81,11 @@ class particle:
 			density=defaultDensity, autoColour=True, colour=[0, 0, 1],
 			limitRadius=True, name=None, static=False, immune=False,
 			radius=None, respawn=True):
-
+		global particlePosList
+		global particleMassList
+		global particleRadiusList
+		global idxList
+		global pListMap
 		massProv = mass != None
 		densityProv = density != defaultDensity
 		radiusProv = radius != None
@@ -132,21 +162,85 @@ class particle:
 		else:
 			self.setColour()
 		particleList.append(self)
+		orderedList.append(self)
 		if static:
 			staticList.append(self)
 		else:
 			nonStaticList.append(self)
+
+		# Add this particle to the relevant lists/arrays
+		if (len(pListMap) == 0):
+			particlePosList  = np.zeros([0, 3])
+			particlePosList  = np.append(particlePosList, self.pos.elements)
+		else:
+			particlePosList  = np.append(particlePosList, self.pos.elements)
+
+		particleMassList = np.append(particleMassList, self.mass)
+		particleRadiusList = np.append(particleRadiusList, self.radius)
+		particlePosList = particlePosList.reshape([len(particleMassList), 3])
+		pListMap[self] = len(particlePosList) - 1
+		# The position of this particle in the pos/mass/radius lists
+		# also holds the position of its index in idxList,
+		# an index which will forever hold the index of this particle
+		# in the orderedList.
+		idxList = np.append(idxList, pListMap[self])
+
+		# Record the collisions detected after a single step, if
+		# they aren't checked straight away.
+		self.collisions = []
 
 		self._respawn = respawn
 
 	alive = True
 	specialColour = False
 	forceFunc = gravitationalForce
+	forceFuncList = gravitationalForceL
 
 	inbound = False
 
 	newMass = False # the mass of the particle after it respawns
 	# colour parameter only used if autoColour is off
+	def idx(self):
+		if (self not in particleList):
+			# The particle does not exist in the simulation.
+			return None
+		idx = pListMap[self]
+		# if (particleList[idx] != self):
+
+
+		return idx
+
+	def delete(self):
+		# print("deleting:", self)
+		global particleList
+		global particlePosList
+		global particleMassList
+		global particleRadiusList
+		global orderedList
+		global pListMap
+		global idxList
+		# print("Initial idxList:", idxList)
+		# print("Initial Map:", pListMap)
+		self.alive = False
+		idx = self.idx()
+		if (idx == None): return # the particle has already been deleted.
+		particleList.remove(self)
+		particlePosList = np.delete(particlePosList, idx, axis=0)
+		particleMassList = np.delete(particleMassList, idx)
+		particleRadiusList = np.delete(particleRadiusList, idx)
+		idxList = np.delete(idxList, idx)
+		mask = idxList > idx
+		mask = np.ones(mask.size, dtype=int) * mask
+		idxList -= mask
+		orderedList.remove(self)
+		for i in idxList:
+			p = orderedList[i]
+			pListMap[p] = i
+		# orderedList.remove(self)
+		# print("Final Map:", pListMap)
+		# print("Final idxList:", idxList)
+
+
 	def __getattr__(self, attr):
 		if (attr in self.info):
 			return self.info[attr]
@@ -170,15 +264,14 @@ class particle:
 
 
 	def calcAcc(self, other, returnResult=False):
-		# force = (G * self.mass * other.mass) / (abs(self.pos - other.pos) ** 2) ## THIS IS THE NORMAL ONE USE THIS ONE
-		# forceVector = other.pos.subtract(self.pos)
 		if (self.pos == other.pos): return None
 		forceVector = particle.forceFunc(self, other)
-		force = abs(forceVector)
+		# force = abs(forceVector)
 		if (not returnResult):
 			self.acc += (forceVector / self.mass)
 		else:
 			return (forceVector / self.mass)
+
 	def checkCollision(self, other):
 		if other.alive and (self.mass > 0) and (abs(self.pos.subtract(other.pos)) < self.radius + other.radius):
 			self.contest(other)
@@ -187,15 +280,55 @@ class particle:
 			return False
 
 	def runLoop(self):
+		global particleMassList
+
+		self.collisions = [] # Clear the collision list
+
+		# if not self.system:
+		pList = particlePosList
+		mList = particleMassList
+		try:
+			mList[pListMap[self]] = 0
+		except IndexError:
+			print("self:", self, "\nidx:", self.idx(), "\nalive:", self.alive)
+			exit()
+		dist =  np.array(self.pos) - pList
+
+		# print("idx:", self.idx())
+		# print("dist", dist)
+		force, distAbs = particle.forceFuncList(1, mList, dist)
+		alt = distAbs - (particleRadiusList + self.radius)
+		collisions = alt < 0
+		collisions[self.idx()] = False
+		# print(particleMassList[collisions])
+
+		if (collisions.any()):
+			idxs = idxList[collisions]
+			print("Collisions:", self.idx(), idxs)
+			[self.collisions.append(orderedList[x]) for x in idxs]
+
+		# else:
+			# print("No collisions")
+
+		# acc = force / self.mass
+		# print(force)
+		# print("force", force)
+		self.acc += vector(force.tolist())
+		# print(force)
 		if not self.system:
-			for p in nonStaticList:
-				if p != self and p.alive:
-					if not self.checkCollision(p):
-						self.calcAcc(p)
-		else:
-			for p in self.system:
-				if not self.checkCollision(p) and p.alive:
-					self.calcAcc(p)
+			mList[pListMap[self]] = self.mass
+
+		# exit()
+		# print(force)
+		# exit()
+		# else:
+		# 	posList = np.zeros([len(self.system), self.pos.dim])
+		# 	massList = np.array(len(self.system))
+		# 	for i, p in enumerate(self.system):
+		# 		if not self.checkCollision(p) and p.alive:
+		# 			massList[i] = p.mass
+		# 			posList[i] = p.pos.elements
+		# 			self.calcAcc(p)
 
 
 	def checkOutOfBounds(self, camera): #bounds=[turtle.window_width()/2, turtle.window_height()/2]):
@@ -234,38 +367,51 @@ class particle:
 			# 	camera.panTrackSet(killer)
 			self.respawn()
 		else:
-			self.respawn()
-			if self in particleList:
-				try:
-					if camera.panTrack: camera.panTrackSet()
-					if buffer != 0:
-						BUFFER[self].append(False)
-				except NameError:
-					pass
-				particleList.remove(self)
-			if self in nonStaticList: nonStaticList.remove(self)
-			if self in staticList: staticList.remove(self)
-			self.alive = False
+			# self.respawn()
+			if killer:
+				print("{} dying from {}".format(self.idx(), killer.idx()))
+			else:
+				print("{} dying from no one.".format(self.idx()))
+			try:
+				if camera.panTrack: camera.panTrackSet()
+				if buffer != 0:
+					BUFFER[self].append(False)
+			except NameError:
+				pass
+			self.delete()
+			# if self in particleList:
+			# 	particleList.remove(self)
+			# if self in nonStaticList: nonStaticList.remove(self)
+			# if self in staticList: staticList.remove(self)
+			# self.alive = False
 
 	def contest(self, other):
+		CoM = (other.pos * other.mass + self.pos * self.mass) / (self.mass + other.mass)
 		if self.mass >= other.mass:
 			self.vel = (self.vel.multiply(self.mass).add(other.vel.multiply(other.mass))).multiply(1/(self.mass + other.mass))
 			self.mass += other.mass
 			# Using (mv)_1 + (mv)_2 = (m_1 + m_2)v:
 			self.setRadius()
+			self.pos = CoM
 			other.die(self)
 		else:
 			other.vel = (self.vel.multiply(self.mass).add(other.vel.multiply(other.mass))).multiply(1/(self.mass + other.mass))
 			other.mass += self.mass
 			other.setRadius()
+			other.pos = CoM
 			self.die(other)
 
 	def step(self, delta, camera=None):
+		global particlePosList
+		global particleMassList
+		global particleRadiusList
 		if self.static:
 			self.pos += self.vel * delta# + self.acc * (delta**2 / 2)
 			return False
 
-		oldAcc = self.acc.getClone()
+		# oldAcc = self.acc.getClone()
+		oldmass = self.mass
+		oldradius = self.radius
 		self.acc = vector([0, 0, 0])
 		self.runLoop()
 		if abs(self.radius) > radiusLimit and self.limitRadius:
@@ -274,6 +420,15 @@ class particle:
 
 		self.vel += self.acc * delta
 		self.pos += self.vel * delta
+		idx = self.idx()
+		# print(particlePosList)
+		particlePosList[idx] = self.pos.elements
+		if self.mass != oldmass:
+			particleMassList[idx] = self.mass
+		if self.radius != oldradius:
+			particleRadiusList[idx] = self.radius
+
+
 
 		self.checkOutOfBounds(camera)
 

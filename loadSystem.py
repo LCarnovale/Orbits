@@ -99,7 +99,9 @@ def loadFile(path, length=0, spread=False, key=None, quiet=True):
 		f = open(path, "r")
 		FILE = f.read()
 		f.close()
-
+	except FileNotFoundError:
+		print("Error in loadSystem.py: Unable to find file '{}'".format(path))
+	try:
 		columnNames = None
 		lines = stripComments(FILE)
 

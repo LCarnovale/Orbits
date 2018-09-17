@@ -1081,7 +1081,7 @@ Distance to closest particle: %s
 		global lowestApparentMag
 		global MAX_VISIBILE_MAG
 		global EXPOSURE
-
+		# Work out the panning data
 		delta = self.Delta
 		if pan[0:-1]: self.smoothAcc += 0.01
 		else: self.smoothAcc -= 0.01
@@ -1095,18 +1095,27 @@ Distance to closest particle: %s
 			panAmount = maxPan
 		panRate = panAmount
 
+		# Rotation values
 		if (rotate != [0, 0, 0]):
 			camera.rotate(rotate, rotSpeed)
-		frameStart = time.time()
-		if self.pause == -1 and Buffer.bufferMode != 2: self.Time += delta
 
+		# Start timing the frame
+		frameStart = time.time()
+
+		if self.pause == -1 and Buffer.bufferMode != 2: self.Time += delta
 		doStep = (self.pause == -1 and Buffer.bufferMode != 2)
 
+
+		# Deprecated
 		if (abs(camera.pos) > 1e5):
 			self.commonShiftPos = -camera.pos
+
+		# Draw markers if relevant
 		if DRAW_MARKERS:
 			for m in sorted(markerList, key = lambda x: abs(x.pos - camera.pos), reverse = True):
 				camera.drawParticle(m)
+
+
 		clickTarget = None
 		if (self.clickTarget):
 			clickTarget = self.clickTarget.pop(0)       # Puts the earliest click position in clickTarget
@@ -1115,8 +1124,12 @@ Distance to closest particle: %s
 				pass
 			elif (clickTarget[2] == 1):
 				camera.rotTrackSet()                    # Right click
+
+		# Initialise closest particle variable,
+		# to be set during the main loop.
 		self.closestParticle = None
 
+		# Let the camera perform its step.
 		camera.step((delta if doStep else 0), pan, panAmount)
 		if doStep:
 			if camera.panTrack:
@@ -1127,7 +1140,17 @@ Distance to closest particle: %s
 			camera.panFollow()
 		if camera.rotTrack:
 			camera.rotFollow()
+
+
+		# Initialise popList, particles in this list
+		# after the Main Loop will be removed from the particle list
 		popList = []
+
+		# Particles that collide will be ignored during the mainloop,
+		# go through each collision after the loop and determine the outcome.
+		collisionPairs = []
+		##XXX## MAINLOOP LOOP START ##XXX##
+
 		for I, p  in enumerate(particleList):
 			if (not p.alive and Buffer.bufferMode == BUFFER_NORMAL):
 				popList.append(p)
@@ -1136,7 +1159,9 @@ Distance to closest particle: %s
 			if p.alive:
 				if (I > 0 and (abs(p.pos - camera.pos) > abs(particleList[I - 1].pos - camera.pos))):
 					# Swap the previous one with the current one
-					particleList = particleList[:I - 1] + [particleList[I], particleList[I-1]] + particleList[I + 1:]
+					particleList[I] = particleList[I - 1]
+					particleList[I - 1] = p
+					# particleList = particleList[:I - 1] + [particleList[I], particleList[I-1]] + particleList[I + 1:]
 
 				pWarp = warpedDistance(p)
 				if (self.closestParticle == None):
@@ -1146,13 +1171,14 @@ Distance to closest particle: %s
 
 				if doStep and not (p == camera.panTrack or p == camera.rotTrack):
 					p.step(delta, camera)
+					if p.collisions:
+						collisionPairs.append([p, p.collisions])
 					# This bit is for preset 5, shouldn't be used otherwise
 					if p.mass < 0:
 						p.pos = p.pos.mag(100)
 
 			buff = Buffer.processPosition(p) # Returns something if it wants anything other than the actual particle to be drawn
-			if buff == BUFFER_DONT_DRAW:
-				# if Buffer.bufferMode == BUFFER_PLAY:
+			if buff == BUFFER_DONT_DRAW: # Indicates the particle is no longer alive
 				popList.append(p)
 				continue
 
@@ -1186,9 +1212,25 @@ Distance to closest particle: %s
 						elif (clickBut == 1):
 							# Right click
 							camera.rotTrackSet(p)
+
+
+		##XXX## MAINLOOP LOOP END  ##XXX##
+
+
 		if Buffer.bufferMode == BUFFER_NORMAL:
+			collided = []
+			for c in collisionPairs:
+				primary = c[0]
+				if (primary in collided): continue
+				collided.append(primary)
+				for sec in c[1]:
+					if sec in collided: continue
+					print("Checking collision of {} with {}:".format(primary.idx(), sec.idx()))
+					primary.checkCollision(sec)
+					collided.append(sec)
+
 			for p in popList:
-				particleList.remove(p)
+				p.delete()
 			# popList = []
 
 		if AUTO_EXPOSURE and drawStars:
@@ -1859,6 +1901,8 @@ if preset == "1":
 	MainLoop.addData("Pan speed", "round(panRate, 2)", True)
 	MainLoop.addData("Camera pan lock", "camera.panTrackLock", True)
 	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
+	MainLoop.addDataLine()
+	MainLoop.addData("Particle ID", "MainLoop.target.idx()", True)
 	new = particle(25000, vector(0, dim=3))
 	# print(new.colour)
 
@@ -2076,8 +2120,8 @@ elif preset == "3" or preset == "3.1":
 		MainLoop.addData("Hipparcos catalog id", "MainLoop.target.HIPid", True, "---")
 		if (getStars < 10):
 			STARS_DATA = loadSystem.loadFile("StarsData.txt", key=[
-				"$dist != 100000", 
-				"(\"$proper\" != \"None\") or (\"$bf\" != \"None\") or ($mag < {})".format(getStars)
+				"$dist != 100000",
+				"(\"$proper\" != \"None\") or ($mag < {})".format(getStars)
 			], quiet=False)
 			# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($absmag < {})".format(getStars)], quiet=False)
 		else:
@@ -2092,9 +2136,11 @@ elif preset == "3" or preset == "3.1":
 		nameFile.close()
 		things, adj = names.split("---")
 		things, adj = things.split("\n"), adj.split("\n")
+		things = [x for x in things if x.strip()]
+		adk    = [x for x in adj    if x.strip()]
 		def randomName():
-			global things
-			global adj
+			# global things
+			# global adj
 			return random.sample(adj, 1)[0] + " " + random.sample(things, 1)[0]
 
 
@@ -2280,20 +2326,23 @@ elif preset == "6":
 
 
 if (TRUE_NBODY == False or TRUE_NBODY == "False"):
-	print("Auto-assigning systems...")
+	try:
+		print("Auto-assigning systems...")
 
-	# forces = {}
-	for p1 in particleList:
-		forces = []
-		# Now go through the list a second time and find the accelerations due to each particle
-		for p2 in particleList:
-			if (p1.pos == p2.pos): continue
-			forces.append([p2, abs(p1.calcAcc(p2, True))])
-		# Pick the top few particles attracting p1
-		forces.sort(key=lambda x:x[1], reverse = True)
-		bodies = [x[0] for x in forces[0:min(DEFAULT_SYSTEM_SIZE, len(forces))]]
-		p1.system = bodies
-
+		# forces = {}
+		for p1 in particleList:
+			forces = []
+			# Now go through the list a second time and find the accelerations due to each particle
+			for p2 in particleList:
+				if (p1.pos == p2.pos): continue
+				forces.append([p2, abs(p1.calcAcc(p2, True))])
+			# Pick the top few particles attracting p1
+			forces.sort(key=lambda x:x[1], reverse = True)
+			bodies = [x[0] for x in forces[0:min(DEFAULT_SYSTEM_SIZE, len(forces))]]
+			p1.system = bodies
+	except KeyboardInterrupt:
+		print("Stopping.")
+		exit()
 	# print("Moon system:", ", ".join([x.name for x in planets["Moon"].system]))
 	# print("ISS system:", ", ".join([x.name for x in planets["ISS"].system]))
 	# print("Earth system:", ", ".join([x.name for x in planets["Earth"].system]))
@@ -2466,12 +2515,12 @@ if TestMode:
 						else:
 							print("\nAt time: %s, for %s:" %(timeString(Time), p.name))
 							print("\tShould be at:    %s\twith vel: %s (mag: %s)" % (
-								targetPos.string(format="{:,.2f}"), 
-								targetVel.string(format="{:,.2f}"), 
+								targetPos.string(format="{:,.2f}"),
+								targetVel.string(format="{:,.2f}"),
 								numPrefix(abs(targetVel), "m/s")))
 							print("\tWas actually at: %s\twith vel: %s (mag: %s)" % (
-								p.pos.string(format = "{:,.2f}"), 
-								p.vel.string(format = "{:,.2f}"), 
+								p.pos.string(format = "{:,.2f}"),
+								p.vel.string(format = "{:,.2f}"),
 								numPrefix(abs(p.vel), "m/s")))
 							print("\tOffset by        %s (mag: %s) over %d steps of %lfs, average %s/step or %s" % (
 								(p.pos - targetPos).string(format = "{: ,.2f}"),

@@ -14,6 +14,8 @@
 \usepackage{multicol}
 \usepackage{hyperref}
 
+\usepackage[backend=bibtex,style=verbose-trad1, citestyle=numeric]{biblatex}
+
 
 \newcommand\dd{{2-Dimensional}\xspace}
 \newcommand\ddd{{3-Dimensional}\xspace}
@@ -32,6 +34,8 @@
 \newcommand\yp{y\prime\xspace}
 \newcommand\vp{v\prime\xspace}
 
+\newcommand{\bb}[1]{\mathbf{#1}}
+
 \title{Projecting Spherical Objects onto a 2-Dimensional plane within 3-Dimensional Space}
 
 
@@ -42,20 +46,20 @@
 \section{Scenario}
 
 	\subsection{Introduction}
-	Consider \ddd space containing objects we will define as spheres of any size. Within this space, we will have a point of
-	observation, called the camera. The camera itself is a singular point, however at a fixed distance from the camera, in a direction given by a
-	unit vector $\ru$ , is a \dd plane
-	representing the screen of the computer running the simulation. The location of the camera and each object will be given as a vector:
-	$$P = \begin{pmatrix}x_P\\y_P\\z_P\end{pmatrix}, C = \begin{pmatrix}x_C\\y_C\\z_C\end{pmatrix}, \hat{\mathbf{r}} = \begin{pmatrix}x_r\\y_r\\z_r\end{pmatrix}:|\ru|=1$$
-%	Likewise, the position of an object in space will be given as:
+		Consider \ddd space containing objects we will define as spheres of any size. Within this space, we will have a point of
+		observation, called the camera. The camera itself is a singular point, however at a fixed distance from the camera, in a direction given by a
+		unit vector $\ru$ , is a \dd plane
+		representing the screen of the computer running the simulation. The location of the camera and each object will be given as a vector:
+		$$P = \begin{pmatrix}x_P\\y_P\\z_P\end{pmatrix}, C = \begin{pmatrix}x_C\\y_C\\z_C\end{pmatrix}, \hat{\mathbf{r}} = \begin{pmatrix}x_r\\y_r\\z_r\end{pmatrix}:|\ru|=1$$
+	%	Likewise, the position of an object in space will be given as:
 
 
-	In Figure \ref{fig:proj3d}, the line perpendicular to the plane through C is parallel to $\ru$, and the distance from the camera to the screen will be
-	defined as $S_d$.
+		In Figure \ref{fig:proj3d}, the line perpendicular to the plane through C is parallel to $\ru$, and the distance from the camera to the screen will be
+		defined as $S_d$.
 	\subsection{Projecting spheres onto a plane}
-	Projecting a spherical object onto a \dd plane, if the plane is not perpendicular to the vector between the camera and the object, will produce a conic section, ie, an ellipse. This is essentially the definition of a conic section, the intersection of a \dd plane and a cone extending from the camera at $C$ to the object at $P$, made up of the tangents that join them. 
-See figure \ref{fig:proj3d} for a visualisation.
-Such an ellipse will have certain properties, such always being aligned so that the line through the major axis passes through the centre of the screen, meaning there are three unknowns:
+		Projecting a spherical object onto a \dd plane, if the plane is not perpendicular to the vector between the camera and the object, will produce a conic section, ie, an ellipse. This is essentially the definition of a conic section, the intersection of a \dd plane and a cone extending from the camera at $C$ to the object at $P$, made up of the tangents that join them.
+		See figure \ref{fig:proj3d} for a visualisation.
+		Such an ellipse will have certain properties, such always being aligned so that the line through the major axis passes through the centre of the screen, meaning there are three unknowns:
 	\begin{itemize}
 		\item The length of the minor axis
 		\item The length of the major axis
@@ -65,7 +69,7 @@ Such an ellipse will have certain properties, such always being aligned so that 
 	\begin{figure}
 		\includegraphics[width = 12cm]{Fig1.PNG}
 		\caption{Projection of a sphere onto a \dd plane.}
-		\label{fig:proj3d}	
+		\label{fig:proj3d}
 		\includegraphics[width = 12cm]{Fig2.PNG}
 		\caption{View of the ellipse looking onto the plane (from underneath)}
 		\label{fig:proj2d}
@@ -317,7 +321,7 @@ The leapfrog approach is a more accurate method, and differs from the previous m
 	\mathbf{v}_{i+1/2} &= \mathbf{v}_{i-1/2} + \mathbf{a}_i \Delta t  \\
 	\mathbf{p}_{i+1}    &= \mathbf{p}_i + \mathbf{v}_{i + 1/2} \Delta t
 \end{align*}
-In a parabolic position time scenario, the approximation provides an exact result, with 100\% accuracy. 
+In a parabolic position time scenario, the approximation provides an exact result, with 100\% accuracy.
 In an n-body simulation this is essentially never the case but it is still a good approximation, as shown in the figure.\\
 \begin{center}
 \begin{tikzpicture}
@@ -334,26 +338,67 @@ In an n-body simulation this is essentially never the case but it is still a goo
 	\draw [line width=0.1] (4,0)--(y1);
 	\draw [<->] (1,-0.7) -- (4, -0.7) node [pos=0.5, anchor=north] {h};
 %	\draw [decoration={brace, mirror, raise = 0.5}, decorate] (1, -1) -- (4, -1) node [pos=0.5, anchor=north, yshift=-0.5] {h} ;
-	
+
 \end{tikzpicture}
 \end{center}
 \subsection{Starting the simulation}
-\paragraph{}
-The main difficulty with this method is starting the process, where normally the position and velocities are given at a single instant, not a half step difference.
-To start the simulation, we must offset the velocity using the normal methods shown at the start of the section.
-ie, if $v_0$ and $x_0$ are given, then;
-$$v_{1/2} = v_0 + a_0 \frac{\Delta t}{2}$$
-This makes it difficult to change the time step in the simulation, as the offset at the start is based on the initial time step.
-To do so, we have to first remove the offset between the position and velocity, one way to do this is to first subtract $a_i \frac{\Delta t_0}{2}$ from, then adding $a_i \frac{\Delta t_1}{2}$ to the current $v$, where $\Delta t_0$ and $\Delta t_1$ are the previous and new time steps respectively. 
+	\paragraph{}
+	The main difficulty with this method is starting the process, where normally the position and velocities are given at a single instant, not a half step difference.
+	To start the simulation, we must offset the velocity using the normal methods shown at the start of the section.
+	ie, if $v_0$ and $x_0$ are given, then;
+	$$v_{1/2} = v_0 + a_0 \frac{\Delta t}{2}$$
+	This makes it difficult to change the time step in the simulation, as the offset at the start is based on the initial time step.
+	To do so, we have to first remove the offset between the position and velocity, one way to do this is to first subtract $a_i \frac{\Delta t_0}{2}$ from, then adding $a_i \frac{\Delta t_1}{2}$ to the current $v$, where $\Delta t_0$ and $\Delta t_1$ are the previous and new time steps respectively.
+
+\subsection{Using matrix mathematics to perform faster calculations}
+	Generally using a static n-dimensional array as a matrix will be
+	faster than using a dynamic n-dimensional list. This is especially
+	the case with Numpy's arrays compared to the native python lists.
+
+	To make calculations we require the following arrays to be known at all times:
+	\begin{itemize}
+		\item $\bb P_N \in \mathbb{R}^{N \times 3} \to$ Array of position vectors.
+
+		\item $\bb R \in \mathbb{R^N} \to $ Array of radii of particles.
+
+		\item $\bb M \in \mathbb{R^N} \to $ Array of masses of particles.
+	\end{itemize}
+	Where $N$ is the number of particles. For a calculation such as standard
+	gravitational attraction, we would perform the following particle for each particle.
+	Here the individual particle we are simulating for is as position $\bb P$,
+	with mass $M$ and radius $R$.
+	\begin{align*}
+		\intertext{Find the distance to each other particle:}
+		\bb D_N &= \bb P_N - \{\bb P \} \\
+		\intertext{(The braces indicate the subtraction is for each element in the matrix $\bb P_N$)}
+		\intertext{The absolute distances are given by:}
+		\bb D &= |\bb D_N| = \{|\bb x| \forall \bb x \in \bb D_N \}
+		\intertext{For the force:}
+		\bb F_N &=  G M \odot \bb M \odot (\bb D_N) \oslash (|\bb D|^3) \\
+		\intertext{Where $\odot, \oslash$ are element wise multiply and divide respectively.
+							Also note that cubic power at the right is element wise aswell.}
+		\intertext{Now we sum the forces to get the net force:}
+		\bb F &= \sum_{n = 0}^{N} \bb F_{N_n} \\
+		\intertext{The acceleration is simply derived from $\bb F = m \bb a$, however it
+							would be fine to simply remove the mass of the particle at the start
+							in this case to directly calculate acceleration instead of force.}
+		\intertext{We also want to check for collisions. Lets consider a vector $\bb A$
+							containing the `altitude' of each particle, ie the surface-surface distance.}
+		\bb A &= \bb D - \bb R - \{R\} \\
+		\bb B_\mathrm{collision} &= \{\bb A < 0\}
+		\intertext{Where $\bb B$ is a boolean vector where a value of True indicates that
+								our current particle is colliding with the particle at that index.}
+	\end{align*}
+
 
 \section{Drawing Crescents on Bodies}
-\paragraph{}To draw a crescent on a body, we first imagine drawing a disc that represents the boundary between the surface of the body illuminated and the surface of the body in darkness.
-The radius of this disk is given by:
+	\paragraph{}To draw a crescent on a body, we first imagine drawing a disc that represents the boundary between the surface of the body illuminated and the surface of the body in darkness.
+	The radius of this disk is given by:
 
-$$r = R_2\sqrt{2\left(1 - \cos{2\theta}\right)}$$
-where $\theta$ is given by;
-$$\cos{\theta} = \frac{R_1 - R_2}{d}$$
-where $R_1$ and $R_2$ are the radii of the parent body (eg. the sun) and the child body (eg. the earth) respectively. $d$ is the distance between the centre of each body, as shown in Figure \ref{fig:crescentRadius}.
+	$$r = R_2\sqrt{2\left(1 - \cos{2\theta}\right)}$$
+	where $\theta$ is given by;
+	$$\cos{\theta} = \frac{R_1 - R_2}{d}$$
+	where $R_1$ and $R_2$ are the radii of the parent body (eg. the sun) and the child body (eg. the earth) respectively. $d$ is the distance between the centre of each body, as shown in Figure \ref{fig:crescentRadius}.
 \begin{figure}
 	\includegraphics[width = 14cm]{CrescentRadius.pdf}
 	\caption{A cross section representing the radius of the boundary disc between illuminated and non illuminated surface, the disc is the line of length $2r$, such that r is the radius of that disc.}
