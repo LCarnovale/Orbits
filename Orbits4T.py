@@ -356,9 +356,10 @@ DRAW_MARKERS = args["-mk"][1]
 RELATIVITY_EFFECTS = args["-rel"][1]
 RELATIVITY_SPEED = 0
 
-SCREEN_SETUP = False        # True when the screen is made, to avoid setting it up multiple times
+SCREEN_SETUP  = False        # True when the screen is made, to avoid setting it up multiple times
 LOW_FPS_LIMIT = 0.25         # If the frame rate is below this for two consecutive frames then abort the sim
-
+PAUSE_ON      = 1
+PAUSE_OFF     = -1
 
 MAX_VISIBILE_MAG = 15
 # Camera constants
@@ -1172,6 +1173,8 @@ Distance to closest particle: %s
 				if doStep and not (p == camera.panTrack or p == camera.rotTrack):
 					p.step(delta, camera)
 					if p.collisions:
+						self.target = p
+						if self.pause == -1: pause()
 						collisionPairs.append([p, p.collisions])
 					# This bit is for preset 5, shouldn't be used otherwise
 					if p.mass < 0:
