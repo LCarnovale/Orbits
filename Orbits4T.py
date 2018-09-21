@@ -48,7 +48,7 @@ LINUX = False # If true, then non alphanumeric key controls will be replaced wit
 #    read as a negative number.                                                                                                     #
 #                                                                                                                           #
 ########### PUT DEFAULTS HERE ###############################################################################################
-args = {#   [<type>   <def>	 <Req.Pmtr>  <Def.Pmtr>
+args = {#   [<type>   \/	 <Req.Pmtr>  <Def.Pmtr>
 "-?"  :  [None], # Help.
 "-d"  :     [float,	0.025,	True], # Delta time per step
 "-n"  :     [int,   20,		True], # Particle count
@@ -94,7 +94,6 @@ args = {#   [<type>   <def>	 <Req.Pmtr>  <Def.Pmtr>
 "-PM":      [str,   False,  False, True],  # Enter the preset maker
 "-dbg":     [str,   False,  False, True],  # Enter debug mode. (Frame by frame with command line options)
 "-P?":      [str,   False,  False, True],  # Show available presets and quit
-"-msd":     [str,   False,  False, True], # Show a tool to measure screen depth then exit
 "-AA_OFF":  [str,   True,   False, False]   # Turn off AutoAbort.
 }
 
@@ -169,7 +168,6 @@ Key|Parameter type|Description
 -AA_OFF:            Turn off AutoAbort. (AutoAbort will kill the simulation if two consecutive frames
 						last longer than a second, it's only trying to help you not bring your
 						computer to a standstill, be careful if you choose to abandon it)
--msd :              Bring up a tool to measure a value for screendepth, then exit.
 -? : Enter this help screen then exit
 
 Using the program:
@@ -270,7 +268,6 @@ presetShow              = args["-P?"][1]
 
 TestMode 				= args["-test"][1]
 AUTO_ABORT              = args["-AA_OFF"][1]      # I wouldn't change this unless you know the programs good to go
-MeasureScreenDepth      = args["-msd"][1]
 
 SMART_DRAW_PARAMETER = args["-sdp"][1]     # Approx number of pixels between each point
 
@@ -464,11 +461,6 @@ if TestMode:
 elif presetShow:
 	print("Function not available (since my lazy ass hasn't written it)")
 	pass
-# elif MeasureScreenDepth:
-# 	print("\nEntering screen depth measuring mode...\n")
-# 	time.sleep(1)
-
-
 
 if not AUTO_ABORT:
 	print("Auto abort is off!")
@@ -677,8 +669,8 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	# 	return False
 	return True
 
-def drawLine(pointA, pointB = " ", fill = "black", width = 1):
-	if (type(pointB) == str): # This feels bad but its an easy way to account for numpy arrays
+def drawLine(pointA, pointB = None, fill = "black", width = 1):
+	if (pointB == None):
 		x1, y1 = (0, 0)
 		x2, y2 = pointA
 	else:
@@ -690,35 +682,6 @@ def drawLine(pointA, pointB = " ", fill = "black", width = 1):
 	turtle.goto(x1, y1)
 	turtle.down()
 	turtle.goto(x2, y2)
-	turtle.up()
-
-def drawScreenDepthRuler(screenDepth):
-	# screenDepth is in pixels
-	# Keep the ruler less than 500 pixels long
-	maxLength = 500
-
-	origin = np.array([screenWidth()/2 - 30, screenHeight()/2 - 20])
-	tickAdjust = np.array([0, 5])
-
-	frac = screenDepth / maxLength
-	cutRatio = int(frac) + 1
-	rulerLen = screenDepth * 1.0 / cutRatio
-	rulerAdj = np.array([rulerLen, 0])
-	leftTick = origin - rulerAdj
-
-	drawLine(origin - tickAdjust, origin + tickAdjust, fill = "white")
-	drawLine(origin, leftTick, fill = "white")
-	drawLine(leftTick - tickAdjust, leftTick + tickAdjust, fill = "white")
-
-	textOrigin = (origin[0] - maxLength, origin[1] - 20)
-	turtle.goto(textOrigin)
-	turtle.down()
-	turtle.pencolor("white")
-	if (cutRatio == 1):
-		string = "You should be this distance from the screen centre."
-	else:
-		string = "You should be %d times this distance from the screen centre." % cutRatio
-	turtle.write(string)
 	turtle.up()
 
 # These must be in descending order
@@ -1024,8 +987,6 @@ Distance to closest particle: %s
 			time,
 			distString)
 			#("---" if not self.closestParticle else numPrefix(abs(camera.pos - self.closestParticle.pos), "m"))
-		if (MeasureScreenDepth):
-			drawScreenDepthRuler(camera.screenDepth)
 
 
 		if self.DataDisplay: maxLen = max([len(x[0]) for x in self.DataDisplay])
@@ -1966,7 +1927,7 @@ elif preset == "2.5":
 
 
 
-elif preset == "3" or preset == "3.1":
+elif preset == "3":
 	#############################
 	# Loading this preset will load planets from SolSystem.txt
 	# And, if the relevant argument is used, starts from StarsData.txt
@@ -2126,12 +2087,12 @@ elif preset == "3" or preset == "3.1":
 				"$dist != 100000",
 				"(\"$proper\" != \"None\") or ($mag < {})".format(getStars)
 			], quiet=False)
-			# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($absmag < {})".format(getStars)], quiet=False)
+			# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($mag < {})".format(getStars)], quiet=False)
 		else:
 			# STARS_DATA = loadSystem.loadFile("StarsData.txt", getStars, True, key=["$dist!=100000"], quiet=False)
-			STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$absmag<={}".format(getStars - 20), "$dist != 100000"], quiet=False)
-			# print("Loading named stars...")
-			# STARS_DATA.update(loadSystem.loadFile("StarsData.txt", key=["\"$proper\" != 'None'", "$dist != 100000"], quiet = False))
+			STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist<={}".format(getStars)], quiet=False)
+#			print("Loading named stars...")
+#			STARS_DATA.update(loadSystem.loadFile("StarsData.txt", key=["\"$proper\" != 'None'", "$dist != 100000"], quiet = False))
 
 		# Load names.txt to make random names for stars with no name.
 		nameFile = open("names.txt", "r")
@@ -2216,14 +2177,6 @@ elif preset == "3" or preset == "3.1":
 	camera.panTrackSet(MainLoop.target)
 	clearTarget()
 
-	if preset == "3.1":
-		new = particle(10**32, vector([1, 0, 0]) * 2000 * PARSEC,
-						name = "Bright Ass Star", density=1e3,
-						immune=True, limitRadius = False, colour = "orange")
-		new.info["appmag"] = 0
-		new.info["absmag"] = -100
-		new.info["ci"] = 0.1
-
 	# Fill out tree
 	print("Building parent-child tree...")
 	for p in particleList:
@@ -2248,8 +2201,6 @@ elif preset == "3" or preset == "3.1":
 			else:
 				planetTree[p] = fillDict(p)
 
-
-# elif preset == "3.1":
 
 
 elif preset == "4":
@@ -2297,6 +2248,7 @@ elif preset == "5":
 		window = turtle.Screen()
 		window.setup(width = 1.0, height = 1.0)
 		turtle.bgcolor([0, 0, 0])
+		# turtle.bgcolor("white")
 		turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
 		turtle.hideturtle()
 		SCREEN_SETUP = True
@@ -2314,10 +2266,9 @@ elif preset == "5":
 # preset6
 elif preset == "6":
 	# Lagrange points
-	MASS_INDEX = args["-vm"][1]
 	sep = args["-sep"][1]
-	A = particle(1e5, vector([0, 0,   0]), immune=True)
-	B = particle(10**(MASS_INDEX), vector([0, 0, sep]), immune=True)
+	A = particle(1e7, vector([0, 0,   0]), immune=True)
+	B = particle(1e2, vector([0, 0, sep]), immune=True)
 	B.circularise(A, binary=True, axis = vector([1, 0, 0]))
 	# A.circularise(B, axis=vector([0, -1, 0]))
 	MainLoop.addData("A-B dist", "abs(A.pos - B.pos)", True, "---")
@@ -2384,7 +2335,8 @@ if not TestMode:
 	if not SCREEN_SETUP:
 		window = turtle.Screen()
 		window.setup(width = 1.0, height = 1.0)
-		turtle.bgcolor([0, 0, 0])
+		# turtle.bgcolor([0, 0, 0])
+		turtle.bgcolor("white")
 
 		turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
 		turtle.hideturtle()
@@ -2482,7 +2434,7 @@ if TestMode:
 		testList = []
 		for p in particleList:
 			if (p.name in names):
-				p._respawn = False
+				p.respawn = False
 				testList.append(p)
 		flag = False
 		# We know there is test data because otherwise the program would have exited by now
@@ -2526,7 +2478,7 @@ if TestMode:
 								p.vel.string(format = "{:,.2f}"),
 								numPrefix(abs(p.vel), "m/s")))
 							print("\tOffset by        %s (mag: %s) over %d steps of %lfs, average %s/step or %s" % (
-								(p.pos - targetPos).string(format = "{: ,.2f}"),
+								(p.pos - targetPos).string(2),
 								numPrefix(abs(p.pos - targetPos), "m", 3),
 								stepCounter, (Delta if not tempDelta else tempDelta),
 								numPrefix(abs(p.pos - targetPos) / stepCounter, "m", 3),
@@ -2609,14 +2561,8 @@ while Running:
 		if (int(time.time() - demoTimer) % 15 >= 14) and (camera.panTrackLock):
 			# demoTimer = time.time()
 			camera.panTrackLock = False
-			if args["-rp"][-1]:
+			for i in range(random.randint(1, 10)):
 				cycleTargets()
-				while (MainLoop.target.absmag != None):
-					cycleTargets()
-			else:
-				for i in range(random.randint(1, 10)):
-					cycleTargets()
-
 			goToTarget(lock = True)
 		if (camera.panTrackLock and camera.rotTrackLock):
 			pan[0] = 0.5
