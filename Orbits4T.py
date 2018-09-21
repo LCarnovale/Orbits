@@ -2335,8 +2335,8 @@ if not TestMode:
 	if not SCREEN_SETUP:
 		window = turtle.Screen()
 		window.setup(width = 1.0, height = 1.0)
-		# turtle.bgcolor([0, 0, 0])
-		turtle.bgcolor("white")
+		turtle.bgcolor([0, 0, 0])
+		# turtle.bgcolor("white")
 
 		turtle.tracer(0, 0)             # Makes the turtle's speed instantaneous
 		turtle.hideturtle()
