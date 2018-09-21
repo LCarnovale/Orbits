@@ -17,6 +17,7 @@ radiusLimit    = 250
 ALL_IMMUNE	   = False
 voidRadius 	   = 5000
 CAMERA_UNTRACK_IF_DIE = True
+USE_NUMPY      = True
 
 # G = 6.67408e-11
 G = 1
@@ -283,40 +284,45 @@ class particle:
 			return False
 
 	def runLoop(self):
-		global particleMassList
+		if USE_NUMPY:
+			global particleMassList
 
-		self.collisions = [] # Clear the collision list
+			self.collisions = [] # Clear the collision list
 
-		# if not self.system:
-		pList = particlePosList
-		mList = particleMassList
-		try:
-			mList[pListMap[self]] = 0
-		except IndexError:
-			print("Error: particle's index is invalid")
-			print("self:", self, "\nidx:", self.idx(), "\nalive:", self.alive)
-			exit()
-		dist =  np.array(self.pos) - pList
-		# distAbs = np.linalg.norm(dist, 2, axis)
+			# if not self.system:
+			pList = particlePosList
+			mList = particleMassList
+			try:
+				mList[pListMap[self]] = 0
+			except IndexError:
+				print("Error: particle's index is invalid")
+				print("self:", self, "\nidx:", self.idx(), "\nalive:", self.alive)
+				exit()
+			dist =  np.array(self.pos) - pList
+			# distAbs = np.linalg.norm(dist, 2, axis)
 
-		# Use 1 instead of actual mass to get acceleration instead of Force
-		force, distAbs = particle.forceFuncList(1, mList, dist)
-		alt = distAbs - (particleRadiusList + self.radius)
-		collisions = alt < 0
-		collisions[self.idx()] = False
-		# print(particleMassList[collisions])
-		badAlts = alt[alt < 0]
-		idxs = []
-		if (collisions.any()):
-			idxs = idxList[collisions]
-			# print("Collisions:", self.idx(), [[x,y] for x, y in zip(idxs, badAlts)])
-			[self.collisions.append(orderedList[x]) for x in idxs]
+			# Use 1 instead of actual mass to get acceleration instead of Force
+			force, distAbs = particle.forceFuncList(1, mList, dist)
+			alt = distAbs - (particleRadiusList + self.radius)
+			collisions = alt < 0
+			collisions[self.idx()] = False
+			# print(particleMassList[collisions])
+			badAlts = alt[alt < 0]
+			idxs = []
+			if (collisions.any()):
+				idxs = idxList[collisions]
+				# print("Collisions:", self.idx(), [[x,y] for x, y in zip(idxs, badAlts)])
+				[self.collisions.append(orderedList[x]) for x in idxs]
+			self.acc += vector(force.tolist())
+			# print(force)
+			if not self.system:
+				mList[pListMap[self]] = self.mass
+		else:
 
-
-		# for p in particleList:
-		# 	altDiff = self.radius + p.radius
-		# 	missedCollisions = []
-		# 	if p == self: continue
+			for p in particleList:
+			# 	altDiff = self.radius + p.radius
+			# 	missedCollisions = []
+				if p == self: continue
 		# 	if (abs(p.pos - self.pos) - altDiff) < 0:
 		# 		if p.idx() not in idxs:
 		# 			missedCollisions.append(p.idx())
@@ -328,10 +334,6 @@ class particle:
 		# acc = force / self.mass
 		# print(force)
 		# print("force", force)
-		self.acc += vector(force.tolist())
-		# print(force)
-		if not self.system:
-			mList[pListMap[self]] = self.mass
 
 		# exit()
 		# print(force)

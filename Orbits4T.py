@@ -359,7 +359,7 @@ RELATIVITY_SPEED = 0
 SCREEN_SETUP  = False        # True when the screen is made, to avoid setting it up multiple times
 LOW_FPS_LIMIT = 0.25         # If the frame rate is below this for two consecutive frames then abort the sim
 PAUSE_ON      = 1
-PAUSE_OFF     = -1
+PAUSE_OFF     = -1           # setting MainLoop.pause to one of these will pause or unpause the simulation
 
 MAX_VISIBILE_MAG = 15
 # Camera constants
@@ -377,8 +377,8 @@ DEFAULT_ZERO_VEC = [0, 0, 0]
 DEFAULT_UNIT_VEC = [1, 0, 0]
 
 # Drawing/Visual constants
-MAG_SHIFT  = -1              # All apparent magnitudes are shifted by this amount before being drawn
-MIN_CLICK_RESPONSE_SIZE = 10 # Radius of area (in pixels) around centre of object that can be clicked
+MAG_SHIFT  = 0               # All apparent magnitudes are shifted by this amount before being drawn
+MIN_CLICK_RESPONSE_SIZE = 15 # Radius of area (in pixels) around centre of object that can be clicked
 							 # depending on its size
 MIN_BOX_WIDTH = 50
 COMPLEX_FLARE = args["-cf"][1]
@@ -394,7 +394,6 @@ AUTO_EXPOSURE_STEP_UP = 0.8      # Coeffecient of the log of the current exposur
 AUTO_EXPOSURE_STEP_DN = 0.9     # When decreasing exposure, mimic a 'shock' reaction
 #                               # By going faster down in exposure. (This is close the human eye's behaviour i think)
 
-# AUTO_EXP_BASE = 2             # Increasing this will make the auto exposure 'stronger' (Must be > 1)
 REFERENCE_INTENSITY = 1E-65     # 'R', The intensity of a zero magnitude object. Theoretically in units of W/m^2
 INTENSITY_BASE = 10**(5/2)      # 'C', Intensity of a body = R*C^( - apparent magnitude)
 MIN_VISIBLE_INTENSITY = 4E-70   # Only compared with the intensity after exposure has been applied.
@@ -1944,6 +1943,7 @@ elif preset == "2":
 			forceVec += (p.pos - p2.pos).setMag(Pmodule.G * p.mass * p2.mass / (abs(p.pos - p2.pos)**2))
 		velVec = forceVec.cross(vector([1, 0, 0]))
 		velVec.setMag(sqrt(abs(forceVec.dot(p.pos - COM) / p.mass)))
+		velVec *= 0.7
 		p.vel = velVec
 		# p.circularise([totalMass / 2, COM], axis = vector([0, 1, 0]))
 elif preset == "2.5":
@@ -2258,7 +2258,7 @@ elif preset == "4":
 			colour=[1,0,0], autoColour=False)
 	for i in range(PARTICLE_COUNT):
 		radius = i / (PARTICLE_COUNT - 1) * (PRESET_4_MAX_RADIUS - PRESET_4_MIN_RADIUS) + PRESET_4_MIN_RADIUS
-		particle(variableMass, vector([radius, 0, 0]), density=10)
+		particle(variableMass, vector([radius, 0, 0]), density=10, respawn=False)
 		particleList[-1].circularise(Sun, axis = vector([0, -1, 0]))
 	camera.pos = vector([0, 0, radius])
 	camera.rotTrackSet(Sun)
