@@ -2076,7 +2076,7 @@ elif preset == "3" or preset == "3.1":
 		MainLoop.addData("Hipparcos catalog id", "MainLoop.target.HIPid", True, "---")
 		if (getStars < 10):
 			STARS_DATA = loadSystem.loadFile("StarsData.txt", key=[
-				"$dist != 100000", 
+				"$dist != 100000",
 				"(\"$proper\" != \"None\") or (\"$bf\" != \"None\") or ($mag < {})".format(getStars)
 			], quiet=False)
 			# STARS_DATA = loadSystem.loadFile("StarsData.txt", key=["$dist != 100000", "(\"$proper\" != \"None\") or ($absmag < {})".format(getStars)], quiet=False)
@@ -2274,6 +2274,24 @@ elif preset == "6":
 	MainLoop.addData("A-B dist", "abs(A.pos - B.pos)", True, "---")
 	camera.pos = vector([-3 * sep, 0, 0.5 * sep])
 
+elif preset == "7":
+	Pmodule.particle.forceFunc = Pmodule.magForce
+	step = 2*pi / PARTICLE_COUNT
+	for i in range(PARTICLE_COUNT):
+		angle = i * step
+		# new = particle(variableMass, randomVector(3, 100), respawn=False)
+		new = particle(variableMass, vector([0, 50 * cos(angle), 50 * sin(angle)]), respawn = False)
+		if (angle < pi):
+		# if (i % 2):
+			new.charge = 10
+			new.colour = "blue"
+		else:
+			new.charge = -10
+			new.colour = "red"
+	# MainLoop.target = new
+	camera.pos = vector([-300, 0, 0])
+	MainLoop.addData("Charge", "MainLoop.target.charge", True, "---")
+
 # if not TestMode:
 
 # print("True nbody: {}, supplied: {}".format(TRUE_NBODY, args["-tn"][-1]))
@@ -2466,12 +2484,12 @@ if TestMode:
 						else:
 							print("\nAt time: %s, for %s:" %(timeString(Time), p.name))
 							print("\tShould be at:    %s\twith vel: %s (mag: %s)" % (
-								targetPos.string(format="{:,.2f}"), 
-								targetVel.string(format="{:,.2f}"), 
+								targetPos.string(format="{:,.2f}"),
+								targetVel.string(format="{:,.2f}"),
 								numPrefix(abs(targetVel), "m/s")))
 							print("\tWas actually at: %s\twith vel: %s (mag: %s)" % (
-								p.pos.string(format = "{:,.2f}"), 
-								p.vel.string(format = "{:,.2f}"), 
+								p.pos.string(format = "{:,.2f}"),
+								p.vel.string(format = "{:,.2f}"),
 								numPrefix(abs(p.vel), "m/s")))
 							print("\tOffset by        %s (mag: %s) over %d steps of %lfs, average %s/step or %s" % (
 								(p.pos - targetPos).string(format = "{: ,.2f}"),

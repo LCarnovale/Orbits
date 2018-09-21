@@ -17,6 +17,9 @@ CAMERA_UNTRACK_IF_DIE = True
 
 # G = 6.67408e-11
 G = 1
+# MU_0 = 4e-7 * pi
+MU_0 = 1
+eps_0 = 1e-1
 
 TestMode = False
 R_POWER = 2 # For N-power force function, force is GMm/(r^n)
@@ -41,6 +44,17 @@ def nPowerForce(particleA, particleB):
 	vec = mag * unit(particleB.pos - particleA.pos)
 	return vec
 
+def magForce(A, B):
+	# F = q_A(E + v_A x B) (x is cross product)
+	# E = 1/(4 pi eps_0) * q_B * r / r^3
+	# B = mu_0 /4pi * q_B * v x r / r^3
+	# print("hi")
+	r = A.pos - B.pos
+	dist = abs(r)
+	E = 1 / (eps_0) * B.charge * r / dist**3
+	B = MU_0 * B.charge * B.vel.cross(r) / dist**3
+	F = A.charge * (E + A.vel.cross(B))
+	return F
 
 ### CIRCULARISE FUNCTIONS
 # def gravitationalCircularise(particleA, particleB):
@@ -229,6 +243,15 @@ class particle:
 	def die(self, killer=None):
 		# print("%s dying to %s" % (self.name, killer.name))
 		global particleList
+		if killer:
+			if killer.charge != None:
+				if killer.charge == 0:
+					killer.colour = "white"
+				elif killer.charge < 0:
+					killer.colour = "red"
+				else:
+					killer.colour = "blue"
+
 		if self._respawn:
 			# if CAMERA_UNTRACK_IF_DIE and camera.panTrack == self:
 			# 	camera.panTrackSet(killer)
@@ -253,11 +276,17 @@ class particle:
 			self.mass += other.mass
 			# Using (mv)_1 + (mv)_2 = (m_1 + m_2)v:
 			self.setRadius()
+			if (self.charge != None and other.charge != None):
+				self.charge += other.charge
+				# if (self.charge == 0): self.colour = "white"
 			other.die(self)
 		else:
 			other.vel = (self.vel.multiply(self.mass).add(other.vel.multiply(other.mass))).multiply(1/(self.mass + other.mass))
 			other.mass += self.mass
 			other.setRadius()
+			if (self.charge != None and other.charge != None):
+				other.charge += self.charge
+				# if (other.charge == 0): other.colour = "white"
 			self.die(other)
 
 	def step(self, delta, camera=None):
