@@ -22,6 +22,8 @@ USE_NUMPY      = True
 # G = 6.67408e-11
 G = 1
 
+REFLECTION_COEFF = 1000
+
 TestMode = False
 R_POWER = 2 # For N-power force function, force is GMm/(r^n)
 
@@ -72,9 +74,22 @@ def nPowerForce(particleA, particleB):
 ### CIRCULARISE FUNCTIONS
 # def gravitationalCircularise(particleA, particleB):
 
+# Helper functions
 
-
-
+# # Converts absolute magnitude to apparent
+# # assumes distance is in metres
+# def calcAppMag(absMag, dist):
+# 	PARSEC = 3.085677581e+16
+# 	appMag = 5 * log(dist / (10 * PARSEC), 10)
+# 	return appMag
+#
+# def calcIntensity(absMag, dist):
+# 	REFERENCE_INTENSITY = 1E-65     # 'R', The intensity of a zero magnitude object. Theoretically in units of W/m^2
+# 	INTENSITY_BASE = 10**(5/2)      # 'C', Intensity of a body = R*C^( - apparent magnitude)
+# 	# ^^^ Copied from Orbits4T.py
+# 	appMag = calcAppMag(absMag, dist)
+# 	intensity = REFERENCE_INTENSITY * INTENSITY_BASE**(-appMag)
+# 	return intensity
 
 class particle:
 	def __init__(
@@ -284,6 +299,38 @@ class particle:
 			return False
 
 	def runLoop(self):
+		# check reflector status
+		# if self.name == "Earth":
+		# 	print(">>>", self.parent.name)
+		# 	print("R?>", self.reflector)
+
+		if self.reflector:
+			# incidentIntensity = 0
+			P = self.parent
+			# if self.name == "Earth": print(self.parent.name)
+			while P:
+				if not P.parent and P.absmag:
+					break
+
+				# if P.absmag:
+					incidentIntensity += calcIntensity(P.absmag, abs(self.pos - P.pos))
+				P = P.parent
+			# Assume we are now reflecting everything off of the whole surface
+			if P:
+				absmag = -2.5 * log(REFLECTION_COEFF/4 * (self.radius / abs(self.pos - P.pos))**2) - P.absmag
+				self.info['absmag'] = absmag
+			# captureArea = pi * self.radius**2
+			# luminosity = captureArea * incidentIntensity
+			# if self.name == "Earth": print(luminosity)
+			# if (luminosity > 0):
+			# 	# Math from wikipedia: https://en.wikipedia.org/wiki/Luminosity#Magnitude
+			# 	# absMag = -2.5 * log(luminosity / (3.0128e28), 10)
+			# 	# Note that is technically for bolometric magnitude but who cares
+			# 	self.info["absmag"] = absMag
+			# 	print(self.name, self.absmag)
+			# else:
+			# 	pass
+
 		if USE_NUMPY:
 			global particleMassList
 

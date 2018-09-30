@@ -329,8 +329,13 @@ SUN_RADIUS   = 695.7e6
 # Random Planet Settings
 MIN_PERIOD = 20  * DAY
 MAX_PERIOD = 150 * YEAR
+MIN_MOON_PERIOD = 10 * DAY
+MAX_MOON_PERIOD = 100 * DAY
 MAX_PLANET_COUNT = 12
 MIN_PLANET_COUNT = 1
+MAX_MOON_COUNT   = 15
+MIN_MOON_COUNT   = 0
+MOON_OCCURANCE_ORDER = 3 # Number of moons generated using: int(<rand between 0 and 1> ^ <occurance order>)
 
 # Buffer constants
 BUFFER_NORMAL = 0
@@ -404,7 +409,7 @@ FLARE_RAD_EXP = 1.5
 FLARE_BASE = 1e6             # Scales the size of the flares
 FLARE_POLY_POINTS = 20
 FLARE_POLY_MAX_POINTS = 100
-MIN_RMAG = 0.01             # min 'brightness' of the rings in a flare. Might need to differ across machines.
+MIN_RMAG = 0.05             # min 'brightness' of the rings in a flare. Might need to differ across machines.
   # Diffraction variables
 DIFF_SPIKES = args["-dfs"][1]
 PRIMARY_WAVELENGTH = 600E-9  # Average wavelength of light from stars. in m.
@@ -583,10 +588,18 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	else:
 		points = ellipsePoints
 	points = min(points, MAX_POINTS)
-	localX = major/2
-	localY = 0
-	screenX = localX * cos(angle) - localY * sin(angle)
-	screenY = localY * cos(angle) + localX * sin(angle)
+	# localX = major/2
+	# localY = 0
+	# coordAngle is the 'cartesian plane' angle of the centre of the oval
+	coordAngle = (0 if x == 0 else atan(y / x))
+	if (x < 0 and y < 0):
+		coordAngle -= pi # Make negative
+	elif x < 0:
+		coordAngle += pi # Make positive
+
+
+	# screenX = localX * cos(angle) - localY * sin(angle)
+	# screenY = localY * cos(angle) + localX * sin(angle)
 
 	flareWidth = 0
 	if (mag != None): mag += MAG_SHIFT
@@ -602,8 +615,11 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 		# Assume that each sucessive maximum is 1/50th (AIRY_RATIO) the intensity of
 		# the previous
 		intensity = EXPOSURE * getIntensity(mag)
+		if (intensity == 0.0): return
 		tempDiffRadius = DIFFRACTION_RADIUS
+		# if (points < 2): return
 		flareWidth = (AIRY_COEFF * log(MIN_VISIBLE_INTENSITY / intensity)) * tempDiffRadius
+
 
 		if (lowestApparentMag == None):
 			lowestApparentMag = mag
@@ -625,22 +641,82 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 		turtle.up()
 	if flareWidth < 0: return False
 	if (points > 2):
-		turtle.up()
-		turtle.goto(x + screenX, y + screenY)
-		turtle.begin_fill()
-		turtle.fillcolor(fill)
-		onScreen = True
-		Drawn = False
 		screenRadius = camera.screenRadius
+		# Assuming that the angle puts the major axs through
+		# the screen centre we can clip points that are outside
+		# of the screen:
 		centreRadius = (x**2 + y**2)**(1/2)
+		X = centreRadius - screenRadius
+		if (X <= -major or points < 10):
+			# The whole ellipse is on screen.
+			# or the thing is small anyway
+			clipAngle = -pi/2
+		elif (X >= major):
+			# The whole ellipse is probably off the screen
+			return
+		else:
+			# Do some quik mafs:
+			Y = minor/major * sqrt(major**2 - X**2)
+			cosTheta = Y / sqrt(X**2 + Y**2)
+			clipAngle = -acos(cosTheta)
+			# 'clipAngle' gives the angle from the minor axis
+			# that the perimeter clips the screens radius
+			# +pi/2 ==> the centre end of the perimeter is
+			#        just touching the screen radius
+			#        (so the whole thing is probably out of view)
+			# -pi/2 ==> the outer end is just touching,
+            #        ie, almost all of it will be in view.
+
+		turtle.up()
+		# turtle.goto(x + screenX, y + screenY)
+		# coordSign = 1 if coordAngle == 0 else coordAngle / abs(coordAngle)
+		# start = (
+		# 	# x - cos(coordAngle) * major/2 - sin(coordAngle) * minor/2,
+		# 	# y - sin(coordAngle) * minor/2 + sin(coordAngle) * major/2
+		# 	x - 1 * major/2 * cos(coordAngle),
+		# 	y - 1 * major/2 * sin(coordAngle)
+		# )
+
+		# Shifts an xy pair relative to major-minor axes
+		# to the x-y axes of the screen, returns the new xy pair relative
+		# to the centre of the oval and the screen x-y plane
+		def localShift(angle):
+			# coordAngle -= pi
+			locX = major/2 * cos(angle)
+			locY = minor/2 * sin(angle)
+			shiftX = locX * cos(coordAngle-pi) - locY * sin(coordAngle-pi)
+			shiftY = locY * cos(coordAngle-pi) + locX * sin(coordAngle-pi)
+			return np.array([shiftX, shiftY])
+
+		turtle.fillcolor(fill)
+		# onScreen = True
+		# Drawn = False
+		# draw between <angle> and <pi - angle>
+		clipAngle = pi/2 - clipAngle
+		centre = np.array([x, y])
+		start = centre + localShift(clipAngle)
+		turtle.goto(*start)
+		turtle.begin_fill()
+		# turtle.dot(15)
+		# start = int(- clipAngle / (2*pi) * points)
+		# end =   int(  clipAngle / (2*pi) * points)
+		# start = -int(points/2)
+		# end   =  int(points/2)
 		start = 0
-		end = points
+		end   = points
+		# maxAngle =
 		for i in range(start, end):
-			localX = major/2 * cos(2 * pi * i / points)
-			localY = minor/2 * sin(2 * pi * i / points)
-			screenX = localX * cos(angle) - localY * sin(angle)
-			screenY = localY * cos(angle) + localX * sin(angle)
-			turtle.goto(x + screenX, y + screenY)
+			# if (i == start): turtle.dot(10)
+			tempAngle = 2*((points / 2) - i)/points * clipAngle
+			point = centre + localShift(tempAngle)
+			turtle.goto(*point)
+			# localX = major/2 * cos(clipAngle * i / points)
+			# localY = minor/2 * sin(clipAngle * i / points)
+			# screenX = localX * cos(angle) - localY * sin(angle)
+			# screenY = localY * cos(angle) + localX * sin(angle)
+
+			# turtle.goto(x + screenX, y + screenY)
+			# if (i == start): turtle.dot(5)
 		turtle.end_fill()
 
 	if (drawStars):
@@ -665,6 +741,7 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 			turtle.pencolor([x * scale for x in fill])
 			if not DIFF_SPIKES: turtle.dot((r) + minor)
 			else: polyDot(r + minor, fill = [x * scale for x in fill])
+			# drawOval(x, y, major + r, minor + r, angle, fill = [x * scale for x in fill])
 	# else:
 	# 	return False
 	return True
@@ -999,13 +1076,13 @@ Distance to closest particle: %s
 			if (data[1]):
 				try:
 					value = eval(data[2])
-				# except KeyError:
-				# 	value = "KEY_ERROR"
-				# except NameError:
-				# 	value = "NAME_ERROR"
-				# except ValueError:
-				# 	value = "VALERROR"
-				except Exception:
+				except KeyError:
+					value = "'KEY-ERROR'"
+				except NameError:
+					value = "'NAME-ERROR'"
+				except ValueError:
+					value = "'VALUE-ERROR'"
+				except:
 					value = data[3]
 			else:
 				value = data[2]
@@ -1854,10 +1931,10 @@ setup()
 Running = True
 Buffer = buffer()
 
-if preset == "1":
+if preset == "1" or preset == "1.1":
 	if (not args["-tn"][-1]):
 		TRUE_NBODY = True
-
+	reflection = (preset == "1.1")
 	# for i in range(10):
 	# 	particle(50 + i*20, vector([50, 100 - 10*i, 0]))
 	# Cloud of particles orbiting a big thing
@@ -1866,7 +1943,11 @@ if preset == "1":
 	MainLoop.addData("Camera rot lock", "camera.rotTrackLock", True)
 	MainLoop.addDataLine()
 	MainLoop.addData("Particle ID", "MainLoop.target.idx()", True)
-	new = particle(25000, vector(0, dim=3))
+	sun = particle(25000, vector(0, dim=3))
+	if reflection:
+		sun.info['absmag'] = 35
+		Pmodule.REFLECTION_COEFF = 1e-13
+		EXPOSURE = 0.1
 	# print(new.colour)
 
 	for i in range(PARTICLE_COUNT):
@@ -1874,7 +1955,9 @@ if preset == "1":
 			position=randomVector(3, 50, 400).makeOrthogonal(vector([random.random()*0.2, 1, random.random()*0.2])),
 			colour = [random.random(), random.random(), random.random()],
 		autoColour=False, respawn=False )
-		new.circularise(particleList[0], axis=vector([0, 1, 0]))
+		new.circularise(sun, axis=vector([0, 1, 0]))
+		new.info['parent'] = sun
+		if reflection: new.info['reflector'] = True
 
 	camera.pos = vector([camera.screenDepth, 0, 0])
 	camera.pointAt(vector(0, dim=3))
@@ -1941,6 +2024,7 @@ elif preset == "3":
 	#   - Parents are stored as objects! under:
 	#         Particle.info["parent"] = <particle object>
 	if (not args["-G"][-1]): Pmodule.G = REAL_G
+	Pmodule.REFLECTION_COEFF = 1e4
 
 	if (not args["-sf"][-1]): smoothFollow = 0.04
 
@@ -2005,7 +2089,10 @@ elif preset == "3":
 						colour=(colours[planetName] if planetName in colours else [0.5, 0.5, 0.5]),
 						limitRadius=False, name=planetName)
 			new.info["appmag"] = 0
-			if data["ABSMAG"]: new.info["absmag"] = data["ABSMAG"]
+			if data["ABSMAG"]:
+				new.info["absmag"] = data["ABSMAG"]
+			else:
+				new.info["reflector"] = True
 			if data["PARENT"]: new.info["parent"] = data["PARENT"]
 
 			planetList.append(new)
@@ -2143,14 +2230,16 @@ elif preset == "3":
 			systemChoice = planetList[-len(STARS_DATA)+1::int(1/randomPlanets)]
 			EarthMass = 5.97e24
 			density   = 5.51e+3 # Also Earth's density
+			periodToRadiusCoeff = (Pmodule.G / 4 * pi**2) ** (1/3) # Multiply by system mass and period^2 both raised again to (1/3) to get radius
 			for system in systemChoice:
 				# system is a particle
 				systemAxis = randomVector(3, 10)
 				system.static = False
 				Pmodule.nonStaticList.append(system)
 				dbgCounter = 0
-				maxRadius = (Pmodule.G * system.mass * MAX_PERIOD**2 / 4 * pi**2) ** (1/3)
-				minRadius = (Pmodule.G * system.mass * MIN_PERIOD**2 / 4 * pi**2) ** (1/3)
+				moonCounter = 0
+				maxRadius = periodToRadiusCoeff * (system.mass * MAX_PERIOD**2) ** (1/3)
+				minRadius = periodToRadiusCoeff * (system.mass * MIN_PERIOD**2) ** (1/3)
 				planetCount = ( int( random.random() * (MAX_PLANET_COUNT - MIN_PLANET_COUNT) ) + MIN_PLANET_COUNT)
 				for i in range(planetCount):
 					dbgCounter += 1
@@ -2164,11 +2253,42 @@ elif preset == "3":
 						system.vel,
 						immune = True, colour = [random.random() for i in range(3)], autoColour=False,
 						density = (random.random() + 0.5)*density, limitRadius = False,
-						name = "%s - %d"%(system.name, i))
+						name = "%s - %d"%(system.name, i+1))
 					new.circularise(system, axis = systemAxis + randomVector(3, 0, 2))
 					new.info["parent"] = system
+					new.info["reflector"] = True
 					planetList.append(new)
-				print("Making system for %s. %d planets made." % (system.name, dbgCounter))
+					# make moons:
+					moonCount = ( int( random.random()**MOON_OCCURANCE_ORDER *
+					             (MAX_MOON_COUNT - MIN_MOON_COUNT) ) + MIN_MOON_COUNT)
+					if moonCount:
+						planetAxis = randomVector(3, 10)
+						moonMinRadius = periodToRadiusCoeff * (newMass * MIN_MOON_PERIOD**2)**(1/3)
+						moonMaxRadius = periodToRadiusCoeff * (newMass * MAX_MOON_PERIOD**2)**(1/3)
+
+					for m in range(moonCount):
+						moonCounter += 1
+						radius = random.random()**2 * (moonMaxRadius - moonMinRadius) + moonMinRadius
+						newMoonMass = 1e-2 * newMass * 10**(((random.random()-.5)*2)**3 * 2)
+						moonPos = randomVector(3, radius).makeOrthogonal(planetAxis + randomVector(3, 0, 3))
+						moonPos += newPos
+						newMoon = particle(
+							newMoonMass,
+							moonPos,
+							new.vel, # The parent planets velocity
+							immune = True,
+							colour = [random.random() for i in range(3)], autoColour=False,
+							density = (random.random() + 0.5)*new.density,
+							limitRadius = False, name = "%s.%d" % (new.name, m+1)
+						)
+						newMoon.circularise(new, axis = planetAxis + randomVector(3, 0, 2))
+						relVel = newMoon.vel - new.vel
+						newMoon.vel = new.vel + (random.random()**4 + 1) * relVel
+						newMoon.info["parent"] = new
+						newMoon.info["reflector"] = True
+
+
+				print("Making system for %s. %d planets with %d moons made." % (system.name, dbgCounter, moonCounter))
 					# MainLoop.target = new
 
 	search(args["-ir"][1], listen=False)
@@ -2203,14 +2323,22 @@ elif preset == "3":
 
 
 
-elif preset == "4":
+elif preset == "4" or preset == "4.1":
 	# defaultDensity = 10
+	reflection = (preset == "4.1")
 	Sun = particle(300000, vector([0, 0, 0]), density=10, name="Sun",
 			colour=[1,0,0], autoColour=False)
+	if reflection:
+		Sun.info['absmag'] = 50
+		Pmodule.REFLECTION_COEFF = 1e-13
+
 	for i in range(PARTICLE_COUNT):
 		radius = i / (PARTICLE_COUNT - 1) * (PRESET_4_MAX_RADIUS - PRESET_4_MIN_RADIUS) + PRESET_4_MIN_RADIUS
-		particle(variableMass, vector([radius, 0, 0]), density=10, respawn=False)
-		particleList[-1].circularise(Sun, axis = vector([0, -1, 0]))
+		new = particle(variableMass, vector([radius, 0, 0]), density=10, respawn=False)
+		new.circularise(Sun, axis = vector([0, -1, 0]))
+		if reflection:
+			new.info['reflector'] = True
+			new.info['parent'] = Sun
 	camera.pos = vector([0, 0, radius])
 	camera.rotTrackSet(Sun)
 
