@@ -325,6 +325,7 @@ EARTH_MASS   = 5.97e24   # These are all the actual values, not simulated.
 EARTH_RADIUS = 6.371e6
 SUN_MASS     = 1.989e30
 SUN_RADIUS   = 695.7e6
+SOL_LUM      = 3.827e+26 # Watts
 
 # Random Planet Settings
 MIN_PERIOD = 20  * DAY
@@ -386,43 +387,50 @@ MIN_BOX_WIDTH = 50
 COMPLEX_FLARE = args["-cf"][1]
 SHOW_SCREENDEPTH = True
 
+MAX_RINGS = 80 # Maximum number of rings to draw to create a flare
 
 # Exposure options
 EXPOSURE = 1                 # The width of the flares are multiplied by this
-EXP_COEFF = 400
+# EXP_COEFF = 400
 MAX_EXPOSURE = 1e20
 AUTO_EXPOSURE = args["-ae"][1]
-AUTO_EXPOSURE_STEP_UP = 0.8      # Coeffecient of the log of the current exposure to step up and down
+AUTO_EXPOSURE_STEP_UP = 0.2      # Coeffecient of the log of the current exposure to step up and down
 AUTO_EXPOSURE_STEP_DN = 0.9     # When decreasing exposure, mimic a 'shock' reaction
 #                               # By going faster down in exposure. (This is close the human eye's behaviour i think)
 
-REFERENCE_INTENSITY = 1E-65     # 'R', The intensity of a zero magnitude object. Theoretically in units of W/m^2
+REFERENCE_INTENSITY = 4e-7     # 'R', The intensity of a zero magnitude object. Theoretically in units of W/m^2
 INTENSITY_BASE = 10**(5/2)      # 'C', Intensity of a body = R*C^( - apparent magnitude)
 MIN_VISIBLE_INTENSITY = 4E-70   # Only compared with the intensity after exposure has been applied.
   # Auto Exposure Profile:
-REFERENCE_EXPOSURE = 3e6        # Exposure when looking at a zero-mag object
+REFERENCE_EXPOSURE = 1e6        # Exposure when looking at a zero-mag object
 EXPOSURE_POWER = 1.3            # AutoExposure = REF_EXP * e^(EXP_PWR*Magnitude)
 AUTO_EXP_BASE = e**EXPOSURE_POWER
 
 # Flare options
-FLARE_RAD_EXP = 1.5
-FLARE_BASE = 1e6             # Scales the size of the flares
+# FLARE_RAD_EXP = 1.5
+FLARE_BASE = 5e5             # Scales the size of the flares
 FLARE_POLY_POINTS = 20
 FLARE_POLY_MAX_POINTS = 100
-MIN_RMAG = 0.05             # min 'brightness' of the rings in a flare. Might need to differ across machines.
+MIN_RMAG = 0.01             # min 'brightness' of the rings in a flare. Might need to differ across machines.
   # Diffraction variables
 DIFF_SPIKES = args["-dfs"][1]
 PRIMARY_WAVELENGTH = 600E-9  # Average wavelength of light from stars. in m.
-FOCAL_LENGTH = 2E-2          # Focal length of the 'eyeball' in the camera
+FOCAL_LENGTH = 5e-3           # Focal length of the 'eyeball' in the camera
 PUPIL_WIDTH_FACTOR = 0.01   # This multiplied by the exposure gives the width of the pupil in calculations
-AIRY_RATIO = 1/50            # The ratio of the intensity between successive maximums in an airy disk
+AIRY_RATIO = 1/10            # The ratio of the intensity between successive maximums in an airy disk
   # Not user defined, don't change these. Computed now to save time later
 AIRY_COEFF = 1 / log(AIRY_RATIO)
-DIFFRACTION_RADIUS = 2.4 * FLARE_BASE * FOCAL_LENGTH * PRIMARY_WAVELENGTH / ( PUPIL_WIDTH_FACTOR )
+DIFFRACTION_RADIUS = FLARE_BASE * FOCAL_LENGTH * PRIMARY_WAVELENGTH / ( PUPIL_WIDTH_FACTOR )
+# DIFFRACTION_RADIUS is the radius of the first order light ring,
+# with a brightness of AIRY_RATIO * the centre brightness, and so on for each ring
+# The flare will extend for all the rings that are above the minimum light intensity
 
+# COMFORTABLE_INTENSITY
 currentDisplay = ""          # Holds the last data shown on screen incase of an auto-abort
 lowestApparentMag = None     # The lowest apparent mag of an object on screen, used for auto exposure
+totalIncidentIntensity = 0   # The total intensity of light falling on the camera in each frame
 
+fullFlareBuffer = []
 ## Load presets
 inBuiltPresets = ["1", "2", "3", "4", "5"]
 if (preset not in inBuiltPresets or presetShow):
@@ -570,17 +578,23 @@ def polyDot(radius, fill=None, x=None, y=None):
 # I = R * B^(-m)
 def getIntensity(apparentMag):
 	# global REFERENCE_INTENSITY
+
 	return REFERENCE_INTENSITY * INTENSITY_BASE**(-apparentMag)
 
 # m = log_B(R / I)
 def intensityToMag(intensity, exposure=1):
 	# global REFERENCE_INTENSITY
+
+	if (intensity == 0 or exposure == 0):
+		return 100
 	return log(REFERENCE_INTENSITY / (intensity / exposure)) / log(INTENSITY_BASE)
 
-def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = None):
+# def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = None):
+def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, intensity = None):
 	global ellipsePoints
 	global drawStars
 	global lowestApparentMag
+	global totalIncidentIntensity
 	global FLARE_POLY_POINTS
 	if SMART_DRAW:
 		perimApprox = 2*pi*sqrt((major**2 + minor**2) / 2)
@@ -602,33 +616,43 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 	# screenY = localY * cos(angle) + localX * sin(angle)
 
 	flareWidth = 0
-	if (mag != None): mag += MAG_SHIFT
-	if (mag != None):
+	centre = np.array([x, y])
+
+	# if (mag != None): mag += MAG_SHIFT
+	if (intensity != None):
 		# This uses Rayleigh Criterion to determine the width of the diffraction 'flare'
 		# ie, an 'Airy disk'. Using this it is then sufficient to set the intensity
 		# of the centre to 100%, and the edge of the disk to 0%, and then have a linear
 		# slope through the radius.
 
+		# Rayleigh Criterion:
+		# sin(x) = 1.22 lambda / d
+		# x: angle from centre to first dark fringe
+		# d: diameter of aperture
+		# AIRY_COEFF is 1/log(AIRY_RATIO) so the log below becomes log base AIRY_RATIO
+
 		# Generally the middle ring about x = 0 will be the only one visible, however when
 		# the camera is close to very bright lights further maximums will be visible and overlap
-		# (since we wouldn't be working with a point source).
-		# Assume that each sucessive maximum is 1/50th (AIRY_RATIO) the intensity of
+		# (since we wouldn't be working with a point source for very bright sources).
+		# Assume that each sucessive maximum is (AIRY_RATIO) the intensity of
 		# the previous
-		intensity = EXPOSURE * getIntensity(mag)
-		if (intensity == 0.0): return
-		tempDiffRadius = DIFFRACTION_RADIUS
+		# intensity = EXPOSURE * getIntensity(mag)
+		if (intensity == 0.0): return False
+		tempDiffRadius = DIFFRACTION_RADIUS * intensity
 		# if (points < 2): return
-		flareWidth = (AIRY_COEFF * log(MIN_VISIBLE_INTENSITY / intensity)) * tempDiffRadius
 
+		flareWidth = (AIRY_COEFF * log(MIN_VISIBLE_INTENSITY / intensity)) * tempDiffRadius #* intensity
+		# print(flareWidth)
 
-		if (lowestApparentMag == None):
-			lowestApparentMag = mag
-		elif (lowestApparentMag and mag < lowestApparentMag):
-			lowestApparentMag = mag
-	elif (points <= 2 and mag == None):
+		# if (lowestApparentMag == None):
+		# 	lowestApparentMag = mag
+		# elif (lowestApparentMag and mag < lowestApparentMag):
+		# 	lowestApparentMag = mag
+	elif (points <= 2 and intensity == None):
 		fill = [1, 1, 1]
 
 	if box:
+		# box 'inner' radius, ie half the width of a side
 		boxRadius = max(MIN_BOX_WIDTH, major * 1.4 + flareWidth) / 2
 		turtle.up()
 		turtle.pencolor([1, 1, 1])
@@ -638,8 +662,10 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 		turtle.goto(x + boxRadius, y + boxRadius)
 		turtle.goto(x + boxRadius, y - boxRadius)
 		turtle.goto(x - boxRadius, y - boxRadius)
-		turtle.up()
+		turtle.up() #Draw the box
+
 	if flareWidth < 0: return False
+
 	if (points > 2):
 		screenRadius = camera.screenRadius
 		# Assuming that the angle puts the major axs through
@@ -668,14 +694,7 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
             #        ie, almost all of it will be in view.
 
 		turtle.up()
-		# turtle.goto(x + screenX, y + screenY)
-		# coordSign = 1 if coordAngle == 0 else coordAngle / abs(coordAngle)
-		# start = (
-		# 	# x - cos(coordAngle) * major/2 - sin(coordAngle) * minor/2,
-		# 	# y - sin(coordAngle) * minor/2 + sin(coordAngle) * major/2
-		# 	x - 1 * major/2 * cos(coordAngle),
-		# 	y - 1 * major/2 * sin(coordAngle)
-		# )
+
 
 		# Shifts an xy pair relative to major-minor axes
 		# to the x-y axes of the screen, returns the new xy pair relative
@@ -693,15 +712,10 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 		# Drawn = False
 		# draw between <angle> and <pi - angle>
 		clipAngle = pi/2 - clipAngle
-		centre = np.array([x, y])
 		start = centre + localShift(clipAngle)
 		turtle.goto(*start)
 		turtle.begin_fill()
-		# turtle.dot(15)
-		# start = int(- clipAngle / (2*pi) * points)
-		# end =   int(  clipAngle / (2*pi) * points)
-		# start = -int(points/2)
-		# end   =  int(points/2)
+
 		start = 0
 		end   = points
 		# maxAngle =
@@ -710,20 +724,14 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 			tempAngle = 2*((points / 2) - i)/points * clipAngle
 			point = centre + localShift(tempAngle)
 			turtle.goto(*point)
-			# localX = major/2 * cos(clipAngle * i / points)
-			# localY = minor/2 * sin(clipAngle * i / points)
-			# screenX = localX * cos(angle) - localY * sin(angle)
-			# screenY = localY * cos(angle) + localX * sin(angle)
 
-			# turtle.goto(x + screenX, y + screenY)
-			# if (i == start): turtle.dot(5)
-		turtle.end_fill()
+		turtle.end_fill() # Draw the oval:
 
 	if (drawStars):
 		turtle.up()
 		turtle.goto(x, y)
 		turtle.pencolor(fill)
-		if (mag == None):
+		if (intensity == None):
 			if (points < 2):
 				turtle.dot(2)
 			return True
@@ -733,17 +741,34 @@ def drawOval(x, y, major, minor, angle, fill = [0, 0, 0], box = False, mag = Non
 			M = max(fill)
 			fill = [x * 1/M for x in fill]
 
-		for r in range(int(flareWidth), 0, -1):
+		flareBuffer = [centre]
+
+		if flareWidth > MAX_RINGS:
+			step = -flareWidth / MAX_RINGS
+		else:
+			step = -1
+		# for r in range(int(flareWidth), 0, step):
+		r = flareWidth
+		while (r > 0):
 			# Ir: Intensity at radius 'r' (Scaled so that 0 is the minimum threshold)
 			# Ir = intensity * (1 - r / flareWidth)
 			scale = (1 - r / flareWidth) ** 2
-			if (scale < MIN_RMAG): continue
-			turtle.pencolor([x * scale for x in fill])
-			if not DIFF_SPIKES: turtle.dot((r) + minor)
-			else: polyDot(r + minor, fill = [x * scale for x in fill])
+			if (scale < MIN_RMAG):
+				r += step
+				continue
+			if not DIFF_SPIKES:
+				# turtle.pencolor([x * scale for x in fill])
+				# turtle.dot((r) + minor)
+				flareBuffer.append([r + major, [x * scale for x in fill]])
+			else:
+				polydot(r + major, [x * scale for x in fill])
 			# drawOval(x, y, major + r, minor + r, angle, fill = [x * scale for x in fill])
+			r += step
+		global fullFlareBuffer
+		fullFlareBuffer.append(flareBuffer)
 	# else:
 	# 	return False
+		totalIncidentIntensity += intensity
 	return True
 
 def drawLine(pointA, pointB = None, fill = "black", width = 1):
@@ -808,6 +833,9 @@ def radiusTerm(radius):
 		return ("%.5e Solar radii" % (radius / SUN_RADIUS))
 	else:
 		return ("%.5e Earth radii" % (radius / EARTH_RADIUS))
+
+def lumTerm(luminosity):
+	return ("%.5e Solar Luminosity" % (luminosity / SOL_LUM))
 
 # Fill's a nested dictionary. Really designed only for use with
 # the planet-child tree
@@ -1015,9 +1043,12 @@ class MainLoop:
 		self.smoothAcc = 0 # Used mainly for relativity stuff
 
 	def Zero(self):
+		global totalIncidentIntensity
 		self.commonShiftPos = DEFAULT_ZERO_VEC
 		self.commonShiftVel = DEFAULT_ZERO_VEC
 		self.commonRotate = DEFAULT_ZERO_VEC
+		totalIncidentIntensity = 0
+
 
 	def setDelta(self, delta):
 		for p in particleList:
@@ -1118,6 +1149,7 @@ Distance to closest particle: %s
 		global panRate
 		global lowestApparentMag
 		global MAX_VISIBILE_MAG
+		global totalIncidentIntensity
 		global EXPOSURE
 		# Work out the panning data
 		delta = self.Delta
@@ -1276,21 +1308,79 @@ Distance to closest particle: %s
 		if AUTO_EXPOSURE and drawStars:
 			# print("LAM:", lowestApparentMag, "Exposure:", EXPOSURE, end="")
 			# GreatestIntensity = getIntensity(lowestApparentMag)
-			if lowestApparentMag != None: targetExp = REFERENCE_EXPOSURE * AUTO_EXP_BASE ** lowestApparentMag
+			lowestApparentMag = intensityToMag(totalIncidentIntensity)
+			# if lowestApparentMag != None: targetExp = REFERENCE_EXPOSURE * AUTO_EXP_BASE ** lowestApparentMag
+			if totalIncidentIntensity:
+				netRawIntensity = totalIncidentIntensity / EXPOSURE
+				targetExp = (
+					REFERENCE_INTENSITY / netRawIntensity * REFERENCE_EXPOSURE
+				)
 			else: targetExp = min(1.1 * EXPOSURE, MAX_EXPOSURE)
 
 			# if targetExp < EXPOSURE_MIN: targetExp = EXPOSURE_MIN
 			# elif targetExp > MAX_EXPOSURE: targetExp = MAX_EXPOSURE
-			expStep = (targetExp - EXPOSURE)
-			if    (expStep > 0): expStep = EXPOSURE / (1 - AUTO_EXPOSURE_STEP_UP)
-			elif  (expStep < 0): expStep = -EXPOSURE * (AUTO_EXPOSURE_STEP_DN)
+			# expStep = (targetExp - EXPOSURE)
+			expGreater = (targetExp > EXPOSURE)
+			if    (expGreater): expStep = EXPOSURE / (1 - AUTO_EXPOSURE_STEP_UP)
+			else:               expStep = -EXPOSURE * (AUTO_EXPOSURE_STEP_DN)
+			# if    (expStep > 0): expStep /= (1 - AUTO_EXPOSURE_STEP_UP)
+			# elif  (expStep < 0): expStep *= (AUTO_EXPOSURE_STEP_DN)
 			if (abs(EXPOSURE - targetExp) <= abs(expStep)):
 				EXPOSURE = targetExp
 			else:
 				EXPOSURE += expStep
-			lowestApparentMag = None
+			# EXPOSURE += expStep
+			# lowestApparentMag = None
 			MAX_VISIBILE_MAG = intensityToMag(MIN_VISIBLE_INTENSITY, EXPOSURE)
 			# print(" ->", EXPOSURE, "Target:", targetExp)
+
+		global fullFlareBuffer
+		if drawStars and fullFlareBuffer:
+			# Draw the flares
+			loop = True
+			i = 1
+			turtle.up()
+			# fullFlareBuffer.reverse()
+			finalFlares = [[] for x in fullFlareBuffer]
+			while loop:
+				loop = False
+				for j, flare in enumerate(fullFlareBuffer):
+					# if len(flare) == i + 1:
+					# 	finalFlares[j] = ([flare[0], flare[i][0], flare[i][1]])
+					# 	continue
+					# elif len(flare) <= i:
+					# 	continue
+					# else:
+					# 	loop = True
+					if (i + 1 == len(flare)):
+						# This is the last ring
+						finalFlares[j] = [flare[0], flare[i][0], flare[i][1]]
+						continue
+					elif (i     >= len(flare)):
+						# We are past the end of the rings
+						continue
+					else:
+						# We have yet to reach the last ring
+						loop = True
+
+					centre = flare[0]
+					radius = flare[i][0]
+					fill   = flare[i][1]
+					turtle.goto(*centre)
+					turtle.pencolor(fill)
+					turtle.dot(radius)
+					# polyDot(radius, fill, *centre)
+				i += 1
+			for flare in finalFlares:
+				if not flare: continue
+				centre = flare[0]
+				radius = flare[1]
+				fill   = flare[2]
+				turtle.goto(*centre)
+				turtle.pencolor(fill)
+				turtle.dot(radius)
+			fullFlareBuffer = []
+
 
 
 		frameEnd = time.time()
@@ -1448,6 +1538,7 @@ class camera:
 	# 	converted from the particles m/s to m/step for the camera, simply by
 	# 	multiplying the velocity in m/s by the time step (delta)
 	def step(self, delta, pan=[0, 0, 0], panRate=1):
+		# global totalIncidentIntensity
 		if (self.screenRadius == 0): self.screenRadius = (screenWidth()**2 + screenHeight()**2)**(1/2)
 		panShift = (pan[0] * self.screenXaxis +
 					pan[1] * self.screenYaxis +
@@ -1471,6 +1562,8 @@ class camera:
 			self.vel *= 1 / (self.speedParameter) * panRate
 			# time travelled will be a bit more as observed by a stationary observer
 		self.pos += self.vel
+
+		# if totalIncidentIntensity
 		# if (self.vel):
 		#
 		# 	self.TransformMatrix = Matrix([[]])
@@ -1552,19 +1645,35 @@ class camera:
 			pos = particle[0]
 			radius = particle[1]
 			colour = particle[2]
+			intensity = None
 		else:
-			appMag = particle.absmag
-			if (appMag != None):
-				appMag += 5 * log(abs(particle.pos - self.pos) / (10 * PARSEC), 10)
-				particle.info["appmag"] = appMag
+			pos = particle.pos
+			radius = particle.radius
+			colour = particle.colour
+			dist   = abs(pos - self.pos)
+			absMag = particle.absmag
+			lum    = particle.lum
+			if (absMag != None):
+				appMag = absMag + 5 * log(dist / (10 * PARSEC), 10)
+				particle.info['appmag'] = appMag
 				if (lowestApparentMag == None or appMag < lowestApparentMag):
 					newLow = True
 				if (appMag > MAX_VISIBILE_MAG):
 					if newLow: MAX_VISIBILE_MAG = appMag
 					return False
-			pos = particle.pos
-			radius = particle.radius
-			colour = particle.colour
+			if (lum != None):
+				rawIntensity = lum / (4 * pi * dist**2)
+			# elif (appMag != None):
+				# print("here")
+				# rawIntensity = getIntensity(appMag)
+			else:
+				rawIntensity = None
+
+			if (rawIntensity != None):
+				intensity = (EXPOSURE * rawIntensity)
+				# print("here1")
+			else:
+				intensity = None
 		# Get relative position to camera's position.
 		relPosition = pos - self.pos
 
@@ -1584,7 +1693,7 @@ class camera:
 		if (distance < radius):
 			# and this one
 			return False
-		elif (distance > MAX_DRAW_DIST and appMag == None):
+		elif (distance > MAX_DRAW_DIST and intensity == None):
 			return False
 
 		ScreenParticleDistance = self.screenDepth * abs(relPosition) * abs(self.rot) / (relPosition.dot(self.rot))
@@ -1616,7 +1725,7 @@ class camera:
 			angle = 0
 		else:
 			angle = pi/2
-		drawOval(X, Y, majorAxis, minorAxis, angle, colour, box, mag=(appMag if not drawAt else None))
+		drawOval(X, Y, majorAxis, minorAxis, angle, colour, box, intensity=(intensity if not drawAt else None))
 		return [X, Y, majorAxis, minorAxis]
 
 	def drawAt(self, posVector, radius, colour = None, box=False):
@@ -1785,6 +1894,8 @@ def downScreenDepth():
 def upMaxMag():
 	global REFERENCE_EXPOSURE
 	global EXPOSURE
+	global FLARE_BASE
+	FLARE_BASE *= 1.1
 	# global MAX_VISIBILE_MAG
 	# MAX_VISIBILE_MAG += 0.1
 	REFERENCE_EXPOSURE *= 1.1
@@ -1793,6 +1904,8 @@ def upMaxMag():
 def downMaxMag():
 	global REFERENCE_EXPOSURE
 	global EXPOSURE
+	global FLARE_BASE
+	FLARE_BASE /= 1.1
 	# global MAX_VISIBILE_MAG
 	# MAX_VISIBILE_MAG -= 0.1
 	REFERENCE_EXPOSURE /= 1.1
@@ -2024,7 +2137,7 @@ elif preset == "3":
 	#   - Parents are stored as objects! under:
 	#         Particle.info["parent"] = <particle object>
 	if (not args["-G"][-1]): Pmodule.G = REAL_G
-	Pmodule.REFLECTION_COEFF = 1e4
+	Pmodule.REFLECTION_COEFF = 1e-30
 
 	if (not args["-sf"][-1]): smoothFollow = 0.04
 
@@ -2052,8 +2165,9 @@ elif preset == "3":
 	print("Loading planets...")
 	Data = loadSystem.loadFile(DATA_FILE)
 	MainLoop.addDataLine()
-	if drawStars:
-		MainLoop.addData("Exposure", "round(EXPOSURE, 4)", True)
+	if drawStars or getStars:
+		MainLoop.addData("Exposure       ", "'%.4e' % EXPOSURE", True, "---")
+		MainLoop.addData("Total intensity", "'%.4e' % totalIncidentIntensity", True, "---")
 		MainLoop.addDataLine()
 	MainLoop.addData("Selected target", "MainLoop.target.name", True, "None")
 	MainLoop.addData("Mass", "'%.5e'%(MainLoop.target.mass) + 'kg \t(' + massTerm(MainLoop.target.mass) + ')'", True, "---")
@@ -2089,6 +2203,8 @@ elif preset == "3":
 						colour=(colours[planetName] if planetName in colours else [0.5, 0.5, 0.5]),
 						limitRadius=False, name=planetName)
 			new.info["appmag"] = 0
+			if data["LUM"]:
+				new.info["lum"] = data["LUM"] * SOL_LUM
 			if data["ABSMAG"]:
 				new.info["absmag"] = data["ABSMAG"]
 			else:
@@ -2106,9 +2222,9 @@ elif preset == "3":
 	# MainLoop.target = planets["Earth"]
 	if "Phobos" in planets:
 		planets["Phobos"].immune = False # Screw you phobos
-	MainLoop.addData("Absolute Magnitude", "MainLoop.target.info['absmag']", True, "---")
-	MainLoop.addData("Apparent Magnitude", "round(MainLoop.target.info['appmag'],2)", True, "---")
-
+	MainLoop.addData("Absolute Magnitude", "MainLoop.target.absmag", True, "---")
+	MainLoop.addData("Apparent Magnitude", "round(MainLoop.target.appmag, 2)", True, "---")
+	MainLoop.addData("Luminosity        ", "lumTerm(MainLoop.target.lum)", True, "---")
 	if args["-sr"][1]:
 		# Make saturnian rings
 		objectCount = args["-sr"][1]
@@ -2214,6 +2330,7 @@ elif preset == "3":
 			planetList.append(new)
 			new.info["appmag"] = 0
 			new.info["absmag"] = STAR["absmag"]
+			new.info["lum"]    = STAR["lum"] * SOL_LUM
 			new.info["mag"] = STAR["mag"]
 			new.info["ID"] = STAR_key
 			new.info["HIPid"] = "None" if not STAR["hip"] else int(STAR["hip"])

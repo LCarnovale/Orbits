@@ -258,10 +258,17 @@ class particle:
 
 
 	def __getattr__(self, attr):
+		if (attr == 'info'):
+			return self.info
 		if (attr in self.info):
 			return self.info[attr]
 		else:
 			return None
+
+	# def __setattr__(self, attr, val):
+	# 	self.info[attr] = val
+	# 	return self[attr]
+
 	def setColour(self, colour=None):
 		if self.autoColour:
 			self.colour = [min(self.radius/radiusLimit, 1), 0, min(1, (0 if (radiusLimit < self.radius) else (radiusLimit - self.radius)/radiusLimit))]
@@ -305,21 +312,23 @@ class particle:
 		# 	print("R?>", self.reflector)
 
 		if self.reflector:
-			# incidentIntensity = 0
+			incidentIntensity = 0
 			P = self.parent
 			# if self.name == "Earth": print(self.parent.name)
 			while P:
-				if not P.parent and P.absmag:
-					break
+				if P.lum:
+					# break
+					incidentIntensity += P.lum / (4 * pi * abs(P.pos - self.pos)**2)
 
 				# if P.absmag:
-					incidentIntensity += calcIntensity(P.absmag, abs(self.pos - P.pos))
 				P = P.parent
 			# Assume we are now reflecting everything off of the whole surface
-			if P:
-				absmag = -2.5 * log(REFLECTION_COEFF/4 * (self.radius / abs(self.pos - P.pos))**2) - P.absmag
-				self.info['absmag'] = absmag
-			# captureArea = pi * self.radius**2
+			# absmag = -2.5 * log(REFLECTION_COEFF/4 * (self.radius / abs(self.pos - P.pos))**2) - P.absmag
+			captureArea = pi * self.radius**2
+			surfArea = 4 * captureArea
+			reflected = REFLECTION_COEFF * captureArea * incidentIntensity
+			self.info['lum'] = reflected
+			# self.info['absmag'] = absmag
 			# luminosity = captureArea * incidentIntensity
 			# if self.name == "Earth": print(luminosity)
 			# if (luminosity > 0):
