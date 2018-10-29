@@ -251,7 +251,7 @@ def loadFile(path, length=0, spread=False, key=None, quiet=True):
 			else:
 				rowCounter += 1
 				if COUNT and not quiet:
-					print("\rItem count: {}, id: {}                ".format(rowCounter, row[0]), end = "")
+					print("Item count: {}, id: {}".format(rowCounter, row[0]), end = "\r")
 					sys.stdout.flush()
 				if AUTO_ID:
 					data[rowCounter] = newRow
